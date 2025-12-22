@@ -1,0 +1,11 @@
+{
+  "dependencies": ["."],
+  "graphs": {
+    "deep_research": "./src/agent/graph.py:agent"
+  },
+  "env": ".env",
+  "auth": {
+    "path": "./src/security/auth.py:auth"
+  }
+}
+
