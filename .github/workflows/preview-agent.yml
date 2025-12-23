@@ -1,0 +1,90 @@
+name: Preview Agent Deployment
+
+on:
+  pull_request:
+    paths:
+      - 'apps/agent/**'
+
+env:
+  LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
+
+jobs:
+  preview:
+    name: Deploy Preview to LangSmith
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/agent
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Install LangGraph CLI
+        run: uv pip install langgraph-cli
+
+      - name: Deploy Preview to LangSmith
+        id: deploy
+        run: |
+          # Deploy with a unique revision name for this PR
+          REVISION_NAME="pr-${{ github.event.pull_request.number }}"
+          
+          uv run langgraph deploy \
+            --config langgraph.json \
+            --revision "$REVISION_NAME" \
+            --wait \
+            2>&1 | tee deploy_output.txt
+          
+          # Try to extract the deployment URL from output
+          DEPLOY_URL=$(grep -oP 'https://[^\s]+\.langgraph\.app' deploy_output.txt | head -1 || echo "")
+          echo "deploy_url=$DEPLOY_URL" >> $GITHUB_OUTPUT
+        env:
+          LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
+
+      - name: Comment on PR
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const deployUrl = '${{ steps.deploy.outputs.deploy_url }}' || 'Check LangSmith dashboard';
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## 🤖 Agent Preview Deployed
+              
+              | Resource | URL |
+              |----------|-----|
+              | **Agent Preview** | ${deployUrl} |
+              | **LangSmith Dashboard** | [View Deployments](https://smith.langchain.com/o/${{ secrets.LANGSMITH_WORKSPACE_ID }}/deployments) |
+              
+              **Revision:** \`pr-${{ github.event.pull_request.number }}\`
+              
+              Test this preview by updating your frontend URL params:
+              \`\`\`
+              ?apiUrl=${deployUrl}&assistantId=deep_research
+              \`\`\`
+              `
+            })
+
+  cleanup:
+    name: Cleanup Preview on PR Close
+    runs-on: ubuntu-latest
+    if: github.event.action == 'closed'
+    steps:
+      - name: Note about cleanup
+        run: |
+          echo "PR closed - preview revision pr-${{ github.event.pull_request.number }} can be cleaned up manually in LangSmith"
+          echo "LangSmith doesn't currently support automatic revision deletion via CLI"
+
