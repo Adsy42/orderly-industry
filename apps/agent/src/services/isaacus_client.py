@@ -100,28 +100,31 @@ class IsaacusClient:
     async def embed(
         self,
         texts: list[str],
-        model: str = "legal-embed-v1",
+        model: str = "kanon-2-embedder",
     ) -> list[list[float]]:
         """Generate embeddings for texts.
 
         Uses legal-optimized embedding model for better semantic
         understanding of Australian legal documents.
 
+        API docs: https://docs.isaacus.com/api-reference/embeddings
+
         Args:
             texts: List of text strings to embed
-            model: Embedding model to use
+            model: Embedding model to use (default: kanon-2-embedder)
 
         Returns:
             List of embedding vectors (1536 dimensions each)
         """
         response = await self._request(
             "POST",
-            "/embed",
+            "/v1/embeddings",
             json_data={
-                "texts": texts,
+                "texts": texts,  # Isaacus uses 'texts' field
                 "model": model,
             },
         )
+        # Isaacus returns { embeddings: [[...], [...], ...] }
         return response.get("embeddings", [])
 
     async def rerank(

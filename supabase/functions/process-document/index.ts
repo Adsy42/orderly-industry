@@ -181,50 +181,78 @@ function chunkText(text: string): string[] {
 }
 
 // Call Isaacus API to generate embeddings with retry logic
+// API docs: https://docs.isaacus.com/api-reference/embeddings
 async function generateEmbeddings(
   texts: string[],
   isaacusApiKey: string,
   isaacusBaseUrl: string,
 ): Promise<number[][]> {
-  let lastError: Error | null = null;
+  const allEmbeddings: number[][] = [];
+  
+  // Isaacus API uses /v1/embeddings endpoint (plural, with v1 prefix)
+  const endpoint = `${isaacusBaseUrl}/v1/embeddings`;
+  console.log(`Calling Isaacus API: ${endpoint} for ${texts.length} chunks`);
 
-  for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-    try {
-      const response = await fetch(`${isaacusBaseUrl}/embed`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${isaacusApiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          texts,
-          model: "legal-embed-v1",
-        }),
-      });
+  // Process in smaller batches to avoid token limits
+  const BATCH_SIZE = 5;
+  
+  for (let batchStart = 0; batchStart < texts.length; batchStart += BATCH_SIZE) {
+    const batch = texts.slice(batchStart, batchStart + BATCH_SIZE);
+    let lastError: Error | null = null;
+    
+    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
+      try {
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${isaacusApiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            texts: batch, // Isaacus uses 'texts' field
+            model: "kanon-2-embedder",
+          }),
+        });
 
-      if (!response.ok) {
-        throw new Error(
-          `Isaacus API error: ${response.status} ${response.statusText}`,
+        if (!response.ok) {
+          const errorText = await response.text();
+          console.error(`Isaacus API error response: ${errorText}`);
+          throw new Error(
+            `Isaacus API error: ${response.status} - ${errorText}`,
+          );
+        }
+
+        const data = await response.json();
+        console.log(`Isaacus response keys: ${Object.keys(data).join(', ')}`);
+        // Isaacus returns { embeddings: [[...], [...], ...] } or { data: [{ embedding: [...] }, ...] }
+        let batchEmbeddings: number[][];
+        if (data.embeddings) {
+          batchEmbeddings = data.embeddings;
+        } else if (data.data) {
+          batchEmbeddings = data.data.map((item: { embedding: number[] }) => item.embedding);
+        } else {
+          throw new Error(`Unexpected Isaacus response format: ${JSON.stringify(data).slice(0, 200)}`);
+        }
+        allEmbeddings.push(...batchEmbeddings);
+        break; // Success, move to next batch
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        console.warn(
+          `Embedding batch ${batchStart / BATCH_SIZE + 1} attempt ${attempt + 1} failed: ${lastError.message}`,
         );
-      }
 
-      const data = await response.json();
-      return data.embeddings;
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error));
-      console.warn(
-        `Embedding attempt ${attempt + 1} failed: ${lastError.message}`,
-      );
-
-      if (attempt < MAX_RETRIES - 1) {
-        await new Promise((resolve) =>
-          setTimeout(resolve, Math.pow(2, attempt) * 1000),
-        );
+        if (attempt < MAX_RETRIES - 1) {
+          await new Promise((resolve) =>
+            setTimeout(resolve, Math.pow(2, attempt) * 1000),
+          );
+        } else {
+          throw lastError;
+        }
       }
     }
   }
 
-  throw lastError || new Error("Failed to generate embeddings after retries");
+  return allEmbeddings;
 }
 
 // Store embeddings in database
