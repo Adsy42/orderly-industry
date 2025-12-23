@@ -1,26 +1,26 @@
 """Agent tools for document analysis using Isaacus Legal AI."""
 
+from .isaacus_classify import (
+    DEFAULT_CLAUSE_TYPES,
+    ISAACUS_CLASSIFY_TOOL,
+    ClassifiedClause,
+    IsaacusClassifyInput,
+    IsaacusClassifyOutput,
+    isaacus_classify,
+)
+from .isaacus_extract import (
+    ISAACUS_EXTRACT_TOOL,
+    Citation,
+    IsaacusExtractInput,
+    IsaacusExtractOutput,
+    isaacus_extract,
+)
 from .isaacus_search import (
-    isaacus_search,
     ISAACUS_SEARCH_TOOL,
     IsaacusSearchInput,
     IsaacusSearchOutput,
     SearchResult,
-)
-from .isaacus_extract import (
-    isaacus_extract,
-    ISAACUS_EXTRACT_TOOL,
-    IsaacusExtractInput,
-    IsaacusExtractOutput,
-    Citation,
-)
-from .isaacus_classify import (
-    isaacus_classify,
-    ISAACUS_CLASSIFY_TOOL,
-    IsaacusClassifyInput,
-    IsaacusClassifyOutput,
-    ClassifiedClause,
-    DEFAULT_CLAUSE_TYPES,
+    isaacus_search,
 )
 
 __all__ = [

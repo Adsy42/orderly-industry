@@ -64,7 +64,7 @@ When no information is found:
 
 class DocumentAgentConfig:
     """Configuration for the Document Agent subagent."""
-    
+
     name: str = "document_agent"
     description: str = """
 Specialist agent for analyzing and searching matter documents.
@@ -75,16 +75,16 @@ Delegate to this agent when users ask about:
 - Analyzing contracts or legal documents
 - Searching for provisions, definitions, or obligations
 """
-    
+
     system_instructions: str = DOCUMENT_AGENT_INSTRUCTIONS
-    
+
     # Tools this agent has access to
     tools: list[str] = [
         "isaacus_search",
         "isaacus_extract",
         "isaacus_classify",
     ]
-    
+
     # Agent capabilities for orchestrator decision-making
     capabilities: dict[str, Any] = {
         "document_search": True,
@@ -96,11 +96,11 @@ Delegate to this agent when users ask about:
 
 def create_document_agent_prompt(matter_id: str, matter_title: str) -> str:
     """Create a contextualized prompt for the Document Agent.
-    
+
     Args:
         matter_id: The UUID of the current matter.
         matter_title: The title of the matter for context.
-        
+
     Returns:
         The full system prompt with matter context.
     """
@@ -117,4 +117,3 @@ All tool calls should use this matter_id unless otherwise specified.
 
 # Export for agent registration
 DOCUMENT_AGENT = DocumentAgentConfig()
-

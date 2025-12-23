@@ -1,7 +1,8 @@
 """Isaacus extractive QA tool for precise answer extraction with citations."""
 
 import os
-from typing import Optional, List
+from typing import List, Optional
+
 from pydantic import BaseModel, Field
 
 from ..services.isaacus_client import IsaacusClient
@@ -33,7 +34,9 @@ class IsaacusExtractInput(BaseModel):
 class IsaacusExtractOutput(BaseModel):
     """Output schema for the isaacus_extract tool."""
 
-    answer: str = Field(description="The extracted answer or 'Not found' if no answer could be extracted")
+    answer: str = Field(
+        description="The extracted answer or 'Not found' if no answer could be extracted"
+    )
     confidence: float = Field(
         default=0.0,
         description="Confidence score for the answer (0-1)",
@@ -57,20 +60,20 @@ async def isaacus_extract(
 ) -> IsaacusExtractOutput:
     """
     Extract a precise answer from matter documents with citations.
-    
+
     This tool uses Isaacus extractive QA models to find and extract the exact
     answer to a question from legal documents, along with citations showing
     where the answer was found.
-    
+
     Args:
         matter_id: The UUID of the matter to search within.
         question: A specific question to answer from the documents.
         document_ids: Optional list of specific document IDs to search.
         supabase_client: Supabase client (injected by agent context).
-        
+
     Returns:
         IsaacusExtractOutput with the answer, confidence, and citations.
-        
+
     Example:
         >>> result = await isaacus_extract(
         ...     matter_id="uuid-here",
@@ -79,7 +82,7 @@ async def isaacus_extract(
     """
     api_key = os.getenv("ISAACUS_API_KEY")
     base_url = os.getenv("ISAACUS_BASE_URL", "https://api.isaacus.com")
-    
+
     if not api_key:
         return IsaacusExtractOutput(
             answer="Unable to process: API not configured",
@@ -88,9 +91,9 @@ async def isaacus_extract(
             question=question,
             found=False,
         )
-    
+
     client = IsaacusClient(api_key=api_key, base_url=base_url)
-    
+
     try:
         # First, perform a semantic search to find relevant chunks
         embeddings = await client.embed([question])
@@ -102,9 +105,9 @@ async def isaacus_extract(
                 question=question,
                 found=False,
             )
-        
+
         query_embedding = embeddings[0]
-        
+
         # Get relevant chunks from the database
         if supabase_client is None:
             return IsaacusExtractOutput(
@@ -114,7 +117,7 @@ async def isaacus_extract(
                 question=question,
                 found=False,
             )
-        
+
         response = await supabase_client.rpc(
             "match_document_embeddings",
             {
@@ -124,7 +127,7 @@ async def isaacus_extract(
                 "match_count": 10,
             },
         ).execute()
-        
+
         if not response.data:
             return IsaacusExtractOutput(
                 answer="Not found in the documents",
@@ -133,12 +136,12 @@ async def isaacus_extract(
                 question=question,
                 found=False,
             )
-        
+
         # Filter by document_ids if provided
         chunks = response.data
         if document_ids:
             chunks = [c for c in chunks if c["document_id"] in document_ids]
-        
+
         if not chunks:
             return IsaacusExtractOutput(
                 answer="Not found in the specified documents",
@@ -147,39 +150,47 @@ async def isaacus_extract(
                 question=question,
                 found=False,
             )
-        
+
         # Combine relevant chunks into context
-        context = "\n\n---\n\n".join([
-            f"[From: {chunk['filename']}]\n{chunk['chunk_text']}"
-            for chunk in chunks[:5]  # Limit context size
-        ])
-        
+        context = "\n\n---\n\n".join(
+            [
+                f"[From: {chunk['filename']}]\n{chunk['chunk_text']}"
+                for chunk in chunks[:5]  # Limit context size
+            ]
+        )
+
         # Use Isaacus extract to get the answer
         result = await client.extract(question=question, context=context)
-        
+
         if result and result.get("answer"):
             # Find which chunk contains the answer
             answer_text = result["answer"]
             citations = []
-            
+
             for chunk in chunks[:5]:
                 if answer_text.lower() in chunk["chunk_text"].lower():
-                    citations.append(Citation(
-                        document_id=chunk["document_id"],
-                        filename=chunk["filename"],
-                        text_excerpt=chunk["chunk_text"][:500],  # Truncate for brevity
-                        position=f"Chunk {chunk.get('chunk_index', 'N/A')}",
-                    ))
-            
+                    citations.append(
+                        Citation(
+                            document_id=chunk["document_id"],
+                            filename=chunk["filename"],
+                            text_excerpt=chunk["chunk_text"][
+                                :500
+                            ],  # Truncate for brevity
+                            position=f"Chunk {chunk.get('chunk_index', 'N/A')}",
+                        )
+                    )
+
             # If no exact match, cite the top result
             if not citations and chunks:
-                citations.append(Citation(
-                    document_id=chunks[0]["document_id"],
-                    filename=chunks[0]["filename"],
-                    text_excerpt=chunks[0]["chunk_text"][:500],
-                    position=f"Chunk {chunks[0].get('chunk_index', 'N/A')}",
-                ))
-            
+                citations.append(
+                    Citation(
+                        document_id=chunks[0]["document_id"],
+                        filename=chunks[0]["filename"],
+                        text_excerpt=chunks[0]["chunk_text"][:500],
+                        position=f"Chunk {chunks[0].get('chunk_index', 'N/A')}",
+                    )
+                )
+
             return IsaacusExtractOutput(
                 answer=answer_text,
                 confidence=result.get("confidence", 0.8),
@@ -187,7 +198,7 @@ async def isaacus_extract(
                 question=question,
                 found=True,
             )
-        
+
         return IsaacusExtractOutput(
             answer="Not found in the documents",
             confidence=0.0,
@@ -195,7 +206,7 @@ async def isaacus_extract(
             question=question,
             found=False,
         )
-        
+
     except Exception as e:
         print(f"Isaacus extract error: {e}")
         return IsaacusExtractOutput(
@@ -223,4 +234,3 @@ Best for: "What is the termination notice period?", "Who are the parties?",
     "input_schema": IsaacusExtractInput,
     "func": isaacus_extract,
 }
-

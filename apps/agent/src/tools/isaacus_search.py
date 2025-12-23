@@ -1,7 +1,8 @@
 """Isaacus semantic search tool for document queries within matters."""
 
 import os
-from typing import List, Optional
+from typing import List
+
 from pydantic import BaseModel, Field
 
 from ..services.isaacus_client import IsaacusClient
@@ -59,20 +60,20 @@ async def isaacus_search(
 ) -> IsaacusSearchOutput:
     """
     Search for relevant document chunks within a matter using semantic similarity.
-    
+
     This tool uses Isaacus embedding models optimized for Australian legal documents
     to find the most relevant passages matching a natural language query.
-    
+
     Args:
         matter_id: The UUID of the matter to search within.
         query: A natural language question or search query.
         max_results: Maximum number of results to return (1-20).
         threshold: Minimum similarity score (0-1) for results.
         supabase_client: Supabase client (injected by agent context).
-        
+
     Returns:
         IsaacusSearchOutput with matching document chunks and their sources.
-        
+
     Example:
         >>> results = await isaacus_search(
         ...     matter_id="uuid-here",
@@ -83,7 +84,7 @@ async def isaacus_search(
     # Initialize Isaacus client
     api_key = os.getenv("ISAACUS_API_KEY")
     base_url = os.getenv("ISAACUS_BASE_URL", "https://api.isaacus.com")
-    
+
     if not api_key:
         return IsaacusSearchOutput(
             results=[],
@@ -91,9 +92,9 @@ async def isaacus_search(
             query=query,
             matter_id=matter_id,
         )
-    
+
     client = IsaacusClient(api_key=api_key, base_url=base_url)
-    
+
     try:
         # Generate embedding for the query
         embeddings = await client.embed([query])
@@ -104,9 +105,9 @@ async def isaacus_search(
                 query=query,
                 matter_id=matter_id,
             )
-        
+
         query_embedding = embeddings[0]
-        
+
         # Call the Supabase RPC function to find similar documents
         if supabase_client is None:
             # Fallback - should be injected by agent context
@@ -116,7 +117,7 @@ async def isaacus_search(
                 query=query,
                 matter_id=matter_id,
             )
-        
+
         response = await supabase_client.rpc(
             "match_document_embeddings",
             {
@@ -126,7 +127,7 @@ async def isaacus_search(
                 "match_count": max_results,
             },
         ).execute()
-        
+
         if response.data:
             results = [
                 SearchResult(
@@ -137,21 +138,21 @@ async def isaacus_search(
                 )
                 for row in response.data
             ]
-            
+
             return IsaacusSearchOutput(
                 results=results,
                 total_found=len(results),
                 query=query,
                 matter_id=matter_id,
             )
-        
+
         return IsaacusSearchOutput(
             results=[],
             total_found=0,
             query=query,
             matter_id=matter_id,
         )
-        
+
     except Exception as e:
         # Log error but don't expose internal details
         print(f"Isaacus search error: {e}")
@@ -178,4 +179,3 @@ Returns ranked results with document names, excerpts, and similarity scores.
     "input_schema": IsaacusSearchInput,
     "func": isaacus_search,
 }
-

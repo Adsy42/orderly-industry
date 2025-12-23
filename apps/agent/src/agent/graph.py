@@ -17,8 +17,8 @@ from src.agent.prompts import (
     SUBAGENT_DELEGATION_INSTRUCTIONS,
 )
 from src.agent.tools import tavily_search, think_tool
+from src.agents.document_agent import DOCUMENT_AGENT_INSTRUCTIONS
 from src.tools import ISAACUS_TOOLS
-from src.agents.document_agent import DOCUMENT_AGENT, DOCUMENT_AGENT_INSTRUCTIONS
 
 # Limits
 max_concurrent_research_units = 3

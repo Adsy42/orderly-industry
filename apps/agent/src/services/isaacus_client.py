@@ -228,4 +228,3 @@ class IsaacusClient:
     async def __aexit__(self, *args: Any) -> None:
         """Async context manager exit."""
         await self.close()
-

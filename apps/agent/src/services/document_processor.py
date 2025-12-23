@@ -218,4 +218,3 @@ class DocumentProcessor:
             chunks.append(current.strip())
 
         return chunks
-
