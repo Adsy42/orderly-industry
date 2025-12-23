@@ -2,6 +2,7 @@ name: Preview Agent Deployment
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, closed]
     paths:
       - 'apps/agent/**'
 
@@ -12,6 +13,7 @@ jobs:
   preview:
     name: Deploy Preview to LangSmith
     runs-on: ubuntu-latest
+    if: github.event.action != 'closed'
     defaults:
       run:
         working-directory: apps/agent
@@ -37,20 +39,50 @@ jobs:
       - name: Deploy Preview to LangSmith
         id: deploy
         run: |
+          set -e
+          
           # Deploy with a unique revision name for this PR
           REVISION_NAME="pr-${{ github.event.pull_request.number }}"
+          echo "🚀 Deploying revision: $REVISION_NAME"
           
-          uv run langgraph deploy \
+          # Run deployment and capture output
+          if uv run langgraph deploy \
             --config langgraph.json \
             --revision "$REVISION_NAME" \
             --wait \
-            2>&1 | tee deploy_output.txt
+            2>&1 | tee deploy_output.txt; then
+            echo "✅ Deployment successful"
+            DEPLOY_STATUS="success"
+          else
+            echo "❌ Deployment failed"
+            DEPLOY_STATUS="failure"
+            cat deploy_output.txt
+            exit 1
+          fi
           
           # Try to extract the deployment URL from output
           DEPLOY_URL=$(grep -oP 'https://[^\s]+\.langgraph\.app' deploy_output.txt | head -1 || echo "")
           echo "deploy_url=$DEPLOY_URL" >> $GITHUB_OUTPUT
+          echo "deploy_status=$DEPLOY_STATUS" >> $GITHUB_OUTPUT
         env:
           LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
+
+      - name: Add Workflow Summary
+        if: always()
+        run: |
+          echo "## 🤖 Agent Preview Deployment" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**PR:** #${{ github.event.pull_request.number }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Revision:** \`pr-${{ github.event.pull_request.number }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ steps.deploy.outputs.deploy_status }}" == "success" ]; then
+            echo "**Status:** ✅ Deployed successfully" >> $GITHUB_STEP_SUMMARY
+            echo "**URL:** ${{ steps.deploy.outputs.deploy_url }}" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "**Status:** ❌ Deployment failed" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Check the workflow logs for details." >> $GITHUB_STEP_SUMMARY
+          fi
 
       - name: Comment on PR
         uses: actions/github-script@v7
@@ -83,8 +115,37 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event.action == 'closed'
     steps:
-      - name: Note about cleanup
+      - name: Log Cleanup Information
         run: |
-          echo "PR closed - preview revision pr-${{ github.event.pull_request.number }} can be cleaned up manually in LangSmith"
-          echo "LangSmith doesn't currently support automatic revision deletion via CLI"
+          echo "## 🧹 Preview Cleanup" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**PR:** #${{ github.event.pull_request.number }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Action:** ${{ github.event.action }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Merged:** ${{ github.event.pull_request.merged }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Preview Revision" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Revision \`pr-${{ github.event.pull_request.number }}\` is no longer needed." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "⚠️ **Note:** LangSmith revisions are lightweight when inactive." >> $GITHUB_STEP_SUMMARY
+          echo "If cleanup is desired, delete manually from the [LangSmith Dashboard](https://smith.langchain.com/o/${{ secrets.LANGSMITH_WORKSPACE_ID }}/deployments)." >> $GITHUB_STEP_SUMMARY
+
+      - name: Comment on PR about cleanup
+        if: github.event.pull_request.merged == true
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `## 🧹 Preview Cleanup
+              
+              PR merged! The preview revision \`pr-${{ github.event.pull_request.number }}\` is no longer active.
+              
+              Production deployment will be triggered automatically by the merge to main.
+              
+              > **Note:** Preview revisions are lightweight when inactive. No manual cleanup required.
+              `
+            })
 

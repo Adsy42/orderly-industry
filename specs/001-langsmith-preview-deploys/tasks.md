@@ -25,9 +25,9 @@
 
 **Purpose**: Configure GitHub repository with required secrets and permissions
 
-- [ ] T001 Add `LANGSMITH_API_KEY` secret to GitHub repository settings
-- [ ] T002 Add `LANGSMITH_WORKSPACE_ID` secret to GitHub repository settings
-- [ ] T003 Verify workflow permissions allow issue comments in Settings → Actions → General
+- [ ] T001 Add `LANGSMITH_API_KEY` secret to GitHub repository settings *(manual step - do in GitHub UI)*
+- [ ] T002 Add `LANGSMITH_WORKSPACE_ID` secret to GitHub repository settings *(manual step - do in GitHub UI)*
+- [ ] T003 Verify workflow permissions allow issue comments in Settings → Actions → General *(manual step - do in GitHub UI)*
 
 ---
 
@@ -37,9 +37,9 @@
 
 **⚠️ CRITICAL**: Preview deployment workflows cannot work until these are verified
 
-- [ ] T004 Verify `apps/agent/langgraph.json` is valid by running `cd apps/agent && langgraph dev` locally
-- [ ] T005 Verify agent deploys manually via `langgraph deploy --config langgraph.json` locally
-- [ ] T006 [P] Create `.github/scripts/` directory structure
+- [ ] T004 Verify `apps/agent/langgraph.json` is valid by running `cd apps/agent && langgraph dev` locally *(manual step)*
+- [ ] T005 Verify agent deploys manually via `langgraph deploy --config langgraph.json` locally *(manual step)*
+- [x] T006 [P] Create `.github/scripts/` directory structure *(not needed - using inline scripts)*
 
 **Checkpoint**: Foundation ready - user story implementation can now begin
 
@@ -53,16 +53,16 @@
 
 ### Implementation for User Story 1
 
-- [ ] T007 [US1] Update workflow trigger in `.github/workflows/preview-agent.yml` to include `opened`, `synchronize`, `reopened` actions
-- [ ] T008 [US1] Add path filter for `apps/agent/**` in `.github/workflows/preview-agent.yml`
-- [ ] T009 [US1] Configure Python 3.11 and uv setup steps in `.github/workflows/preview-agent.yml`
-- [ ] T010 [US1] Add LangGraph CLI installation step in `.github/workflows/preview-agent.yml`
-- [ ] T011 [US1] Implement deployment step with `--revision pr-${{ github.event.pull_request.number }}` in `.github/workflows/preview-agent.yml`
-- [ ] T012 [US1] Add `--wait` flag to deployment command for health check in `.github/workflows/preview-agent.yml`
-- [ ] T013 [US1] Capture deployment URL from CLI output in `.github/workflows/preview-agent.yml`
-- [ ] T014 [US1] Implement PR comment posting with deployment URL using `actions/github-script@v7` in `.github/workflows/preview-agent.yml`
-- [ ] T015 [US1] Add error handling with clear failure messages in `.github/workflows/preview-agent.yml`
-- [ ] T016 [US1] Add workflow summary output for GitHub Actions UI in `.github/workflows/preview-agent.yml`
+- [x] T007 [US1] Update workflow trigger in `.github/workflows/preview-agent.yml` to include `opened`, `synchronize`, `reopened` actions
+- [x] T008 [US1] Add path filter for `apps/agent/**` in `.github/workflows/preview-agent.yml`
+- [x] T009 [US1] Configure Python 3.11 and uv setup steps in `.github/workflows/preview-agent.yml`
+- [x] T010 [US1] Add LangGraph CLI installation step in `.github/workflows/preview-agent.yml`
+- [x] T011 [US1] Implement deployment step with `--revision pr-${{ github.event.pull_request.number }}` in `.github/workflows/preview-agent.yml`
+- [x] T012 [US1] Add `--wait` flag to deployment command for health check in `.github/workflows/preview-agent.yml`
+- [x] T013 [US1] Capture deployment URL from CLI output in `.github/workflows/preview-agent.yml`
+- [x] T014 [US1] Implement PR comment posting with deployment URL using `actions/github-script@v7` in `.github/workflows/preview-agent.yml`
+- [x] T015 [US1] Add error handling with clear failure messages in `.github/workflows/preview-agent.yml`
+- [x] T016 [US1] Add workflow summary output for GitHub Actions UI in `.github/workflows/preview-agent.yml`
 
 **Checkpoint**: User Story 1 complete - PRs with agent changes now get preview deployments
 
@@ -76,10 +76,10 @@
 
 ### Implementation for User Story 2
 
-- [ ] T017 [US2] Add `closed` action to PR trigger in `.github/workflows/preview-agent.yml`
-- [ ] T018 [US2] Create cleanup job with `if: github.event.action == 'closed'` condition in `.github/workflows/preview-agent.yml`
-- [ ] T019 [US2] Add cleanup logging step noting revision `pr-${{ github.event.pull_request.number }}` in `.github/workflows/preview-agent.yml`
-- [ ] T020 [US2] Document manual cleanup process in PR comment for LangSmith dashboard in `.github/workflows/preview-agent.yml`
+- [x] T017 [US2] Add `closed` action to PR trigger in `.github/workflows/preview-agent.yml`
+- [x] T018 [US2] Create cleanup job with `if: github.event.action == 'closed'` condition in `.github/workflows/preview-agent.yml`
+- [x] T019 [US2] Add cleanup logging step noting revision `pr-${{ github.event.pull_request.number }}` in `.github/workflows/preview-agent.yml`
+- [x] T020 [US2] Document manual cleanup process in PR comment for LangSmith dashboard in `.github/workflows/preview-agent.yml`
 
 **Note**: LangSmith CLI doesn't currently support programmatic revision deletion. Cleanup is logged for manual action if needed. Revisions are lightweight when inactive.
 
@@ -95,13 +95,13 @@
 
 ### Implementation for User Story 3
 
-- [ ] T021 [P] [US3] Configure push trigger for `main` branch in `.github/workflows/deploy-agent.yml`
-- [ ] T022 [P] [US3] Add path filter for `apps/agent/**` in `.github/workflows/deploy-agent.yml`
-- [ ] T023 [US3] Configure Python 3.11 and uv setup steps in `.github/workflows/deploy-agent.yml`
-- [ ] T024 [US3] Add LangGraph CLI installation step in `.github/workflows/deploy-agent.yml`
-- [ ] T025 [US3] Implement production deployment step with `--wait` flag in `.github/workflows/deploy-agent.yml`
-- [ ] T026 [US3] Add workflow summary with deployment confirmation in `.github/workflows/deploy-agent.yml`
-- [ ] T027 [US3] Add `workflow_dispatch` trigger for manual deployments in `.github/workflows/deploy-agent.yml`
+- [x] T021 [P] [US3] Configure push trigger for `main` branch in `.github/workflows/deploy-agent.yml`
+- [x] T022 [P] [US3] Add path filter for `apps/agent/**` in `.github/workflows/deploy-agent.yml`
+- [x] T023 [US3] Configure Python 3.11 and uv setup steps in `.github/workflows/deploy-agent.yml`
+- [x] T024 [US3] Add LangGraph CLI installation step in `.github/workflows/deploy-agent.yml`
+- [x] T025 [US3] Implement production deployment step with `--wait` flag in `.github/workflows/deploy-agent.yml`
+- [x] T026 [US3] Add workflow summary with deployment confirmation in `.github/workflows/deploy-agent.yml`
+- [x] T027 [US3] Add `workflow_dispatch` trigger for manual deployments in `.github/workflows/deploy-agent.yml`
 
 **Checkpoint**: User Story 3 complete - Merges to main trigger production deployment
 
@@ -115,10 +115,10 @@
 
 ### Implementation for User Story 4
 
-- [ ] T028 [US4] Enhance PR comment to include frontend URL params in `.github/workflows/preview-agent.yml`
-- [ ] T029 [US4] Add testing instructions with `?apiUrl=...&assistantId=deep_research` format in `.github/workflows/preview-agent.yml`
-- [ ] T030 [US4] Add LangSmith dashboard link to PR comment in `.github/workflows/preview-agent.yml`
-- [ ] T031 [US4] Update quickstart.md with full-stack testing guide in `specs/001-langsmith-preview-deploys/quickstart.md`
+- [x] T028 [US4] Enhance PR comment to include frontend URL params in `.github/workflows/preview-agent.yml`
+- [x] T029 [US4] Add testing instructions with `?apiUrl=...&assistantId=deep_research` format in `.github/workflows/preview-agent.yml`
+- [x] T030 [US4] Add LangSmith dashboard link to PR comment in `.github/workflows/preview-agent.yml`
+- [x] T031 [US4] Update quickstart.md with full-stack testing guide in `specs/001-langsmith-preview-deploys/quickstart.md`
 
 **Checkpoint**: User Story 4 complete - Full-stack preview testing is documented and easy
 
@@ -128,10 +128,10 @@
 
 **Purpose**: Documentation and final validation
 
-- [ ] T032 [P] Update CONTRIBUTING.md with LangSmith preview workflow documentation
-- [ ] T033 [P] Add GitHub secrets setup instructions to README or docs
-- [ ] T034 Run end-to-end validation: open PR → verify preview → merge → verify production
-- [ ] T035 Update constitution.md if any new patterns were established
+- [x] T032 [P] Update CONTRIBUTING.md with LangSmith preview workflow documentation
+- [x] T033 [P] Add GitHub secrets setup instructions to README or docs *(included in quickstart.md)*
+- [ ] T034 Run end-to-end validation: open PR → verify preview → merge → verify production *(manual step after merge)*
+- [x] T035 Update constitution.md if any new patterns were established *(no new patterns - using existing deployment strategy)*
 
 ---
 
