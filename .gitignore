@@ -62,6 +62,11 @@ yarn-error.log*
 # Vercel
 .vercel/
 
-# Cursor
-.cursor/
+# Cursor - exclude sensitive data but keep Spec Kit commands
+.cursor/*
+!.cursor/commands/
+!.cursor/rules/
+
+# LangGraph local API state
+.langgraph_api/
 

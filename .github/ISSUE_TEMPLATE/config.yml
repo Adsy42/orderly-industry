@@ -1,0 +1,9 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Start with SDD
+    url: https://developer.microsoft.com/blog/spec-driven-development-spec-kit
+    about: Learn about Spec-Driven Development before proposing features
+  - name: Documentation
+    url: https://github.com/github/spec-kit
+    about: Read the Spec Kit documentation
+

@@ -1,0 +1,74 @@
+# <type>(<scope>): <subject>
+#
+# <body>
+#
+# <footer>
+#
+# ============================================================================
+# COMMIT MESSAGE CONVENTION (Conventional Commits)
+# ============================================================================
+#
+# TYPE (required):
+#   feat:     New feature (correlates with MINOR in SemVer)
+#   fix:      Bug fix (correlates with PATCH in SemVer)
+#   docs:     Documentation only changes
+#   style:    Formatting, missing semicolons, etc (no code change)
+#   refactor: Code change that neither fixes a bug nor adds a feature
+#   perf:     Performance improvement
+#   test:     Adding or correcting tests
+#   chore:    Build process, dependencies, CI/CD
+#   ci:       CI configuration changes
+#   revert:   Reverts a previous commit
+#
+# SCOPE (optional):
+#   frontend: Next.js frontend changes
+#   agent:    Python LangGraph agent changes
+#   db:       Database migrations, RLS policies
+#   auth:     Authentication flow changes
+#   api:      API routes or endpoints
+#   ui:       UI components only
+#   deps:     Dependency updates
+#
+# SUBJECT (required):
+#   - Use imperative mood: "add" not "added" or "adds"
+#   - Don't capitalize first letter
+#   - No period at the end
+#   - Max 50 characters
+#
+# BODY (optional):
+#   - Explain WHAT and WHY, not HOW
+#   - Wrap at 72 characters
+#   - Can use bullet points
+#
+# FOOTER (optional):
+#   - Reference issues: Fixes #123, Closes #456
+#   - Reference spec: Spec: 001-user-auth
+#   - Breaking changes: BREAKING CHANGE: <description>
+#
+# ============================================================================
+# EXAMPLES
+# ============================================================================
+#
+# feat(frontend): add user profile avatar upload
+#
+# Users can now upload custom avatars from the profile page.
+# Avatars are stored in Supabase Storage with RLS policies.
+#
+# Spec: 003-user-profiles
+# Closes #45
+#
+# ============================================================================
+#
+# fix(agent): handle timeout in tavily search
+#
+# The search was hanging indefinitely when Tavily API was slow.
+# Added 10-second timeout with graceful error handling.
+#
+# Fixes #78
+#
+# ============================================================================
+#
+# chore(deps): update langchain to 0.3.0
+#
+# ============================================================================
+

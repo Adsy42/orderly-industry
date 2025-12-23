@@ -44,11 +44,16 @@ research_sub_agent = {
     "tools": [tavily_search, think_tool],
 }
 
-# Model Gemini 3 
-# model = ChatGoogleGenerativeAI(model="gemini-3-pro-preview", temperature=0.0)
+# Model options - uncomment the one you want to use:
 
-# Model Claude 4.5
-model = init_chat_model(model="anthropic:claude-sonnet-4-5-20250929", temperature=0.0)
+# OpenAI GPT-4o
+model = init_chat_model(model="openai:gpt-4o", temperature=0.0)
+
+# Anthropic Claude Sonnet
+# model = init_chat_model(model="anthropic:claude-sonnet-4-5-20250929", temperature=0.0)
+
+# Google Gemini
+# model = ChatGoogleGenerativeAI(model="gemini-3-pro-preview", temperature=0.0)
 
 # Create the agent
 agent = create_deep_agent(

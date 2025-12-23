@@ -18,7 +18,7 @@ import {
 import { useQueryState } from "nuqs";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { LangGraphLogoSVG } from "@/components/icons/langgraph";
+import { OrderlyIcon } from "@/components/icons/orderly";
 import { Label } from "@/components/ui/label";
 import { ArrowRight } from "lucide-react";
 import { PasswordInput } from "@/components/ui/password-input";
@@ -138,7 +138,7 @@ const StreamSession = ({
   useEffect(() => {
     checkGraphStatus(apiUrl, apiKey).then((ok) => {
       if (!ok) {
-        toast.error("Failed to connect to LangGraph server", {
+        toast.error("Failed to connect to Orderly server", {
           description: () => (
             <p>
               Please ensure your graph is running at <code>{apiUrl}</code> and
@@ -202,13 +202,13 @@ export const StreamProvider: React.FC<{ children: ReactNode }> = ({
         <div className="animate-in fade-in-0 zoom-in-95 bg-background flex max-w-3xl flex-col rounded-lg border shadow-lg">
           <div className="mt-14 flex flex-col gap-2 border-b p-6">
             <div className="flex flex-col items-start gap-2">
-              <LangGraphLogoSVG className="h-7" />
+              <OrderlyIcon className="h-7 text-primary" />
               <h1 className="text-xl font-semibold tracking-tight">
-                Agent Chat
+                Orderly
               </h1>
             </div>
             <p className="text-muted-foreground">
-              Welcome to Agent Chat! Before you get started, you need to enter
+              Welcome to Orderly! Before you get started, you need to enter
               the URL of the deployment and the assistant / graph ID.
             </p>
           </div>
@@ -235,7 +235,7 @@ export const StreamProvider: React.FC<{ children: ReactNode }> = ({
                 Deployment URL<span className="text-rose-500">*</span>
               </Label>
               <p className="text-muted-foreground text-sm">
-                This is the URL of your LangGraph deployment. Can be a local, or
+                This is the URL of your Orderly deployment. Can be a local or
                 production deployment.
               </p>
               <Input
@@ -266,11 +266,11 @@ export const StreamProvider: React.FC<{ children: ReactNode }> = ({
             </div>
 
             <div className="flex flex-col gap-2">
-              <Label htmlFor="apiKey">LangSmith API Key</Label>
+              <Label htmlFor="apiKey">API Key</Label>
               <p className="text-muted-foreground text-sm">
-                This is <strong>NOT</strong> required if using a local LangGraph
+                This is <strong>NOT</strong> required if using a local
                 server. This value is stored in your browser's local storage and
-                is only used to authenticate requests sent to your LangGraph
+                is only used to authenticate requests sent to your Orderly
                 server.
               </p>
               <PasswordInput
@@ -278,7 +278,7 @@ export const StreamProvider: React.FC<{ children: ReactNode }> = ({
                 name="apiKey"
                 defaultValue={apiKey ?? ""}
                 className="bg-background"
-                placeholder="lsv2_pt_..."
+                placeholder="Enter your API key..."
               />
             </div>
 

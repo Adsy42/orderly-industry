@@ -1,0 +1,95 @@
+name: Database CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/**'
+      - '.github/workflows/ci-database.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'supabase/**'
+      - '.github/workflows/ci-database.yml'
+
+jobs:
+  validate-migrations:
+    name: Validate Migrations
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Validate migration naming
+        run: |
+          echo "Checking migration file naming conventions..."
+          for file in supabase/migrations/*.sql; do
+            if [ -f "$file" ]; then
+              filename=$(basename "$file")
+              # Check format: YYYYMMDDHHmmss_description.sql
+              if ! [[ $filename =~ ^[0-9]{14}_[a-z_]+\.sql$ ]]; then
+                echo "❌ Invalid migration name: $filename"
+                echo "   Expected format: YYYYMMDDHHmmss_description.sql"
+                echo "   Example: 20251223110000_create_profiles.sql"
+                exit 1
+              fi
+              echo "✓ $filename"
+            fi
+          done
+          echo "All migration files follow naming convention!"
+
+      - name: Check for RLS in migrations
+        run: |
+          echo "Checking that CREATE TABLE statements have RLS enabled..."
+          has_error=false
+          
+          for file in supabase/migrations/*.sql; do
+            if [ -f "$file" ]; then
+              filename=$(basename "$file")
+              
+              # Check if file creates a table
+              if grep -qi "create table" "$file"; then
+                # Check if RLS is enabled in the same file
+                if ! grep -qi "enable row level security" "$file"; then
+                  echo "❌ $filename creates table(s) but doesn't enable RLS"
+                  has_error=true
+                else
+                  echo "✓ $filename has RLS enabled"
+                fi
+              fi
+            fi
+          done
+          
+          if [ "$has_error" = true ]; then
+            echo ""
+            echo "Constitution requires: All database tables MUST have Row Level Security (RLS) enabled"
+            exit 1
+          fi
+
+      - name: Lint SQL files
+        run: |
+          echo "Checking SQL style guidelines..."
+          for file in supabase/migrations/*.sql; do
+            if [ -f "$file" ]; then
+              filename=$(basename "$file")
+              
+              # Check for uppercase SQL keywords (should be lowercase)
+              if grep -E '\b(SELECT|INSERT|UPDATE|DELETE|CREATE|ALTER|DROP|FROM|WHERE|AND|OR|JOIN|ON|TABLE|INDEX|POLICY)\b' "$file" | grep -v "^--" | grep -v "^/\*" > /dev/null; then
+                echo "⚠️  $filename may have uppercase SQL keywords (prefer lowercase)"
+              fi
+              
+              # Check for table comments
+              if grep -qi "create table" "$file"; then
+                if ! grep -qi "comment on table" "$file"; then
+                  echo "⚠️  $filename creates table but missing COMMENT ON TABLE"
+                fi
+              fi
+            fi
+          done
+          echo "SQL style check complete!"
+
