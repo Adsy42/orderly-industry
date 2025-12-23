@@ -69,6 +69,21 @@ cp apps/agent/.env.example apps/agent/.env
 3. Copy the **Project URL** and **anon public** key
 4. Add them to both `.env.local` (frontend) and `.env` (agent)
 
+**Note:** The frontend uses `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY` for the Supabase key.
+
+#### Optional: Local Supabase Development
+
+```bash
+# Install Supabase CLI
+npm install -g supabase
+
+# Start local Supabase
+supabase start
+
+# Apply migrations
+supabase db reset
+```
+
 ### 4. Run Locally
 
 ```bash
@@ -92,19 +107,26 @@ pnpm dev:all
 ├── apps/
 │   ├── frontend/                 # Next.js Chat UI
 │   │   ├── src/
-│   │   │   ├── app/              # App Router pages
+│   │   │   ├── app/
 │   │   │   │   ├── api/          # API passthrough routes
-│   │   │   │   └── auth/         # Login/signup pages
+│   │   │   │   ├── auth/         # Auth pages (Supabase UI block)
+│   │   │   │   │   ├── login/
+│   │   │   │   │   ├── sign-up/
+│   │   │   │   │   ├── forgot-password/
+│   │   │   │   │   ├── update-password/
+│   │   │   │   │   ├── confirm/  # Email verification
+│   │   │   │   │   └── error/
+│   │   │   │   └── chat/         # Main chat page
 │   │   │   ├── components/       # React components
-│   │   │   ├── hooks/            # Custom hooks
-│   │   │   ├── lib/              # Utilities (Supabase client)
+│   │   │   ├── lib/
+│   │   │   │   └── supabase/     # Supabase client (browser/server)
 │   │   │   └── providers/        # Context providers
-│   │   ├── package.json
-│   │   └── next.config.mjs
+│   │   ├── middleware.ts         # Auth protection middleware
+│   │   └── package.json
 │   │
 │   └── agent/                    # Deep Research Agent
 │       ├── src/
-│       │   ├── agent/            # Agent code
+│       │   ├── agent/
 │       │   │   ├── graph.py      # Main graph definition
 │       │   │   ├── prompts.py    # System prompts
 │       │   │   └── tools.py      # Search tools
@@ -112,6 +134,11 @@ pnpm dev:all
 │       │       └── auth.py       # JWT validation
 │       ├── langgraph.json        # LangSmith config
 │       └── pyproject.toml
+│
+├── supabase/
+│   ├── config.toml               # Local dev config
+│   └── migrations/               # Database migrations
+│       └── 20251223110000_create_profiles.sql
 │
 ├── package.json                  # Root workspace config
 ├── pnpm-workspace.yaml
@@ -174,7 +201,7 @@ Then open http://localhost:2024/docs to see the API documentation.
 | Variable | Description | Required |
 |----------|-------------|----------|
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL | Yes |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key | Yes |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY` | Supabase anon key | Yes |
 | `NEXT_PUBLIC_API_URL` | API endpoint URL | Yes |
 | `NEXT_PUBLIC_ASSISTANT_ID` | Graph ID (`deep_research`) | Yes |
 | `LANGGRAPH_API_URL` | LangSmith deployment URL | Production |
@@ -192,16 +219,31 @@ Then open http://localhost:2024/docs to see the API documentation.
 
 ## Authentication Flow
 
+The authentication is built using the [Supabase UI password-based auth block](https://supabase.com/ui/docs/nextjs/password-based-auth) which provides:
+
+- Login / Sign up / Forgot password / Update password pages
+- Email confirmation flow
+- Middleware-based route protection
+- Server and client Supabase clients
+
 ```
 1. User → Frontend: Login with email/password
 2. Frontend → Supabase: Authenticate user
-3. Supabase → Frontend: Return JWT token
+3. Supabase → Frontend: Return JWT token (stored in cookies)
 4. Frontend → Agent: Request with JWT in Authorization header
 5. Agent → Supabase: Validate JWT token
 6. Agent → Frontend: Return response (scoped to user)
 ```
 
 All threads and conversations are automatically scoped to the authenticated user.
+
+### Email Templates
+
+Configure email templates in your Supabase project for:
+- **Sign up confirmation**: Redirect to `/auth/confirm`
+- **Password reset**: Redirect to `/auth/confirm` with type=recovery
+
+See the [Supabase docs](https://supabase.com/ui/docs/nextjs/password-based-auth#adding-email-templates) for template examples.
 
 ## Customization
 

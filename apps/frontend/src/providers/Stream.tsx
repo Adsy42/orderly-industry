@@ -25,7 +25,8 @@ import { PasswordInput } from "@/components/ui/password-input";
 import { getApiKey } from "@/lib/api-key";
 import { useThreads } from "./Thread";
 import { toast } from "sonner";
-import { useAuth } from "./AuthProvider";
+import { createClient } from "@/lib/supabase/client";
+import type { Session } from "@supabase/supabase-js";
 
 export type StateType = { messages: Message[]; ui?: UIMessage[] };
 
@@ -81,19 +82,35 @@ const StreamSession = ({
 }) => {
   const [threadId, setThreadId] = useQueryState("threadId");
   const { getThreads, setThreads } = useThreads();
-  const { session } = useAuth();
+  const [session, setSession] = useState<Session | null>(null);
 
-  // Build headers with both API key and JWT token if available
-  const headers = useMemo(() => {
+  // Get session from Supabase client
+  useEffect(() => {
+    const supabase = createClient();
+
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  // Build default headers with JWT token for authentication
+  const defaultHeaders = useMemo(() => {
     const h: Record<string, string> = {};
-    if (apiKey) {
-      h["X-Api-Key"] = apiKey;
-    }
     if (session?.access_token) {
       h["Authorization"] = `Bearer ${session.access_token}`;
     }
     return Object.keys(h).length > 0 ? h : undefined;
-  }, [apiKey, session?.access_token]);
+  }, [session?.access_token]);
 
   const streamValue = useTypedStream({
     apiUrl,
@@ -101,7 +118,7 @@ const StreamSession = ({
     assistantId,
     threadId: threadId ?? null,
     fetchStateHistory: true,
-    headers,
+    defaultHeaders,
     onCustomEvent: (event, options) => {
       if (isUIMessage(event) || isRemoveUIMessage(event)) {
         options.mutate((prev) => {
