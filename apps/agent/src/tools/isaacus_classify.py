@@ -3,6 +3,8 @@
 import os
 from typing import List, Optional
 
+import httpx
+from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
 from ..services.isaacus_client import IsaacusClient
@@ -43,11 +45,11 @@ class IsaacusClassifyInput(BaseModel):
     matter_id: str = Field(description="UUID of the matter containing the documents")
     document_ids: Optional[List[str]] = Field(
         default=None,
-        description="Optional list of specific document IDs to analyze. If not provided, analyzes all matter documents.",
+        description="Optional list of specific document IDs to analyze.",
     )
     clause_types: Optional[List[str]] = Field(
         default=None,
-        description="Optional list of specific clause types to look for. Defaults to common legal clauses.",
+        description="Optional list of specific clause types to look for.",
     )
 
 
@@ -68,14 +70,12 @@ class IsaacusClassifyOutput(BaseModel):
     )
 
 
-async def isaacus_classify(
+@tool(parse_docstring=True)
+def isaacus_classify(
     matter_id: str,
-    document_ids: Optional[List[str]] = None,
-    clause_types: Optional[List[str]] = None,
-    supabase_client=None,  # Injected by agent context
-) -> IsaacusClassifyOutput:
-    """
-    Identify and classify legal clauses in matter documents.
+    clause_types: Optional[str] = None,
+) -> dict:
+    """Identify and classify legal clauses in matter documents.
 
     This tool uses Isaacus classification models optimized for Australian legal
     documents to identify specific types of clauses (termination, indemnity,
@@ -83,70 +83,129 @@ async def isaacus_classify(
 
     Args:
         matter_id: The UUID of the matter to analyze.
-        document_ids: Optional list of specific document IDs to analyze.
-        clause_types: Optional list of clause types to look for. Defaults to
-                     common Australian legal clause types.
-        supabase_client: Supabase client (injected by agent context).
+        clause_types: Comma-separated list of clause types to look for. Defaults to common legal clauses.
 
     Returns:
-        IsaacusClassifyOutput with identified clauses and their classifications.
-
-    Example:
-        >>> result = await isaacus_classify(
-        ...     matter_id="uuid-here",
-        ...     clause_types=["Termination", "Indemnity", "Limitation of Liability"]
-        ... )
+        A dictionary with identified clauses and their classifications.
     """
+    import asyncio
+
+    # Parse clause types from comma-separated string
+    types_list = None
+    if clause_types:
+        types_list = [t.strip() for t in clause_types.split(",")]
+
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+    return loop.run_until_complete(_isaacus_classify_async(matter_id, types_list))
+
+
+async def _isaacus_classify_async(
+    matter_id: str,
+    clause_types: Optional[List[str]] = None,
+) -> dict:
+    """Internal async implementation of isaacus_classify."""
     api_key = os.getenv("ISAACUS_API_KEY")
     base_url = os.getenv("ISAACUS_BASE_URL", "https://api.isaacus.com")
+    supabase_url = os.getenv("SUPABASE_URL")
+    supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv(
+        "SUPABASE_ANON_KEY"
+    )
 
     types_to_search = clause_types or DEFAULT_CLAUSE_TYPES
 
     if not api_key:
-        return IsaacusClassifyOutput(
-            clauses=[],
-            total_found=0,
-            clause_types_searched=types_to_search,
-        )
+        return {
+            "clauses": [],
+            "total_found": 0,
+            "clause_types_searched": types_to_search,
+            "error": "ISAACUS_API_KEY not configured",
+        }
+
+    if not supabase_url or not supabase_key:
+        return {
+            "clauses": [],
+            "total_found": 0,
+            "clause_types_searched": types_to_search,
+            "error": "Supabase not configured",
+        }
 
     client = IsaacusClient(api_key=api_key, base_url=base_url)
 
     try:
-        if supabase_client is None:
-            return IsaacusClassifyOutput(
-                clauses=[],
-                total_found=0,
-                clause_types_searched=types_to_search,
+        # Get document chunks from Supabase
+        async with httpx.AsyncClient() as http_client:
+            # Get documents for the matter first
+            docs_response = await http_client.get(
+                f"{supabase_url}/rest/v1/documents",
+                headers={
+                    "apikey": supabase_key,
+                    "Authorization": f"Bearer {supabase_key}",
+                },
+                params={"matter_id": f"eq.{matter_id}", "select": "id,filename"},
             )
 
-        # Build query for document chunks
-        query = (
-            supabase_client.from_("document_embeddings")
-            .select(
-                "id, document_id, chunk_index, chunk_text, documents!inner(filename, matter_id)"
+            if docs_response.status_code != 200:
+                return {
+                    "clauses": [],
+                    "total_found": 0,
+                    "clause_types_searched": types_to_search,
+                    "error": "Error fetching documents",
+                }
+
+            documents = docs_response.json()
+            if not documents:
+                return {
+                    "clauses": [],
+                    "total_found": 0,
+                    "clause_types_searched": types_to_search,
+                }
+
+            doc_ids = [d["id"] for d in documents]
+            doc_map = {d["id"]: d["filename"] for d in documents}
+
+            # Get chunks for these documents
+            chunks_response = await http_client.get(
+                f"{supabase_url}/rest/v1/document_embeddings",
+                headers={
+                    "apikey": supabase_key,
+                    "Authorization": f"Bearer {supabase_key}",
+                },
+                params={
+                    "document_id": f"in.({','.join(doc_ids)})",
+                    "select": "id,document_id,chunk_index,chunk_text",
+                    "limit": "100",
+                },
             )
-            .eq("documents.matter_id", matter_id)
-        )
 
-        if document_ids:
-            query = query.in_("document_id", document_ids)
+            if chunks_response.status_code != 200:
+                return {
+                    "clauses": [],
+                    "total_found": 0,
+                    "clause_types_searched": types_to_search,
+                    "error": "Error fetching document chunks",
+                }
 
-        response = await query.limit(100).execute()
+            chunks = chunks_response.json()
 
-        if not response.data:
-            return IsaacusClassifyOutput(
-                clauses=[],
-                total_found=0,
-                clause_types_searched=types_to_search,
-            )
+        if not chunks:
+            return {
+                "clauses": [],
+                "total_found": 0,
+                "clause_types_searched": types_to_search,
+            }
 
         classified_clauses = []
 
-        # Process chunks in batches to classify
-        for chunk in response.data:
+        # Process chunks to classify
+        for chunk in chunks:
             chunk_text = chunk["chunk_text"]
             document_id = chunk["document_id"]
-            filename = chunk.get("documents", {}).get("filename", "Unknown")
+            filename = doc_map.get(document_id, "Unknown")
 
             # Skip very short chunks
             if len(chunk_text) < 50:
@@ -161,59 +220,42 @@ async def isaacus_classify(
 
                 # Find the best matching classification above threshold
                 for classification in classifications:
-                    if classification.get("score", 0) > 0.6:  # Confidence threshold
+                    if classification.get("score", 0) > 0.6:
                         classified_clauses.append(
-                            ClassifiedClause(
-                                clause_type=classification["label"],
-                                confidence=classification["score"],
-                                text_excerpt=chunk_text[
-                                    :500
-                                ],  # Truncate for response size
-                                document_id=document_id,
-                                filename=filename,
-                            )
+                            {
+                                "clause_type": classification["label"],
+                                "confidence": classification["score"],
+                                "text_excerpt": chunk_text[:500],
+                                "document_id": document_id,
+                                "filename": filename,
+                            }
                         )
-                        break  # Only take the top classification per chunk
+                        break
 
             except Exception as e:
                 print(f"Classification error for chunk: {e}")
                 continue
 
         # Sort by confidence descending
-        classified_clauses.sort(key=lambda c: c.confidence, reverse=True)
+        classified_clauses.sort(key=lambda c: c["confidence"], reverse=True)
 
-        return IsaacusClassifyOutput(
-            clauses=classified_clauses,
-            total_found=len(classified_clauses),
-            clause_types_searched=types_to_search,
-        )
+        return {
+            "clauses": classified_clauses,
+            "total_found": len(classified_clauses),
+            "clause_types_searched": types_to_search,
+        }
 
     except Exception as e:
         print(f"Isaacus classify error: {e}")
-        return IsaacusClassifyOutput(
-            clauses=[],
-            total_found=0,
-            clause_types_searched=types_to_search,
-        )
+        return {
+            "clauses": [],
+            "total_found": 0,
+            "clause_types_searched": types_to_search,
+            "error": str(e),
+        }
     finally:
         await client.close()
 
 
-# Tool definition for LangGraph
-ISAACUS_CLASSIFY_TOOL = {
-    "name": "isaacus_classify",
-    "description": """
-Identify and classify legal clauses in matter documents.
-Use this tool to find specific types of clauses like termination, indemnity,
-confidentiality, limitation of liability, etc.
-
-Returns a list of identified clauses with their type, confidence, excerpt,
-and source document.
-
-Default clause types searched: Termination, Indemnity, Limitation of Liability,
-Confidentiality, Non-Compete, Force Majeure, Dispute Resolution, Governing Law,
-Assignment, Warranty, Payment Terms, IP, Insurance, Notice, Amendment.
-""".strip(),
-    "input_schema": IsaacusClassifyInput,
-    "func": isaacus_classify,
-}
+# Export the tool function directly
+ISAACUS_CLASSIFY_TOOL = isaacus_classify

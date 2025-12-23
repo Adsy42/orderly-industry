@@ -3,6 +3,8 @@
 import os
 from typing import List
 
+import httpx
+from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
 from ..services.isaacus_client import IsaacusClient
@@ -51,15 +53,14 @@ class IsaacusSearchOutput(BaseModel):
     matter_id: str = Field(description="The matter that was searched")
 
 
-async def isaacus_search(
+@tool(parse_docstring=True)
+def isaacus_search(
     matter_id: str,
     query: str,
     max_results: int = 5,
     threshold: float = 0.5,
-    supabase_client=None,  # Injected by agent context
-) -> IsaacusSearchOutput:
-    """
-    Search for relevant document chunks within a matter using semantic similarity.
+) -> dict:
+    """Search for relevant document chunks within a matter using semantic similarity.
 
     This tool uses Isaacus embedding models optimized for Australian legal documents
     to find the most relevant passages matching a natural language query.
@@ -67,31 +68,57 @@ async def isaacus_search(
     Args:
         matter_id: The UUID of the matter to search within.
         query: A natural language question or search query.
-        max_results: Maximum number of results to return (1-20).
-        threshold: Minimum similarity score (0-1) for results.
-        supabase_client: Supabase client (injected by agent context).
+        max_results: Maximum number of results to return (1-20). Defaults to 5.
+        threshold: Minimum similarity score (0-1) for results. Defaults to 0.5.
 
     Returns:
-        IsaacusSearchOutput with matching document chunks and their sources.
-
-    Example:
-        >>> results = await isaacus_search(
-        ...     matter_id="uuid-here",
-        ...     query="What are the termination clauses?",
-        ...     max_results=5
-        ... )
+        A dictionary with matching document chunks and their sources.
     """
-    # Initialize Isaacus client
+    import asyncio
+
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+    return loop.run_until_complete(
+        _isaacus_search_async(matter_id, query, max_results, threshold)
+    )
+
+
+async def _isaacus_search_async(
+    matter_id: str,
+    query: str,
+    max_results: int = 5,
+    threshold: float = 0.5,
+) -> dict:
+    """Internal async implementation of isaacus_search."""
+    # Check for required env vars
     api_key = os.getenv("ISAACUS_API_KEY")
     base_url = os.getenv("ISAACUS_BASE_URL", "https://api.isaacus.com")
+    supabase_url = os.getenv("SUPABASE_URL")
+    supabase_key = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv(
+        "SUPABASE_ANON_KEY"
+    )
 
     if not api_key:
-        return IsaacusSearchOutput(
-            results=[],
-            total_found=0,
-            query=query,
-            matter_id=matter_id,
-        )
+        return {
+            "results": [],
+            "total_found": 0,
+            "query": query,
+            "matter_id": matter_id,
+            "error": "ISAACUS_API_KEY not configured",
+        }
+
+    if not supabase_url or not supabase_key:
+        return {
+            "results": [],
+            "total_found": 0,
+            "query": query,
+            "matter_id": matter_id,
+            "error": "Supabase credentials not configured",
+        }
 
     client = IsaacusClient(api_key=api_key, base_url=base_url)
 
@@ -99,83 +126,81 @@ async def isaacus_search(
         # Generate embedding for the query
         embeddings = await client.embed([query])
         if not embeddings or len(embeddings) == 0:
-            return IsaacusSearchOutput(
-                results=[],
-                total_found=0,
-                query=query,
-                matter_id=matter_id,
-            )
+            return {
+                "results": [],
+                "total_found": 0,
+                "query": query,
+                "matter_id": matter_id,
+                "error": "Failed to generate query embedding",
+            }
 
         query_embedding = embeddings[0]
 
-        # Call the Supabase RPC function to find similar documents
-        if supabase_client is None:
-            # Fallback - should be injected by agent context
-            return IsaacusSearchOutput(
-                results=[],
-                total_found=0,
-                query=query,
-                matter_id=matter_id,
+        # Call Supabase RPC function to find similar documents
+        async with httpx.AsyncClient() as http_client:
+            response = await http_client.post(
+                f"{supabase_url}/rest/v1/rpc/match_document_embeddings",
+                headers={
+                    "apikey": supabase_key,
+                    "Authorization": f"Bearer {supabase_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "query_embedding": query_embedding,
+                    "matter_uuid": matter_id,
+                    "match_threshold": threshold,
+                    "match_count": max_results,
+                },
             )
 
-        response = await supabase_client.rpc(
-            "match_document_embeddings",
-            {
-                "query_embedding": query_embedding,
-                "matter_uuid": matter_id,
-                "match_threshold": threshold,
-                "match_count": max_results,
-            },
-        ).execute()
+            if response.status_code != 200:
+                return {
+                    "results": [],
+                    "total_found": 0,
+                    "query": query,
+                    "matter_id": matter_id,
+                    "error": f"Supabase RPC error: {response.status_code}",
+                }
 
-        if response.data:
-            results = [
-                SearchResult(
-                    document_id=row["document_id"],
-                    filename=row["filename"],
-                    chunk_text=row["chunk_text"],
-                    similarity=row["similarity"],
-                )
-                for row in response.data
-            ]
+            data = response.json()
 
-            return IsaacusSearchOutput(
-                results=results,
-                total_found=len(results),
-                query=query,
-                matter_id=matter_id,
-            )
+            if data:
+                results = [
+                    {
+                        "document_id": row["document_id"],
+                        "filename": row["filename"],
+                        "chunk_text": row["chunk_text"],
+                        "similarity": row["similarity"],
+                    }
+                    for row in data
+                ]
 
-        return IsaacusSearchOutput(
-            results=[],
-            total_found=0,
-            query=query,
-            matter_id=matter_id,
-        )
+                return {
+                    "results": results,
+                    "total_found": len(results),
+                    "query": query,
+                    "matter_id": matter_id,
+                }
+
+            return {
+                "results": [],
+                "total_found": 0,
+                "query": query,
+                "matter_id": matter_id,
+            }
 
     except Exception as e:
-        # Log error but don't expose internal details
         print(f"Isaacus search error: {e}")
-        return IsaacusSearchOutput(
-            results=[],
-            total_found=0,
-            query=query,
-            matter_id=matter_id,
-        )
+        return {
+            "results": [],
+            "total_found": 0,
+            "query": query,
+            "matter_id": matter_id,
+            "error": str(e),
+        }
     finally:
         await client.close()
 
 
-# Tool definition for LangGraph
-ISAACUS_SEARCH_TOOL = {
-    "name": "isaacus_search",
-    "description": """
-Search for relevant document excerpts within a matter using semantic similarity.
-Use this tool when the user asks questions about documents in a specific matter.
-The search uses Isaacus AI models optimized for Australian legal documents.
-
-Returns ranked results with document names, excerpts, and similarity scores.
-""".strip(),
-    "input_schema": IsaacusSearchInput,
-    "func": isaacus_search,
-}
+# Export the tool function directly - no dict wrapper needed
+ISAACUS_SEARCH_TOOL = isaacus_search
