@@ -217,6 +217,22 @@ git config commit.template .gitmessage
 
 ## Pull Request Process
 
+### Preview Deployments
+
+When you open a PR with agent changes, **automatic preview deployments** are triggered:
+
+| Service | Trigger | Preview Type |
+|---------|---------|--------------|
+| **Vercel** | Any PR | Frontend preview URL |
+| **Supabase** | PR with `supabase/` changes | Branch database |
+| **LangSmith** | PR with `apps/agent/` changes | Preview agent revision |
+
+**LangSmith Preview Flow:**
+1. Open PR with agent changes → Preview deployment starts
+2. After ~3-5 minutes → Comment posted with preview URL
+3. Test using URL params: `?apiUrl=PREVIEW_URL&assistantId=deep_research`
+4. Merge/close PR → Production deployment triggered
+
 ### Before Opening a PR
 
 1. **Ensure SDD workflow is complete**
@@ -231,6 +247,7 @@ git config commit.template .gitmessage
 
 3. **Test your changes**
    - Local testing completed
+   - Preview deployments verified (if applicable)
    - No regressions
 
 ### PR Requirements

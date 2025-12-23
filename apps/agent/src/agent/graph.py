@@ -2,17 +2,18 @@
 
 This module creates a deep research agent with custom tools and prompts
 for conducting web research with strategic thinking and context management.
+
+Version: 1.0.1 - Added CI/CD preview deployment support
 """
 
 from datetime import datetime
 
-from langchain.chat_models import init_chat_model
-from langchain_google_genai import ChatGoogleGenerativeAI
 from deepagents import create_deep_agent
+from langchain.chat_models import init_chat_model
 
 from src.agent.prompts import (
-    RESEARCHER_INSTRUCTIONS,
     RESEARCH_WORKFLOW_INSTRUCTIONS,
+    RESEARCHER_INSTRUCTIONS,
     SUBAGENT_DELEGATION_INSTRUCTIONS,
 )
 from src.agent.tools import tavily_search, think_tool

@@ -1,0 +1,55 @@
+name: Deploy Agent to LangSmith
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'apps/agent/**'
+      - '.github/workflows/deploy-agent.yml'
+  workflow_dispatch:  # Allow manual trigger
+
+env:
+  LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
+
+jobs:
+  deploy:
+    name: Deploy to LangSmith
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/agent
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Install LangGraph CLI
+        run: uv pip install langgraph-cli
+
+      - name: Deploy to LangSmith
+        run: |
+          uv run langgraph deploy \
+            --config langgraph.json \
+            --wait
+        env:
+          LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
+
+      - name: Deployment Summary
+        run: |
+          echo "## 🚀 Agent Deployed to LangSmith" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The LangGraph agent has been deployed successfully." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "View deployment: https://smith.langchain.com/o/${{ secrets.LANGSMITH_WORKSPACE_ID }}/deployments" >> $GITHUB_STEP_SUMMARY
+
