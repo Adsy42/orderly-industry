@@ -7,6 +7,7 @@ This document defines the core principles, technical decisions, and coding stand
 ### I. Monorepo Architecture
 
 The project is structured as a monorepo with two primary applications:
+
 - **Frontend** (`apps/frontend/`): Next.js 15 application for the chat interface
 - **Agent** (`apps/agent/`): Python LangGraph agent for deep research
 
@@ -15,6 +16,7 @@ Each application maintains its own dependencies and can be deployed independentl
 ### II. Authentication-First
 
 Every user interaction must be authenticated and authorized:
+
 - Frontend uses Supabase Auth with cookie-based sessions
 - Agent validates JWT tokens against Supabase on every request
 - All resources (threads, conversations) are scoped to the authenticated user
@@ -30,6 +32,7 @@ Every user interaction must be authenticated and authorized:
 ### IV. Research Agent Patterns
 
 The agent follows a hierarchical delegation model:
+
 - **Orchestrator**: Plans research, delegates to sub-agents, synthesizes findings
 - **Sub-agents**: Execute focused research tasks with specific tool access
 - **Tools**: tavily_search (web search), think_tool (strategic reflection)
@@ -46,40 +49,45 @@ Research workflows must follow: Plan → Delegate → Research → Synthesize �
 ## Technology Stack
 
 ### Frontend
-| Technology | Version | Purpose |
-|------------|---------|---------|
-| Next.js | 15.x | React framework with App Router |
-| React | 19.x | UI library |
-| TypeScript | 5.x | Type safety |
-| Tailwind CSS | 3.x | Styling |
-| Supabase SSR | latest | Auth & database client |
-| LangGraph SDK | latest | Agent communication |
+
+| Technology    | Version | Purpose                         |
+| ------------- | ------- | ------------------------------- |
+| Next.js       | 15.x    | React framework with App Router |
+| React         | 19.x    | UI library                      |
+| TypeScript    | 5.x     | Type safety                     |
+| Tailwind CSS  | 3.x     | Styling                         |
+| Supabase SSR  | latest  | Auth & database client          |
+| LangGraph SDK | latest  | Agent communication             |
 
 ### Agent
-| Technology | Version | Purpose |
-|------------|---------|---------|
-| Python | 3.11+ | Runtime |
-| LangGraph | latest | Agent orchestration framework |
-| LangChain | latest | LLM abstractions and tools |
-| Tavily | latest | Web search API |
-| HTTPX | latest | Async HTTP client |
+
+| Technology | Version | Purpose                       |
+| ---------- | ------- | ----------------------------- |
+| Python     | 3.11+   | Runtime                       |
+| LangGraph  | latest  | Agent orchestration framework |
+| LangChain  | latest  | LLM abstractions and tools    |
+| Tavily     | latest  | Web search API                |
+| HTTPX      | latest  | Async HTTP client             |
 
 ### Infrastructure
-| Service | Purpose |
-|---------|---------|
-| Supabase | Auth, PostgreSQL database, storage |
-| Vercel | Frontend hosting |
-| LangSmith | Agent deployment and monitoring |
+
+| Service   | Purpose                            |
+| --------- | ---------------------------------- |
+| Supabase  | Auth, PostgreSQL database, storage |
+| Vercel    | Frontend hosting                   |
+| LangSmith | Agent deployment and monitoring    |
 
 ## Deployment Strategy
 
 ### Frontend → Vercel
+
 - Root directory: `apps/frontend`
 - Build command: `pnpm build`
 - Environment variables prefixed with `NEXT_PUBLIC_` for client-side access
 - Server-side secrets (e.g., `LANGSMITH_API_KEY`) kept without prefix
 
 ### Agent → LangSmith
+
 - Path to LangGraph API: `apps/agent`
 - Configuration: `langgraph.json`
 - Automatic JWT validation via custom auth handler
@@ -92,16 +100,19 @@ Research workflows must follow: Plan → Delegate → Research → Synthesize �
 All database code must follow these guidelines (see `.cursor/rules/` for detailed patterns):
 
 **Naming Conventions:**
+
 - Use `snake_case` for tables and columns
 - Prefer plural table names, singular column names
 - Foreign key columns: `{table_singular}_id` (e.g., `user_id`)
 
 **Table Structure:**
+
 - Always add `id` column as `bigint generated always as identity primary key` (or `uuid` for auth-linked tables)
 - Always add table comments describing purpose
 - Create all tables in `public` schema unless specified
 
 **Row Level Security:**
+
 - Enable RLS on ALL tables, even public-access ones
 - Create separate policies for each operation (SELECT, INSERT, UPDATE, DELETE)
 - Create separate policies for each role (`anon`, `authenticated`)
@@ -109,6 +120,7 @@ All database code must follow these guidelines (see `.cursor/rules/` for detaile
 - Add indexes on columns used in RLS policies
 
 **Functions:**
+
 - Default to `SECURITY INVOKER`
 - Always set `search_path = ''`
 - Use fully qualified names for all database objects
@@ -117,15 +129,18 @@ All database code must follow these guidelines (see `.cursor/rules/` for detaile
 ### TypeScript (Frontend)
 
 **Imports:**
+
 - Use path aliases (`@/components`, `@/lib`) for internal imports
 - Group imports: React → external → internal → types
 
 **Components:**
+
 - Functional components with TypeScript interfaces
 - Props interfaces named `{ComponentName}Props`
 - Use React Server Components by default, `"use client"` only when needed
 
 **State Management:**
+
 - Context providers in `src/providers/`
 - Custom hooks in `src/hooks/`
 - Prefer URL state (`nuqs`) for shareable state
@@ -133,16 +148,19 @@ All database code must follow these guidelines (see `.cursor/rules/` for detaile
 ### Python (Agent)
 
 **Structure:**
+
 - Type hints on all function signatures
 - Docstrings for public functions
 - Async/await for I/O operations
 
 **Tools:**
+
 - Use `@tool` decorator with `parse_docstring=True`
 - Document args in docstring for automatic schema generation
 - Return formatted strings, not raw data structures
 
 **Prompts:**
+
 - Store in `prompts.py`, not inline
 - Use format strings for dynamic values
 - Include clear instructions and examples
@@ -150,6 +168,7 @@ All database code must follow these guidelines (see `.cursor/rules/` for detaile
 ## Environment Variables
 
 ### Frontend (.env.local)
+
 ```
 NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY=
@@ -162,6 +181,7 @@ LANGSMITH_API_KEY=
 ```
 
 ### Agent (.env)
+
 ```
 SUPABASE_URL=
 SUPABASE_ANON_KEY=
@@ -174,6 +194,7 @@ TAVILY_API_KEY=
 ### Branch Naming
 
 Feature branches are created by Spec Kit with auto-incrementing numbers:
+
 - Format: `###-feature-name` (e.g., `001-user-auth`, `002-chat-history`)
 - Non-feature branches: `fix/###-description`, `docs/description`, `chore/description`
 
@@ -210,6 +231,7 @@ We use [Conventional Commits](https://www.conventionalcommits.org/):
 | `deps` | Dependencies |
 
 **Rules:**
+
 - Use imperative mood: "add" not "added"
 - Don't capitalize first letter
 - No period at the end

@@ -13,6 +13,7 @@ The Deep Research Agent uses Supabase PostgreSQL for user data storage. All tabl
 **Location:** `supabase/migrations/20251223110000_create_profiles.sql`
 
 **Schema:**
+
 ```sql
 create table public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
@@ -25,19 +26,20 @@ create table public.profiles (
 ```
 
 **Indexes:**
+
 ```sql
 create index profiles_email_idx on public.profiles using btree (email);
 ```
 
 **RLS Policies:**
 
-| Policy | Operation | Role | Condition |
-|--------|-----------|------|-----------|
-| Profiles are viewable by authenticated users | SELECT | authenticated | `true` |
-| Profiles are viewable by anonymous users | SELECT | anon | `true` |
-| Users can insert their own profile | INSERT | authenticated | `auth.uid() = id` |
-| Users can update their own profile | UPDATE | authenticated | `auth.uid() = id` |
-| Users can delete their own profile | DELETE | authenticated | `auth.uid() = id` |
+| Policy                                       | Operation | Role          | Condition         |
+| -------------------------------------------- | --------- | ------------- | ----------------- |
+| Profiles are viewable by authenticated users | SELECT    | authenticated | `true`            |
+| Profiles are viewable by anonymous users     | SELECT    | anon          | `true`            |
+| Users can insert their own profile           | INSERT    | authenticated | `auth.uid() = id` |
+| Users can update their own profile           | UPDATE    | authenticated | `auth.uid() = id` |
+| Users can delete their own profile           | DELETE    | authenticated | `auth.uid() = id` |
 
 **Triggers:**
 
@@ -99,6 +101,7 @@ create index profiles_email_idx on public.profiles using btree (email);
 **Purpose:** Store conversation metadata for research threads.
 
 **Schema (proposed):**
+
 ```sql
 create table public.conversations (
   id uuid primary key default gen_random_uuid(),
@@ -113,12 +116,14 @@ comment on table public.conversations is 'User conversations linking to LangGrap
 ```
 
 **Indexes:**
+
 ```sql
 create index conversations_user_id_idx on public.conversations using btree (user_id);
 create index conversations_thread_id_idx on public.conversations using btree (thread_id);
 ```
 
 **RLS Policies:**
+
 ```sql
 -- SELECT: Users can view their own conversations
 create policy "Users can view own conversations"
@@ -147,6 +152,7 @@ using ( (select auth.uid()) = user_id );
 **Purpose:** Store research outputs (reports, sources, etc.)
 
 **Schema (proposed):**
+
 ```sql
 create table public.research_artifacts (
   id uuid primary key default gen_random_uuid(),
@@ -162,6 +168,7 @@ comment on table public.research_artifacts is 'Research outputs including report
 ```
 
 **Indexes:**
+
 ```sql
 create index artifacts_conversation_id_idx on public.research_artifacts using btree (conversation_id);
 create index artifacts_type_idx on public.research_artifacts using btree (artifact_type);
@@ -172,6 +179,7 @@ create index artifacts_type_idx on public.research_artifacts using btree (artifa
 **Purpose:** Store user settings and preferences.
 
 **Schema (proposed):**
+
 ```sql
 create table public.user_preferences (
   user_id uuid primary key references public.profiles (id) on delete cascade,
@@ -207,6 +215,7 @@ $$;
 ```
 
 **Trigger:**
+
 ```sql
 create trigger on_auth_user_created
   after insert on auth.users
@@ -254,17 +263,18 @@ Per `.cursor/rules/create-rls-policies.mdc`:
 
 ## Index Strategy
 
-| Column Type | Index Recommendation |
-|-------------|---------------------|
-| Primary key (uuid) | Automatic B-tree |
-| Foreign key | B-tree for joins |
-| Email/lookup fields | B-tree |
-| Text search | GIN with tsvector |
-| JSONB fields | GIN for containment |
+| Column Type         | Index Recommendation |
+| ------------------- | -------------------- |
+| Primary key (uuid)  | Automatic B-tree     |
+| Foreign key         | B-tree for joins     |
+| Email/lookup fields | B-tree               |
+| Text search         | GIN with tsvector    |
+| JSONB fields        | GIN for containment  |
 
 ## Backup & Recovery
 
 Supabase provides:
+
 - Point-in-time recovery (Pro plan)
 - Daily backups (all plans)
 - Manual backup via `pg_dump`
@@ -281,4 +291,3 @@ supabase db reset
 # Generate types
 supabase gen types typescript --local > types/supabase.ts
 ```
-

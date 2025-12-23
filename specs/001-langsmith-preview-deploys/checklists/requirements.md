@@ -34,4 +34,3 @@
 - All checklist items pass validation
 - Spec references LangSmith Control Plane API as a service boundary, which is acceptable
 - Ready to proceed to `/speckit.plan`
-

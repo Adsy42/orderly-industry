@@ -13,11 +13,13 @@ Given a technical plan, generate a tasks list:
 ### Task Format
 
 Every task MUST follow this format:
+
 ```
 - [ ] [TaskID] [P?] [Story?] Description with file path
 ```
 
 Components:
+
 1. **Checkbox**: `- [ ]` (markdown checkbox)
 2. **Task ID**: Sequential (T001, T002, T003...)
 3. **[P] marker**: Only if parallelizable (different files, no dependencies)
@@ -27,21 +29,25 @@ Components:
 ### Phase Structure
 
 **Phase 1: Setup**
+
 - Project initialization
 - Dependencies installation
 - Configuration files
 
 **Phase 2: Foundational**
+
 - Blocking prerequisites
 - Shared infrastructure
 - Database migrations
 
 **Phase 3+: User Stories** (in priority order)
+
 - Each story gets its own phase
 - Within each: Models → Services → Endpoints → Integration
 - Each phase is independently testable
 
 **Final Phase: Polish**
+
 - Cross-cutting concerns
 - Documentation
 - Cleanup
@@ -74,6 +80,7 @@ Components:
 ### Dependency Graph
 
 Show which tasks depend on others:
+
 ```
 T001 → T002 → T003
               ↓
@@ -85,6 +92,7 @@ T001 → T002 → T003
 ### Parallel Execution
 
 Identify tasks that can run simultaneously:
+
 - Different files with no shared state
 - Independent user stories
 - Tests and implementation (different files)
@@ -92,12 +100,14 @@ Identify tasks that can run simultaneously:
 ## Guidelines
 
 **DO:**
+
 - Include exact file paths
 - Make tasks atomic (single responsibility)
 - Order by dependencies
 - Mark parallelizable tasks
 
 **DON'T:**
+
 - Create vague tasks ("implement feature")
 - Skip file paths
 - Create overly large tasks
@@ -108,4 +118,3 @@ Identify tasks that can run simultaneously:
 - Plan Template: `.specify/templates/plan-template.md`
 - Tasks Template: `.specify/templates/tasks-template.md`
 - Project Structure: `README.md`
-

@@ -48,6 +48,7 @@ The Deep Research Agent is a LangGraph-powered research assistant that conducts 
 **Location:** `apps/agent/src/agent/graph.py`
 
 **Responsibilities:**
+
 1. Parse and understand user research requests
 2. Create a structured TODO list for research planning
 3. Save the original research question to `/research_request.md`
@@ -57,6 +58,7 @@ The Deep Research Agent is a LangGraph-powered research assistant that conducts 
 7. Verify report addresses all aspects of the original request
 
 **Configuration:**
+
 ```python
 agent = create_deep_agent(
     model=model,
@@ -67,12 +69,14 @@ agent = create_deep_agent(
 ```
 
 **Limits:**
+
 - Maximum concurrent research units: 3
 - Maximum researcher iterations: 3
 
 ### Research Sub-Agent
 
 **Definition:**
+
 ```python
 research_sub_agent = {
     "name": "research-agent",
@@ -83,6 +87,7 @@ research_sub_agent = {
 ```
 
 **Responsibilities:**
+
 1. Execute focused web searches on delegated topics
 2. Use strategic reflection to assess research progress
 3. Gather relevant sources and evidence
@@ -90,6 +95,7 @@ research_sub_agent = {
 5. Return structured findings to orchestrator
 
 **Tool Call Limits:**
+
 - Simple queries: 2-3 search calls maximum
 - Complex queries: up to 5 search calls maximum
 - Stop after 5 searches if sources not found
@@ -103,6 +109,7 @@ research_sub_agent = {
 **Location:** `apps/agent/src/agent/tools.py`
 
 **Signature:**
+
 ```python
 @tool(parse_docstring=True)
 def tavily_search(
@@ -113,6 +120,7 @@ def tavily_search(
 ```
 
 **Behavior:**
+
 1. Uses Tavily API to discover relevant URLs
 2. Fetches full webpage content for each URL
 3. Converts HTML to markdown
@@ -125,12 +133,14 @@ def tavily_search(
 **Location:** `apps/agent/src/agent/tools.py`
 
 **Signature:**
+
 ```python
 @tool(parse_docstring=True)
 def think_tool(reflection: str) -> str
 ```
 
 **Usage:**
+
 - After each search to analyze results
 - Before deciding next steps
 - When assessing research gaps
@@ -143,6 +153,7 @@ def think_tool(reflection: str) -> str
 **Location:** `apps/agent/src/agent/prompts.py`
 
 **Content:**
+
 - Research workflow (Plan → Delegate → Research → Synthesize → Write)
 - Research planning guidelines
 - Report writing guidelines with structure patterns
@@ -153,6 +164,7 @@ def think_tool(reflection: str) -> str
 **Purpose:** Instructions for research sub-agents
 
 **Key Elements:**
+
 - Task description and available tools
 - Step-by-step research methodology
 - Hard limits on tool usage
@@ -164,6 +176,7 @@ def think_tool(reflection: str) -> str
 **Purpose:** Guidelines for orchestrator when delegating
 
 **Key Principles:**
+
 - Default to single sub-agent for most queries
 - Parallelize only for explicit comparisons
 - Bias toward focused over exhaustive exploration
@@ -172,11 +185,13 @@ def think_tool(reflection: str) -> str
 ## Model Configuration
 
 **Current Default:**
+
 ```python
 model = init_chat_model(model="openai:gpt-4o", temperature=0.0)
 ```
 
 **Alternatives:**
+
 ```python
 # Anthropic Claude Sonnet
 model = init_chat_model(model="anthropic:claude-sonnet-4-5-20250929", temperature=0.0)
@@ -192,6 +207,7 @@ All agent requests are authenticated via Supabase JWT validation.
 **Location:** `apps/agent/src/security/auth.py`
 
 **Flow:**
+
 1. Extract `Authorization: Bearer {token}` from request headers
 2. Validate token against Supabase Auth API
 3. Return user identity for resource scoping
@@ -204,6 +220,7 @@ All agent requests are authenticated via Supabase JWT validation.
 **Configuration File:** `apps/agent/langgraph.json`
 
 **Required Environment Variables:**
+
 - `SUPABASE_URL`
 - `SUPABASE_ANON_KEY`
 - `ANTHROPIC_API_KEY` or `OPENAI_API_KEY`
@@ -235,9 +252,9 @@ All agent requests are authenticated via Supabase JWT validation.
 ## Quality Metrics
 
 Research quality is evaluated on:
+
 1. Comprehensiveness - all aspects of question addressed
 2. Citation accuracy - sources properly referenced
 3. Structure - appropriate report format for question type
 4. Efficiency - minimal unnecessary tool calls
 5. Clarity - professional writing without self-reference
-

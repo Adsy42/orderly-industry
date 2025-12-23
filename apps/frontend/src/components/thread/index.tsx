@@ -80,7 +80,6 @@ function ScrollToBottom(props: { className?: string }) {
   );
 }
 
-
 export function Thread() {
   const [artifactContext, setArtifactContext] = useArtifactContext();
   const [artifactOpen, closeArtifact] = useArtifactOpen();
@@ -401,7 +400,7 @@ export function Thread() {
                 <div className="sticky bottom-0 flex flex-col items-center gap-8 bg-white">
                   {!chatStarted && (
                     <div className="flex items-center gap-3">
-                      <OrderlyIcon className="h-8 flex-shrink-0 text-primary" />
+                      <OrderlyIcon className="text-primary h-8 flex-shrink-0" />
                       <h1 className="text-2xl font-semibold tracking-tight">
                         Orderly
                       </h1>

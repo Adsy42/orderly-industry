@@ -202,14 +202,12 @@ export const StreamProvider: React.FC<{ children: ReactNode }> = ({
         <div className="animate-in fade-in-0 zoom-in-95 bg-background flex max-w-3xl flex-col rounded-lg border shadow-lg">
           <div className="mt-14 flex flex-col gap-2 border-b p-6">
             <div className="flex flex-col items-start gap-2">
-              <OrderlyIcon className="h-7 text-primary" />
-              <h1 className="text-xl font-semibold tracking-tight">
-                Orderly
-              </h1>
+              <OrderlyIcon className="text-primary h-7" />
+              <h1 className="text-xl font-semibold tracking-tight">Orderly</h1>
             </div>
             <p className="text-muted-foreground">
-              Welcome to Orderly! Before you get started, you need to enter
-              the URL of the deployment and the assistant / graph ID.
+              Welcome to Orderly! Before you get started, you need to enter the
+              URL of the deployment and the assistant / graph ID.
             </p>
           </div>
           <form
@@ -268,10 +266,9 @@ export const StreamProvider: React.FC<{ children: ReactNode }> = ({
             <div className="flex flex-col gap-2">
               <Label htmlFor="apiKey">API Key</Label>
               <p className="text-muted-foreground text-sm">
-                This is <strong>NOT</strong> required if using a local
-                server. This value is stored in your browser's local storage and
-                is only used to authenticate requests sent to your Orderly
-                server.
+                This is <strong>NOT</strong> required if using a local server.
+                This value is stored in your browser's local storage and is only
+                used to authenticate requests sent to your Orderly server.
               </p>
               <PasswordInput
                 id="apiKey"

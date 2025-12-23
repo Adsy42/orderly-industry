@@ -36,6 +36,8 @@ A full-stack AI research assistant combining a Next.js chat interface with a Lan
 
 ## Quick Start
 
+> 📋 **New to the project?** See [ONBOARDING.md](ONBOARDING.md) for a quick setup guide.
+
 ### 1. Clone and Install
 
 ```bash
@@ -51,12 +53,14 @@ cd ../..
 ### 2. Configure Environment Variables
 
 **Frontend** (`apps/frontend/.env.local`):
+
 ```bash
 cp apps/frontend/.env.example apps/frontend/.env.local
 # Edit with your Supabase credentials
 ```
 
 **Agent** (`apps/agent/.env`):
+
 ```bash
 cp apps/agent/.env.example apps/agent/.env
 # Edit with your API keys
@@ -149,13 +153,13 @@ pnpm dev:all
 
 ### Available Scripts
 
-| Command | Description |
-|---------|-------------|
-| `pnpm dev` | Start frontend (port 3000) |
+| Command          | Description                    |
+| ---------------- | ------------------------------ |
+| `pnpm dev`       | Start frontend (port 3000)     |
 | `pnpm dev:agent` | Start agent server (port 2024) |
-| `pnpm dev:all` | Start both concurrently |
-| `pnpm build` | Build frontend for production |
-| `pnpm lint` | Run ESLint on frontend |
+| `pnpm dev:all`   | Start both concurrently        |
+| `pnpm build`     | Build frontend for production  |
+| `pnpm lint`      | Run ESLint on frontend         |
 
 ### Testing the Agent
 
@@ -198,24 +202,24 @@ Then open http://localhost:2024/docs to see the API documentation.
 
 #### Frontend (Vercel)
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL | Yes |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY` | Supabase anon key | Yes |
-| `NEXT_PUBLIC_API_URL` | API endpoint URL | Yes |
-| `NEXT_PUBLIC_ASSISTANT_ID` | Graph ID (`deep_research`) | Yes |
-| `LANGGRAPH_API_URL` | LangSmith deployment URL | Production |
-| `LANGSMITH_API_KEY` | LangSmith API key | Production |
+| Variable                                       | Description                | Required   |
+| ---------------------------------------------- | -------------------------- | ---------- |
+| `NEXT_PUBLIC_SUPABASE_URL`                     | Supabase project URL       | Yes        |
+| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY` | Supabase anon key          | Yes        |
+| `NEXT_PUBLIC_API_URL`                          | API endpoint URL           | Yes        |
+| `NEXT_PUBLIC_ASSISTANT_ID`                     | Graph ID (`deep_research`) | Yes        |
+| `LANGGRAPH_API_URL`                            | LangSmith deployment URL   | Production |
+| `LANGSMITH_API_KEY`                            | LangSmith API key          | Production |
 
 #### Agent (LangSmith)
 
-| Variable | Description | Required |
-|----------|-------------|----------|
-| `SUPABASE_URL` | Supabase project URL | Yes |
-| `SUPABASE_ANON_KEY` | Supabase anon key | Yes |
-| `ANTHROPIC_API_KEY` | Anthropic API key | Yes |
-| `TAVILY_API_KEY` | Tavily search API key | Yes |
-| `LANGSMITH_API_KEY` | LangSmith API key | Auto-set |
+| Variable            | Description           | Required |
+| ------------------- | --------------------- | -------- |
+| `SUPABASE_URL`      | Supabase project URL  | Yes      |
+| `SUPABASE_ANON_KEY` | Supabase anon key     | Yes      |
+| `ANTHROPIC_API_KEY` | Anthropic API key     | Yes      |
+| `TAVILY_API_KEY`    | Tavily search API key | Yes      |
+| `LANGSMITH_API_KEY` | LangSmith API key     | Auto-set |
 
 ## Authentication Flow
 
@@ -240,6 +244,7 @@ All threads and conversations are automatically scoped to the authenticated user
 ### Email Templates
 
 Configure email templates in your Supabase project for:
+
 - **Sign up confirmation**: Redirect to `/auth/confirm`
 - **Password reset**: Redirect to `/auth/confirm` with type=recovery
 
@@ -273,4 +278,3 @@ Edit `apps/agent/src/agent/prompts.py` to customize the agent's behavior.
 ## License
 
 MIT
-

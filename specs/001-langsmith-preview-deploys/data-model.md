@@ -13,15 +13,16 @@ This feature is CI/CD infrastructure and doesn't introduce new application data 
 
 A temporary LangSmith deployment revision associated with a specific PR.
 
-| Attribute | Type | Description |
-|-----------|------|-------------|
-| `revision_name` | string | Unique identifier: `pr-{pr_number}` |
-| `pr_number` | integer | GitHub PR number |
-| `deployment_url` | string | LangSmith deployment URL |
-| `status` | enum | `pending`, `deploying`, `healthy`, `failed` |
-| `created_at` | timestamp | When deployment was triggered |
+| Attribute        | Type      | Description                                 |
+| ---------------- | --------- | ------------------------------------------- |
+| `revision_name`  | string    | Unique identifier: `pr-{pr_number}`         |
+| `pr_number`      | integer   | GitHub PR number                            |
+| `deployment_url` | string    | LangSmith deployment URL                    |
+| `status`         | enum      | `pending`, `deploying`, `healthy`, `failed` |
+| `created_at`     | timestamp | When deployment was triggered               |
 
 **Lifecycle**:
+
 ```
 PR Opened → Deployment Created → Health Check → URL Posted → PR Closed → (Manual Cleanup)
 ```
@@ -30,14 +31,15 @@ PR Opened → Deployment Created → Health Check → URL Posted → PR Closed �
 
 The main LangSmith deployment serving production traffic.
 
-| Attribute | Type | Description |
-|-----------|------|-------------|
-| `deployment_name` | string | Configured in LangSmith dashboard |
-| `revision` | string | Latest deployed revision (git SHA or tag) |
-| `url` | string | Production deployment URL |
-| `status` | enum | `healthy`, `deploying`, `failed` |
+| Attribute         | Type   | Description                               |
+| ----------------- | ------ | ----------------------------------------- |
+| `deployment_name` | string | Configured in LangSmith dashboard         |
+| `revision`        | string | Latest deployed revision (git SHA or tag) |
+| `url`             | string | Production deployment URL                 |
+| `status`          | enum   | `healthy`, `deploying`, `failed`          |
 
 **Lifecycle**:
+
 ```
 PR Merged → Deployment Updated → Health Check → Summary Posted
 ```
@@ -46,14 +48,14 @@ PR Merged → Deployment Updated → Health Check → Summary Posted
 
 GitHub Actions workflow execution tracking.
 
-| Attribute | Type | Description |
-|-----------|------|-------------|
-| `run_id` | integer | GitHub Actions run ID |
-| `workflow_name` | string | `preview-agent` or `deploy-agent` |
-| `trigger` | string | `pull_request` or `push` |
-| `status` | enum | `queued`, `in_progress`, `completed`, `failed` |
-| `pr_number` | integer | Associated PR (if applicable) |
-| `commit_sha` | string | Git commit being deployed |
+| Attribute       | Type    | Description                                    |
+| --------------- | ------- | ---------------------------------------------- |
+| `run_id`        | integer | GitHub Actions run ID                          |
+| `workflow_name` | string  | `preview-agent` or `deploy-agent`              |
+| `trigger`       | string  | `pull_request` or `push`                       |
+| `status`        | enum    | `queued`, `in_progress`, `completed`, `failed` |
+| `pr_number`     | integer | Associated PR (if applicable)                  |
+| `commit_sha`    | string  | Git commit being deployed                      |
 
 ## State Transitions
 
@@ -118,10 +120,10 @@ GitHub Actions workflow execution tracking.
 
 ### GitHub Secrets (new)
 
-| Secret | Purpose | Required |
-|--------|---------|----------|
-| `LANGSMITH_API_KEY` | LangSmith API authentication | Yes |
-| `LANGSMITH_WORKSPACE_ID` | Dashboard link generation | Yes |
+| Secret                   | Purpose                      | Required |
+| ------------------------ | ---------------------------- | -------- |
+| `LANGSMITH_API_KEY`      | LangSmith API authentication | Yes      |
+| `LANGSMITH_WORKSPACE_ID` | Dashboard link generation    | Yes      |
 
 ## Relationships
 
@@ -136,4 +138,3 @@ GitHub Actions workflow execution tracking.
 │   Git Commit    │◀──────────────────│   Deployment    │
 └─────────────────┘                   └─────────────────┘
 ```
-

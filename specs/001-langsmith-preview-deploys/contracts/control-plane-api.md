@@ -33,6 +33,7 @@ langgraph deploy \
 | `LANGSMITH_API_KEY` | Yes | API key for authentication |
 
 **Expected Output**:
+
 ```
 Deploying to LangSmith...
 Building image...
@@ -59,6 +60,7 @@ Used to post deployment URLs on PRs.
 **Endpoint**: `POST /repos/{owner}/{repo}/issues/{issue_number}/comments`
 
 **Request Body**:
+
 ```json
 {
   "body": "## 🤖 Agent Preview Deployed\n\n| Resource | URL |\n|----------|-----|\n| **Agent Preview** | https://... |"
@@ -74,8 +76,8 @@ github.rest.issues.createComment({
   issue_number: context.issue.number,
   owner: context.repo.owner,
   repo: context.repo.repo,
-  body: `## 🤖 Agent Preview Deployed\n...`
-})
+  body: `## 🤖 Agent Preview Deployed\n...`,
+});
 ```
 
 ---
@@ -127,19 +129,18 @@ github.rest.issues.createComment({
 
 ### Common Deployment Errors
 
-| Error | Cause | Resolution |
-|-------|-------|------------|
-| `401 Unauthorized` | Invalid API key | Check `LANGSMITH_API_KEY` secret |
-| `403 Forbidden` | Insufficient permissions | Verify API key has deployment access |
-| `422 Validation Error` | Invalid langgraph.json | Validate config locally with `langgraph dev` |
-| `500 Internal Error` | LangSmith platform issue | Retry or contact support |
-| `Pool Timeout` | Database connection issue | Check agent code for DB configs |
+| Error                  | Cause                     | Resolution                                   |
+| ---------------------- | ------------------------- | -------------------------------------------- |
+| `401 Unauthorized`     | Invalid API key           | Check `LANGSMITH_API_KEY` secret             |
+| `403 Forbidden`        | Insufficient permissions  | Verify API key has deployment access         |
+| `422 Validation Error` | Invalid langgraph.json    | Validate config locally with `langgraph dev` |
+| `500 Internal Error`   | LangSmith platform issue  | Retry or contact support                     |
+| `Pool Timeout`         | Database connection issue | Check agent code for DB configs              |
 
 ### Build Errors
 
-| Error | Cause | Resolution |
-|-------|-------|------------|
-| `ModuleNotFoundError` | Missing dependency | Add to pyproject.toml |
-| `SyntaxError` | Invalid Python code | Fix code and push again |
-| `ImportError` | Circular import or missing module | Check import structure |
-
+| Error                 | Cause                             | Resolution              |
+| --------------------- | --------------------------------- | ----------------------- |
+| `ModuleNotFoundError` | Missing dependency                | Add to pyproject.toml   |
+| `SyntaxError`         | Invalid Python code               | Fix code and push again |
+| `ImportError`         | Circular import or missing module | Check import structure  |

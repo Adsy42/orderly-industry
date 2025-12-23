@@ -88,6 +88,7 @@ apps/frontend/src/
 **Purpose:** Main chat interface combining message list, input, and artifact panel.
 
 **Structure:**
+
 ```
 ┌─────────────────────────────────────────────────────────────────────────────┐
 │                              Thread Component                                │
@@ -122,13 +123,13 @@ apps/frontend/src/
 
 **Location:** `apps/frontend/src/components/thread/messages/`
 
-| Component | Purpose |
-|-----------|---------|
-| `ai.tsx` | AI response messages with markdown rendering |
-| `human.tsx` | User input messages |
-| `tool-calls.tsx` | Tool invocation and result display |
-| `generic-interrupt.tsx` | Agent interrupt/pause handling |
-| `shared.tsx` | Common message utilities |
+| Component               | Purpose                                      |
+| ----------------------- | -------------------------------------------- |
+| `ai.tsx`                | AI response messages with markdown rendering |
+| `human.tsx`             | User input messages                          |
+| `tool-calls.tsx`        | Tool invocation and result display           |
+| `generic-interrupt.tsx` | Agent interrupt/pause handling               |
+| `shared.tsx`            | Common message utilities                     |
 
 ### Agent Inbox
 
@@ -137,6 +138,7 @@ apps/frontend/src/
 **Purpose:** Handle agent interrupts requiring user input.
 
 **Components:**
+
 - `inbox-item-input.tsx` - Input for responding to interrupts
 - `state-view.tsx` - Display agent state
 - `thread-actions-view.tsx` - Thread action buttons
@@ -149,6 +151,7 @@ apps/frontend/src/
 **Purpose:** Display research artifacts in a side panel.
 
 **Features:**
+
 - Collapsible panel
 - Context-aware rendering
 - Support for reports, code, and structured data
@@ -162,6 +165,7 @@ apps/frontend/src/
 **Purpose:** Manage thread state and history.
 
 **State:**
+
 ```typescript
 interface ThreadContextType {
   getThreads: () => Promise<Thread[]>;
@@ -173,6 +177,7 @@ interface ThreadContextType {
 ```
 
 **Usage:**
+
 ```typescript
 const { threads, getThreads, threadsLoading } = useThreads();
 ```
@@ -184,6 +189,7 @@ const { threads, getThreads, threadsLoading } = useThreads();
 **Purpose:** Manage LangGraph streaming connection.
 
 **Features:**
+
 - Real-time message streaming
 - Automatic reconnection
 - State synchronization
@@ -193,6 +199,7 @@ const { threads, getThreads, threadsLoading } = useThreads();
 **Location:** `apps/frontend/src/components/ui/`
 
 Pre-built components:
+
 - `button.tsx` - Button variants
 - `card.tsx` - Card containers
 - `input.tsx` - Text inputs
@@ -212,6 +219,7 @@ Pre-built components:
 **Location:** `apps/frontend/tailwind.config.js`
 
 **Theme Extensions:**
+
 - Custom color palette
 - Typography scale
 - Animation utilities
@@ -238,6 +246,7 @@ Pre-built components:
 ### URL State (nuqs)
 
 Query parameters for shareable state:
+
 - `apiUrl` - LangGraph API endpoint
 - `assistantId` - Assistant/graph ID
 - `threadId` - Current thread ID
@@ -276,6 +285,7 @@ export function createClient(apiUrl: string, apiKey?: string) {
 **Location:** `apps/frontend/src/app/api/[..._path]/route.ts`
 
 Proxies requests to LangGraph server:
+
 1. Receives client request
 2. Adds authentication headers
 3. Forwards to `LANGGRAPH_API_URL`
@@ -290,15 +300,21 @@ Middleware redirects unauthenticated users to `/auth/login`.
 ### Session Access
 
 Server components:
+
 ```typescript
 const supabase = await createClient();
-const { data: { user } } = await supabase.auth.getUser();
+const {
+  data: { user },
+} = await supabase.auth.getUser();
 ```
 
 Client components:
+
 ```typescript
 const supabase = createClient();
-const { data: { session } } = await supabase.auth.getSession();
+const {
+  data: { session },
+} = await supabase.auth.getSession();
 ```
 
 ## Environment Variables
@@ -317,11 +333,11 @@ LANGSMITH_API_KEY=             # API key for server-side requests
 
 ## Responsive Design
 
-| Breakpoint | Layout |
-|------------|--------|
-| < 768px | Single column, stacked panels |
-| 768px - 1024px | Two columns, collapsible sidebar |
-| > 1024px | Three columns with persistent sidebar |
+| Breakpoint     | Layout                                |
+| -------------- | ------------------------------------- |
+| < 768px        | Single column, stacked panels         |
+| 768px - 1024px | Two columns, collapsible sidebar      |
+| > 1024px       | Three columns with persistent sidebar |
 
 ## Accessibility
 
@@ -358,4 +374,3 @@ LANGSMITH_API_KEY=             # API key for server-side requests
 1. Define CSS variables in `globals.css`
 2. Add theme switcher component
 3. Persist preference to `user_preferences` table
-

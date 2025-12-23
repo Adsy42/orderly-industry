@@ -153,10 +153,19 @@
 
   /* Orderly gradient backgrounds */
   .bg-orderly-gradient {
-    background: linear-gradient(135deg, oklch(0.25 0.12 260) 0%, oklch(0.4 0.18 260) 50%, oklch(0.35 0.15 250) 100%);
+    background: linear-gradient(
+      135deg,
+      oklch(0.25 0.12 260) 0%,
+      oklch(0.4 0.18 260) 50%,
+      oklch(0.35 0.15 250) 100%
+    );
   }
 
   .bg-orderly-gradient-subtle {
-    background: linear-gradient(180deg, oklch(0.98 0.01 250) 0%, oklch(0.96 0.02 260) 100%);
+    background: linear-gradient(
+      180deg,
+      oklch(0.98 0.01 250) 0%,
+      oklch(0.96 0.02 260) 100%
+    );
   }
 }
