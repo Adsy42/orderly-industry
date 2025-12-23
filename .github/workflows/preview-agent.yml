@@ -6,6 +6,10 @@ on:
     paths:
       - 'apps/agent/**'
 
+permissions:
+  contents: read
+  pull-requests: write
+
 env:
   LANGSMITH_API_KEY: ${{ secrets.LANGSMITH_API_KEY }}
 
