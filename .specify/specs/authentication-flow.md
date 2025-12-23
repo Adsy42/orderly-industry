@@ -285,3 +285,4 @@ SUPABASE_ANON_KEY=eyJhbG...
 1. Store roles in `raw_app_meta_data` (not `raw_user_meta_data`)
 2. Access via `auth.jwt() -> 'app_metadata' -> 'role'` in RLS
 3. Add role checks to agent auth handler
+

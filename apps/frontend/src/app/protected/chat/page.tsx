@@ -21,4 +21,3 @@ export default function ChatPage(): React.ReactNode {
     </React.Suspense>
   );
 }
-

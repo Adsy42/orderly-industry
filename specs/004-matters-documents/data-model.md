@@ -138,7 +138,7 @@ Represents vector embeddings of document chunks for semantic search.
 | `document_id` | uuid         | FK documents(id) ON DELETE CASCADE, NOT NULL | Parent document          |
 | `chunk_index` | integer      | NOT NULL                                     | Position in document     |
 | `chunk_text`  | text         | NOT NULL                                     | Text of this chunk       |
-| `embedding`   | vector(1536) | NOT NULL                                     | Isaacus embedding vector |
+| `embedding`   | vector(1792) | NOT NULL                                     | Isaacus embedding vector |
 | `created_at`  | timestamptz  | NOT NULL, default now()                      | Creation timestamp       |
 
 **Constraints**:
@@ -231,7 +231,7 @@ Similarity search for document chunks.
 
 ```sql
 create or replace function public.match_document_embeddings(
-  query_embedding vector(1536),
+  query_embedding vector(1792),
   matter_uuid uuid,
   match_threshold float default 0.7,
   match_count int default 10

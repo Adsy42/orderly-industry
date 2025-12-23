@@ -97,3 +97,4 @@ create trigger update_profiles_updated_at
   for each row execute function public.update_updated_at();
 
 
+

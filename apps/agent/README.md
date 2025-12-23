@@ -1,19 +1,19 @@
 # Deep Research Agent
 
-Python LangGraph agent for deep research with web search capabilities.
+Python LangGraph agent for deep research with web search and legal document analysis capabilities.
 
 ## Quick Start
 
 ```bash
-# Install dependencies
-pip install -e ".[dev]"
+# Install dependencies with uv
+uv sync
 
 # Set up environment
 cp .env.example .env
 # Edit .env with your API keys
 
 # Run development server
-langgraph dev
+uv run langgraph dev
 ```
 
 The agent API will be available at [http://localhost:2024](http://localhost:2024).
@@ -22,49 +22,80 @@ The agent API will be available at [http://localhost:2024](http://localhost:2024
 
 Copy `.env.example` to `.env` and configure:
 
-| Variable            | Description                   | Required    |
-| ------------------- | ----------------------------- | ----------- |
-| `ANTHROPIC_API_KEY` | Anthropic API key for Claude  | Yes         |
-| `TAVILY_API_KEY`    | Tavily API key for web search | Yes         |
-| `SUPABASE_URL`      | Supabase project URL          | Yes         |
-| `SUPABASE_ANON_KEY` | Supabase anon key             | Yes         |
-| `LANGSMITH_API_KEY` | LangSmith API key             | Recommended |
-| `LANGSMITH_TRACING` | Enable tracing (`true`)       | Recommended |
+| Variable                     | Description                                  | Required                   |
+| ---------------------------- | -------------------------------------------- | -------------------------- |
+| `OPENAI_API_KEY`             | OpenAI API key for GPT models                | Yes                        |
+| `TAVILY_API_KEY`             | Tavily API key for web search                | Yes                        |
+| `SUPABASE_URL`               | Supabase project URL                         | Yes                        |
+| `SUPABASE_ANON_KEY`          | Supabase anon key                            | Yes                        |
+| `SUPABASE_SERVICE_ROLE_KEY`  | Supabase service role key (bypasses RLS)     | Yes (for document tools)   |
+| `ISAACUS_API_KEY`            | Isaacus Legal AI API key                     | Yes (for document tools)   |
+| `ISAACUS_BASE_URL`           | Isaacus API base URL                         | No (defaults to production)|
+| `DEEPSEEK_API_KEY`           | DeepSeek API key for OCR                     | No (for scanned PDFs)      |
+| `LANGSMITH_API_KEY`          | LangSmith API key                            | Recommended                |
+| `LANGSMITH_TRACING`          | Enable tracing (`true`)                      | Recommended                |
+
+**Important:** The `SUPABASE_SERVICE_ROLE_KEY` is required for document analysis tools to work. Without it, the agent cannot access documents due to Row Level Security (RLS) policies.
 
 ## Project Structure
 
 ```
 src/
 ├── agent/
-│   ├── graph.py        # Main graph definition
-│   ├── prompts.py      # System prompts
-│   └── tools.py        # Search tools (Tavily)
-└── security/
-    └── auth.py         # JWT validation against Supabase
+│   ├── graph.py           # Main graph definition with orchestrator
+│   ├── prompts.py         # System prompts for orchestrator and subagents
+│   └── tools.py           # Core tools (Tavily search)
+├── agents/
+│   └── document_agent.py  # Document Agent subagent configuration
+├── security/
+│   └── auth.py            # JWT validation against Supabase
+├── services/
+│   ├── isaacus_client.py      # Isaacus Legal AI API client
+│   ├── document_processor.py  # Text extraction (PDF/DOCX/TXT)
+│   └── deepseek_ocr.py        # OCR for scanned documents
+└── tools/
+    ├── isaacus_search.py      # Semantic document search + reranking
+    ├── isaacus_extract.py     # Extractive QA with citations
+    ├── isaacus_classify.py    # Legal clause classification
+    ├── get_document_text.py   # Retrieve document text from Supabase
+    └── list_matter_documents.py  # List documents in a matter
 ```
 
 ## Architecture
 
-The agent uses a hierarchical delegation model:
+The agent uses a hierarchical delegation model with specialized subagents:
 
 ```
 ┌─────────────────────────────────────────────┐
 │              Orchestrator                    │
-│   Plans research, delegates, synthesizes    │
+│   Plans tasks, delegates, synthesizes       │
 └─────────────────┬───────────────────────────┘
                   │
-    ┌─────────────┴─────────────┐
-    │                           │
-┌───▼───────┐           ┌───────▼───┐
-│ Sub-agent │           │ Sub-agent │
-│ (focused) │           │ (focused) │
-└─────┬─────┘           └─────┬─────┘
-      │                       │
-┌─────▼─────┐           ┌─────▼─────┐
-│  Tavily   │           │  Tavily   │
-│  Search   │           │  Search   │
-└───────────┘           └───────────┘
+    ┌─────────────┼─────────────┐
+    │             │             │
+┌───▼───────┐ ┌───▼───────┐ ┌───▼───────────┐
+│ Research  │ │ Document  │ │ Future        │
+│ Agent     │ │ Agent     │ │ Subagents     │
+└─────┬─────┘ └─────┬─────┘ └───────────────┘
+      │             │
+┌─────▼─────┐ ┌─────▼───────────────────────┐
+│  Tavily   │ │ • isaacus_search            │
+│  Search   │ │ • isaacus_extract           │
+└───────────┘ │ • isaacus_classify          │
+              │ • get_document_text         │
+              │ • list_matter_documents     │
+              └─────────────────────────────┘
 ```
+
+### Document Agent Tools
+
+| Tool                     | Purpose                                      |
+| ------------------------ | -------------------------------------------- |
+| `isaacus_search`         | Semantic search + reranking across documents |
+| `isaacus_extract`        | Extractive QA with document citations        |
+| `isaacus_classify`       | Legal clause classification                  |
+| `get_document_text`      | Retrieve full document text from Supabase    |
+| `list_matter_documents`  | List all documents in a matter               |
 
 ## Development
 

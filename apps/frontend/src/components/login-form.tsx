@@ -38,8 +38,8 @@ export function LoginForm({
         password,
       });
       if (error) throw error;
-      // Redirect to chat after successful login
-      router.push("/chat");
+      // Redirect to matters after successful login
+      router.push("/protected/matters");
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : "An error occurred");
     } finally {

@@ -96,7 +96,7 @@ export default function ThreadHistory() {
 
   return (
     <>
-      <div className="shadow-inner-right hidden h-screen w-[300px] shrink-0 flex-col items-start justify-start gap-6 border-r-[1px] border-slate-300 lg:flex">
+      <div className="shadow-inner-right hidden h-[calc(100vh-3.5rem)] w-[300px] shrink-0 flex-col items-start justify-start gap-6 border-r-[1px] border-slate-300 lg:flex">
         <div className="flex w-full items-center justify-between px-4 pt-1.5">
           <Button
             className="hover:bg-gray-100"

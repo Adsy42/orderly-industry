@@ -114,7 +114,7 @@ class IsaacusClient:
             model: Embedding model to use (default: kanon-2-embedder)
 
         Returns:
-            List of embedding vectors (1536 dimensions each)
+            List of embedding vectors (1792 dimensions each for kanon-2-embedder)
         """
         response = await self._request(
             "POST",
@@ -124,8 +124,21 @@ class IsaacusClient:
                 "model": model,
             },
         )
-        # Isaacus returns { embeddings: [[...], [...], ...] }
-        return response.get("embeddings", [])
+        # Isaacus returns { embeddings: [{"index": 0, "embedding": [...]}, ...] }
+        # or potentially { embeddings: [[...], [...], ...] } - handle both formats
+        embeddings_data = response.get("embeddings", [])
+
+        if not embeddings_data:
+            return []
+
+        # Check if first item is an object with 'embedding' field or a raw array
+        first_item = embeddings_data[0]
+        if isinstance(first_item, dict) and "embedding" in first_item:
+            # Format: [{"index": 0, "embedding": [...]}, ...]
+            return [item["embedding"] for item in embeddings_data]
+        else:
+            # Format: [[...], [...], ...] - already raw arrays
+            return embeddings_data
 
     async def rerank(
         self,

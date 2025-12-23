@@ -8,6 +8,7 @@ from langchain_core.tools import tool
 from pydantic import BaseModel, Field
 
 from ..services.isaacus_client import IsaacusClient
+from .list_matter_documents import get_matter_documents_list
 
 
 class SearchResult(BaseModel):
@@ -31,8 +32,8 @@ class IsaacusSearchInput(BaseModel):
         le=20,
     )
     threshold: float = Field(
-        default=0.5,
-        description="Minimum similarity threshold (0-1)",
+        default=0.3,
+        description="Minimum similarity threshold (0-1), lower values return more results",
         ge=0,
         le=1,
     )
@@ -58,7 +59,7 @@ def isaacus_search(
     matter_id: str,
     query: str,
     max_results: int = 5,
-    threshold: float = 0.5,
+    threshold: float = 0.3,
 ) -> dict:
     """Search for relevant document chunks within a matter using semantic similarity.
 
@@ -135,6 +136,10 @@ async def _isaacus_search_async(
             }
 
         query_embedding = embeddings[0]
+        print(f"Query embedding dimension: {len(query_embedding)}")
+
+        # Format embedding as string for pgvector (PostgREST expects string format)
+        embedding_str = "[" + ",".join(str(x) for x in query_embedding) + "]"
 
         # Call Supabase RPC function to find similar documents
         async with httpx.AsyncClient() as http_client:
@@ -146,7 +151,7 @@ async def _isaacus_search_async(
                     "Content-Type": "application/json",
                 },
                 json={
-                    "query_embedding": query_embedding,
+                    "query_embedding": embedding_str,
                     "matter_uuid": matter_id,
                     "match_threshold": threshold,
                     "match_count": max_results,
@@ -154,12 +159,16 @@ async def _isaacus_search_async(
             )
 
             if response.status_code != 200:
+                # Log the actual error for debugging
+                error_detail = response.text
+                print(f"Supabase RPC error: {response.status_code} - {error_detail}")
+                print(f"Query embedding dimension: {len(query_embedding)}")
                 return {
                     "results": [],
                     "total_found": 0,
                     "query": query,
                     "matter_id": matter_id,
-                    "error": f"Supabase RPC error: {response.status_code}",
+                    "error": f"Supabase RPC error: {response.status_code} - {error_detail}",
                 }
 
             data = response.json()
@@ -182,12 +191,51 @@ async def _isaacus_search_async(
                     "matter_id": matter_id,
                 }
 
-            return {
-                "results": [],
-                "total_found": 0,
-                "query": query,
-                "matter_id": matter_id,
-            }
+            # No results found - provide smart fallback with available documents
+            available_docs = await get_matter_documents_list(matter_id)
+
+            if available_docs:
+                # Documents exist but no content matches the query
+                ready_docs = [
+                    {"filename": doc["filename"], "status": doc["processing_status"]}
+                    for doc in available_docs
+                    if doc["processing_status"] == "ready"
+                ]
+                processing_docs = [
+                    {"filename": doc["filename"], "status": doc["processing_status"]}
+                    for doc in available_docs
+                    if doc["processing_status"]
+                    in ["pending", "extracting", "embedding"]
+                ]
+
+                return {
+                    "results": [],
+                    "total_found": 0,
+                    "query": query,
+                    "matter_id": matter_id,
+                    "available_documents": ready_docs,
+                    "processing_documents": processing_docs,
+                    "hint": (
+                        f"No content matched your query '{query}'. "
+                        f"There are {len(ready_docs)} searchable document(s) in this matter. "
+                        "Try a different search query, or use list_matter_documents to see all files."
+                    )
+                    if ready_docs
+                    else (
+                        f"Documents are still being processed ({len(processing_docs)} pending). "
+                        "Please wait for processing to complete before searching."
+                    ),
+                }
+            else:
+                # No documents exist in this matter at all
+                return {
+                    "results": [],
+                    "total_found": 0,
+                    "query": query,
+                    "matter_id": matter_id,
+                    "available_documents": [],
+                    "hint": "No documents have been uploaded to this matter yet. Upload documents first to search them.",
+                }
 
     except Exception as e:
         print(f"Isaacus search error: {e}")

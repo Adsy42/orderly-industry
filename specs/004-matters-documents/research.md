@@ -152,7 +152,7 @@ class IsaacusClient:
 **Implementation Notes**:
 
 - Enable `pgvector` extension in Supabase
-- Store embeddings in `document_embeddings` table with `vector(1536)` column
+- Store embeddings in `document_embeddings` table with `vector(1792)` column
 - Chunk documents into ~500 token segments for better retrieval
 - Use cosine similarity for search: `1 - (embedding <=> query_embedding)`
 

@@ -1,7 +1,8 @@
 # Quickstart: Matters & Document Management Foundation
 
 **Feature Branch**: `004-matters-documents`  
-**Date**: 2025-12-23
+**Date**: 2025-12-24  
+**Status**: ✅ Feature Complete
 
 ## Prerequisites
 
@@ -140,25 +141,43 @@ supabase gen types typescript --project-id your-project-id > src/lib/supabase/ty
 
 ## 5. Agent Setup
 
-### Install New Dependencies
+### Install Dependencies
 
 ```bash
 cd apps/agent
-uv add pypdf python-docx httpx
+uv sync  # All dependencies are in pyproject.toml
 ```
 
-### Create Isaacus Tools
+### Agent Tools (Implemented)
 
-Create the following files:
+The following tools are implemented in `src/tools/`:
 
-1. `src/services/isaacus_client.py` - Isaacus API wrapper
-2. `src/tools/isaacus_search.py` - Semantic search tool
-3. `src/tools/isaacus_extract.py` - Extractive QA tool
-4. `src/tools/isaacus_classify.py` - Clause classification tool
+| Tool                       | File                        | Description                         |
+| -------------------------- | --------------------------- | ----------------------------------- |
+| `isaacus_search`           | `isaacus_search.py`         | Semantic search + reranking         |
+| `isaacus_extract`          | `isaacus_extract.py`        | Extractive QA with citations        |
+| `isaacus_classify`         | `isaacus_classify.py`       | Legal clause classification         |
+| `get_document_text`        | `get_document_text.py`      | Retrieve document text from storage |
+| `list_matter_documents`    | `list_matter_documents.py`  | List documents in a matter          |
 
-### Update graph.py
+### Agent Services (Implemented)
 
-Register new tools and Document Agent subagent.
+| Service              | File                     | Description                           |
+| -------------------- | ------------------------ | ------------------------------------- |
+| `IsaacusClient`      | `isaacus_client.py`      | Isaacus API wrapper                   |
+| `DocumentProcessor`  | `document_processor.py`  | PDF/DOCX/TXT text extraction with OCR |
+| `DeepSeekOCR`        | `deepseek_ocr.py`        | OCR for scanned documents             |
+
+### OCR Support (Optional)
+
+For scanned PDF support, add DeepSeek API key:
+
+```bash
+# In apps/agent/.env
+DEEPSEEK_API_KEY=your_deepseek_key
+```
+
+The DocumentProcessor automatically uses OCR when PyMuPDF detects low text content.
 
 ---
 
@@ -315,10 +334,24 @@ If documents stay in "pending" or "extracting":
 
 ---
 
-## Next Steps
+## Implementation Complete
 
-1. Run `/speckit.tasks` to generate implementation tasks
-2. Start with database migrations (P1)
-3. Implement Matter UI (P1)
-4. Implement Document Upload (P1)
-5. Add Isaacus integration (P2)
+All 89 tasks have been implemented. See [IMPLEMENTATION_STATUS.md](./IMPLEMENTATION_STATUS.md) for details.
+
+### Remaining Configuration
+
+1. **Isaacus API Key** - Required for semantic search and document embeddings
+2. **DeepSeek API Key** - Optional, for OCR on scanned PDFs
+
+### Test the Implementation
+
+```bash
+# Start frontend
+cd apps/frontend && pnpm dev
+
+# Start agent
+cd apps/agent && uv run langgraph dev
+
+# Visit http://localhost:3000/protected/matters
+```
+

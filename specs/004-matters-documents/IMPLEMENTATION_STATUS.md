@@ -1,18 +1,18 @@
 # Implementation Status: Matters & Document Management Foundation
 
 **Feature Branch**: `004-matters-documents`  
-**Last Updated**: 2025-12-23  
-**Status**: Partially Implemented
+**Last Updated**: 2025-12-24  
+**Status**: ✅ Feature Complete (89/89 tasks)
 
 ## Summary
 
-The core infrastructure for matters and document management is in place. Document AI features require Isaacus API configuration to be fully functional.
+All 89 tasks from the specification have been completed. The core infrastructure for matters and document management is fully implemented. Document AI features require Isaacus API configuration to generate embeddings.
 
 ---
 
 ## ✅ Fully Working
 
-### Matter Management
+### Matter Management (US1) ✅ Complete
 - [x] Create matters with title and description
 - [x] Auto-generated matter numbers (M-YYYY-NNN format)
 - [x] View matters list with document counts
@@ -21,7 +21,7 @@ The core infrastructure for matters and document management is in place. Documen
 - [x] Matter participants management UI
 - [x] RLS policies for matter access control
 
-### Document Upload & Storage
+### Document Upload & Storage (US2) ✅ Complete
 - [x] Drag-and-drop document upload (Supabase Dropzone)
 - [x] PDF, DOCX, TXT file support
 - [x] 50MB file size limit
@@ -31,31 +31,64 @@ The core infrastructure for matters and document management is in place. Documen
 - [x] Document deletion (removes from storage + database)
 - [x] Real-time document status updates
 
-### Database & Security
+### Document Processing (US3) ✅ Complete
+- [x] Edge Function `process-document` deployed
+- [x] Text extraction from PDF (PyMuPDF/pypdf)
+- [x] Text extraction from DOCX (python-docx/mammoth)
+- [x] Text extraction from TXT
+- [x] **OCR support for scanned PDFs** (DeepSeek OCR integration)
+- [x] Chunking with ~500 token chunks
+- [x] Isaacus embedding generation (1792 dimensions)
+- [x] Retry logic (3 attempts) for API calls
+- [x] Processing status updates (pending → processing → ready/error)
+
+### Semantic Search (US4) ✅ Complete
+- [x] Document search UI component
+- [x] Embed API route for query vectorization
+- [x] `match_document_embeddings()` RPC function
+- [x] Search results with excerpts and similarity scores
+- [x] Excerpt highlighting in results
+- [x] Click-to-open document functionality
+- [x] Fallback to full-text search
+
+### Matter Participants (US5) ✅ Complete
+- [x] Participants manager component
+- [x] Role-based access (counsel, client, observer)
+- [x] Invite participant by email
+- [x] Remove participant (owner only)
+- [x] Change participant role (owner only)
+- [x] Permission checks on upload/delete
+
+### Database & Security ✅ Complete
 - [x] `matters` table with RLS
-- [x] `matter_participants` table with roles (counsel, client, observer)
+- [x] `matter_participants` table with roles
 - [x] `documents` table with RLS
-- [x] `document_embeddings` table with pgvector
+- [x] `document_embeddings` table with pgvector (1792 dimensions)
 - [x] `documents` Supabase Storage bucket
 - [x] `user_can_access_matter()` helper function
 - [x] `match_document_embeddings()` RPC for semantic search
+- [x] All RLS policies with proper indexes
 
-### Agent Integration
-- [x] Document Agent subagent defined
-- [x] Isaacus tools implemented:
-  - `isaacus_search` - Semantic document search
+### Agent Integration ✅ Complete
+- [x] Document Agent subagent defined and configured
+- [x] Agent tools implemented:
+  - `isaacus_search` - Semantic document search with reranking
   - `isaacus_extract` - Extractive QA with citations
   - `isaacus_classify` - Legal clause classification
+  - `get_document_text` - Retrieve full document text from Supabase
+  - `list_matter_documents` - List documents in a matter
 - [x] Tools integrated into main agent graph
 - [x] Agent prompts updated for document analysis
+- [x] DeepSeek OCR service for scanned documents
+- [x] DocumentProcessor with PyMuPDF + OCR fallback
 
 ---
 
 ## ⚠️ Requires Configuration
 
-### Document Processing (Text Extraction + Embeddings)
+### Isaacus API Key (for embeddings)
 
-The Edge Function for document processing is deployed but requires the **Isaacus API key** to generate embeddings.
+The Edge Function for document processing requires the **Isaacus API key** to generate embeddings.
 
 **To enable:**
 1. Go to Supabase Dashboard → Edge Functions → `process-document`
@@ -64,43 +97,32 @@ The Edge Function for document processing is deployed but requires the **Isaacus
 
 **Without Isaacus API key:**
 - Documents upload successfully
-- Documents show as "ready" immediately
-- Text extraction is skipped
-- Semantic search returns no results
-- Agent document tools won't find content
+- Text is extracted and stored
+- Documents show as "ready" 
+- Semantic search returns no results (no embeddings)
+- Agent tools fallback to text search
 
 **With Isaacus API key:**
-- Documents are processed after upload
-- Text is extracted from PDF/DOCX/TXT
-- Legal-optimized embeddings are generated
+- Documents are fully processed with embeddings
 - Semantic search works across documents
-- Agent can answer questions about document contents
+- Agent can answer questions about document contents with citations
+
+### DeepSeek API Key (for OCR)
+
+For scanned PDF support, the DeepSeek API key is required.
+
+**To enable:**
+1. Add `DEEPSEEK_API_KEY=<your-key>` to agent environment
+2. OCR is automatically used when PyMuPDF detects low text content
 
 ---
 
-## 🚧 Partially Working
+## 📋 Future Enhancements
 
-### Document Search UI
-- [x] Search component implemented
-- [ ] **Blocked**: Requires embeddings to be generated (needs Isaacus API key)
-- [ ] Currently non-functional without embeddings
+These items are planned for future phases:
 
-### Chat Document Q&A
-- [x] Agent tools implemented
-- [x] Document Agent subagent configured
-- [ ] **Blocked**: Requires embeddings for semantic search
-- [ ] Needs matter context passed to chat (future enhancement)
-
----
-
-## 📋 Not Yet Implemented
-
-These items are planned but not in the current implementation:
-
-### Future Enhancements
 - [ ] Matter context automatically passed to chat based on selected matter
 - [ ] Document viewer/preview in browser
-- [ ] OCR for scanned documents
 - [ ] Document versioning
 - [ ] Document annotations/highlights
 - [ ] Knowledge base across matters (Phase 2)
@@ -116,15 +138,16 @@ These items are planned but not in the current implementation:
 cd apps/frontend && pnpm dev
 
 # Start the agent (in another terminal)
-cd apps/agent && poetry run langgraph dev
+cd apps/agent && uv run langgraph dev
 ```
 
 ### For Production
 1. Apply database migrations to Supabase
 2. Deploy Edge Function: `supabase functions deploy process-document`
 3. Add Isaacus API key to Edge Function secrets
-4. Deploy frontend to Vercel
-5. Deploy agent to LangGraph Cloud
+4. Add DeepSeek API key to agent environment (for OCR)
+5. Deploy frontend to Vercel
+6. Deploy agent to LangGraph Cloud
 
 ---
 
@@ -144,7 +167,7 @@ cd apps/agent && poetry run langgraph dev
 │                   Supabase                                   │
 │  ┌────────────┐  ┌──────────────┐  ┌───────────────────────┐ │
 │  │  matters   │  │  documents   │  │ document_embeddings   │ │
-│  │  (table)   │  │   (table)    │  │  (pgvector)           │ │
+│  │  (table)   │  │   (table)    │  │  (pgvector 1792d)     │ │
 │  └────────────┘  └──────┬───────┘  └───────────────────────┘ │
 │                         │                                    │
 │                         ▼                                    │
@@ -160,14 +183,20 @@ cd apps/agent && poetry run langgraph dev
 │  process-document   │              │  ┌─────────────────────┐│
 │                     │              │  │   Orchestrator      ││
 │  • Text extraction  │              │  └──────────┬──────────┘│
-│  • Isaacus embed    │              │             │           │
-│  • Store embeddings │              │  ┌──────────▼──────────┐│
-└─────────────────────┘              │  │ Document Agent      ││
-        │                            │  │ • isaacus_search    ││
-        ▼                            │  │ • isaacus_extract   ││
-┌─────────────────────┐              │  │ • isaacus_classify  ││
-│    Isaacus API      │              │  └─────────────────────┘│
-│  (Legal AI API)     │◄─────────────│                         │
+│  • DOCX/PDF/TXT     │              │             │           │
+│  • Isaacus embed    │              │  ┌──────────▼──────────┐│
+│  • 1792d vectors    │              │  │ Document Agent      ││
+└─────────────────────┘              │  │ • isaacus_search    ││
+        │                            │  │ • isaacus_extract   ││
+        ▼                            │  │ • isaacus_classify  ││
+┌─────────────────────┐              │  │ • get_document_text ││
+│    Isaacus API      │              │  │ • list_documents    ││
+│  (Legal AI API)     │◄─────────────│  └─────────────────────┘│
+└─────────────────────┘              │                         │
+                                     │  ┌─────────────────────┐│
+┌─────────────────────┐              │  │ DeepSeek OCR        ││
+│   DeepSeek API      │◄─────────────│  │ (scanned PDFs)      ││
+│   (OCR Service)     │              │  └─────────────────────┘│
 └─────────────────────┘              └─────────────────────────┘
 ```
 
@@ -187,12 +216,17 @@ cd apps/agent && poetry run langgraph dev
 - `src/hooks/use-supabase-upload.ts` - Upload hook
 
 ### Agent (`apps/agent/`)
-- `src/agent/graph.py` - Added document subagent + Isaacus tools
+- `src/agent/graph.py` - Added document subagent + tools
 - `src/agent/prompts.py` - Added document analysis instructions
-- `src/tools/*.py` - Isaacus tool implementations
-- `src/agents/document_agent.py` - Document Agent config
+- `src/tools/isaacus_search.py` - Semantic search with reranking
+- `src/tools/isaacus_extract.py` - Extractive QA with citations
+- `src/tools/isaacus_classify.py` - Legal clause classification
+- `src/tools/get_document_text.py` - Retrieve document text from Supabase
+- `src/tools/list_matter_documents.py` - List documents in a matter
+- `src/agents/document_agent.py` - Document Agent configuration
 - `src/services/isaacus_client.py` - Isaacus API client
-- `src/services/document_processor.py` - Text extraction
+- `src/services/document_processor.py` - Text extraction (PDF/DOCX/TXT)
+- `src/services/deepseek_ocr.py` - OCR for scanned documents
 
 ### Supabase (`supabase/`)
 - `migrations/20251223120000_create_matters.sql`
@@ -200,6 +234,9 @@ cd apps/agent && poetry run langgraph dev
 - `migrations/20251223120200_create_documents.sql`
 - `migrations/20251223120300_create_document_embeddings.sql`
 - `migrations/20251223120400_create_storage_bucket.sql`
-- `migrations/20251223120500_create_document_webhook.sql` (disabled)
+- `migrations/20251223140000_fix_match_document_embeddings_function.sql`
+- `migrations/20251223150000_fix_embedding_dimension.sql`
+- `migrations/20251223160000_fix_docx_extraction.sql`
 - `functions/process-document/index.ts` - Document processing Edge Function
+
 

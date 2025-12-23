@@ -319,3 +319,4 @@ interface CreateDocumentInput {
 | 404    | `PGRST116` | Document not found          |
 | 413    | -          | File too large (50MB limit) |
 | 415    | -          | Unsupported file type       |
+

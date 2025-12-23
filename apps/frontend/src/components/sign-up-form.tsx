@@ -44,7 +44,7 @@ export function SignUpForm({
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/chat`,
+          emailRedirectTo: `${window.location.origin}/auth/confirm?next=/protected/matters`,
         },
       });
       if (error) throw error;

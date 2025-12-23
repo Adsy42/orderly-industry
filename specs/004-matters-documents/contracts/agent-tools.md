@@ -1,12 +1,21 @@
 # API Contract: Agent Tools
 
 **Feature Branch**: `004-matters-documents`  
-**Date**: 2025-12-23  
+**Date**: 2025-12-24  
+**Status**: ✅ Implemented  
 **Location**: `apps/agent/src/tools/`
 
 ## Overview
 
-Three new agent tools extend the deep agents framework with Isaacus-powered document intelligence. These tools are available to the orchestrator and the Document Agent subagent.
+Five agent tools extend the deep agents framework with Isaacus-powered document intelligence and Supabase document access. These tools are available to the orchestrator and the Document Agent subagent.
+
+| Tool                     | Purpose                                      | Status |
+| ------------------------ | -------------------------------------------- | ------ |
+| `isaacus_search`         | Semantic search + reranking across documents | ✅     |
+| `isaacus_extract`        | Extractive QA with document citations        | ✅     |
+| `isaacus_classify`       | Legal clause classification                  | ✅     |
+| `get_document_text`      | Retrieve full document text from Supabase    | ✅     |
+| `list_matter_documents`  | List all documents in a matter               | ✅     |
 
 ## Tool: isaacus_search
 
@@ -364,4 +373,185 @@ class IsaacusClient:
 ```
 ISAACUS_API_KEY=your_api_key_here
 ISAACUS_BASE_URL=https://api.isaacus.com  # optional, defaults to production
+DEEPSEEK_API_KEY=your_deepseek_key  # optional, for OCR on scanned PDFs
 ```
+
+---
+
+## Tool: get_document_text
+
+Retrieve the full extracted text of a document from Supabase.
+
+### Signature
+
+```python
+@tool(parse_docstring=True)
+async def get_document_text(
+    document_id: str,
+) -> str:
+    """Retrieve the full text content of a document.
+
+    Fetches the extracted text from a document stored in Supabase Storage.
+    Uses the document_processor service to extract text from PDF, DOCX,
+    or TXT files. Includes OCR fallback for scanned PDFs via DeepSeek.
+
+    Args:
+        document_id: The UUID of the document to retrieve
+
+    Returns:
+        The full extracted text content of the document, or an error message.
+    """
+```
+
+### Implementation Flow
+
+```
+1. Validate user has access to document via matter membership
+2. Fetch document record from Supabase
+3. Download file from Supabase Storage
+4. Extract text using DocumentProcessor:
+   - PDF: PyMuPDF with DeepSeek OCR fallback
+   - DOCX: python-docx with mammoth fallback
+   - TXT: UTF-8 decode
+5. Return extracted text
+```
+
+### Example Output
+
+```
+Document: Service_Agreement.pdf
+Pages: 12
+
+[Full text content of the document...]
+```
+
+### Error Handling
+
+| Error              | Response                                                            |
+| ------------------ | ------------------------------------------------------------------- |
+| Document not found | "Error: Document {document_id} not found or you don't have access." |
+| Download failed    | "Error: Could not download document from storage."                  |
+| Extraction failed  | "Error: Could not extract text from document."                      |
+
+---
+
+## Tool: list_matter_documents
+
+List all documents in a matter with their metadata.
+
+### Signature
+
+```python
+@tool(parse_docstring=True)
+async def list_matter_documents(
+    matter_id: str,
+) -> str:
+    """List all documents in a matter.
+
+    Retrieves metadata for all documents uploaded to a specific matter,
+    including filename, file type, size, processing status, and upload date.
+
+    Args:
+        matter_id: The UUID of the matter to list documents for
+
+    Returns:
+        Formatted list of documents with their metadata.
+    """
+```
+
+### Implementation Flow
+
+```
+1. Validate user has access to matter
+2. Query documents table filtered by matter_id
+3. Format results with metadata
+```
+
+### Example Output
+
+```
+Documents in matter M-2025-001 (3 total):
+
+1. Service_Agreement.pdf
+   - Type: application/pdf
+   - Size: 245 KB
+   - Status: ready
+   - Uploaded: 2025-12-23 14:30:00
+
+2. Employment_Contract.docx
+   - Type: application/vnd.openxmlformats-officedocument.wordprocessingml.document
+   - Size: 128 KB
+   - Status: ready
+   - Uploaded: 2025-12-23 15:45:00
+
+3. Meeting_Notes.txt
+   - Type: text/plain
+   - Size: 4 KB
+   - Status: ready
+   - Uploaded: 2025-12-24 09:15:00
+```
+
+### Error Handling
+
+| Error            | Response                                                       |
+| ---------------- | -------------------------------------------------------------- |
+| Matter not found | "Error: Matter {matter_id} not found or you don't have access."|
+| No documents     | "No documents found in this matter."                           |
+
+---
+
+## DeepSeek OCR Service
+
+### Location
+
+`apps/agent/src/services/deepseek_ocr.py`
+
+### Purpose
+
+Provides OCR capability for scanned PDF documents when PyMuPDF's native text extraction yields insufficient content.
+
+### Interface
+
+```python
+class DeepSeekOCR:
+    """OCR service using DeepSeek's vision model."""
+
+    def __init__(self, api_key: str | None = None):
+        self.api_key = api_key or os.environ.get("DEEPSEEK_API_KEY")
+        self.client = OpenAI(
+            api_key=self.api_key,
+            base_url="https://api.deepseek.com"
+        )
+
+    async def extract_text_from_images(
+        self,
+        images: list[bytes],
+        language: str = "en",
+    ) -> str:
+        """Extract text from images using vision model."""
+        ...
+```
+
+### Usage in DocumentProcessor
+
+```python
+async def _extract_pdf_pymupdf(self, content: bytes) -> str:
+    # First pass: Native text extraction
+    for page in doc:
+        text = page.get_text().strip()
+        if len(text) < MIN_TEXT_THRESHOLD:
+            # Page needs OCR - render to image
+            ocr_needed_pages.append((page_num, pixmap))
+
+    # Second pass: OCR for pages with low text
+    if ocr_needed_pages and self.ocr_service:
+        ocr_text = await self.ocr_service.extract_text_from_images(images)
+        # Merge OCR results with native text
+```
+
+### Environment Variables
+
+```
+DEEPSEEK_API_KEY=your_deepseek_key  # Required for OCR functionality
+```
+

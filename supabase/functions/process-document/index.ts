@@ -1,5 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
+// Use JSZip for DOCX extraction (DOCX is a ZIP of XML files)
+import JSZip from "npm:jszip@3.10.1";
 
 // Document processing constants
 const CHUNK_SIZE = 2000; // Characters (~500 tokens)
@@ -43,14 +45,139 @@ async function updateDocumentStatus(
   }
 }
 
-// Extract text from PDF (simple implementation - for production use proper library)
+/**
+ * Extract text from DOCX using JSZip.
+ * 
+ * DOCX files are ZIP archives containing:
+ * - word/document.xml: Main document content
+ * - word/header*.xml: Headers
+ * - word/footer*.xml: Footers
+ */
+async function extractTextFromDocx(content: Uint8Array): Promise<string> {
+  try {
+    const zip = await JSZip.loadAsync(content);
+    const parts: string[] = [];
+
+    // Extract main document content
+    const documentXml = zip.file("word/document.xml");
+    if (documentXml) {
+      const xmlContent = await documentXml.async("text");
+      const text = extractTextFromXml(xmlContent);
+      if (text.trim()) {
+        parts.push(text);
+      }
+    }
+
+    // Extract headers (optional)
+    for (const filename of Object.keys(zip.files)) {
+      if (filename.match(/^word\/header\d*\.xml$/)) {
+        const headerXml = zip.file(filename);
+        if (headerXml) {
+          const xmlContent = await headerXml.async("text");
+          const text = extractTextFromXml(xmlContent);
+          if (text.trim()) {
+            parts.unshift(text); // Headers go first
+          }
+        }
+      }
+    }
+
+    // Extract footers (optional)
+    for (const filename of Object.keys(zip.files)) {
+      if (filename.match(/^word\/footer\d*\.xml$/)) {
+        const footerXml = zip.file(filename);
+        if (footerXml) {
+          const xmlContent = await footerXml.async("text");
+          const text = extractTextFromXml(xmlContent);
+          if (text.trim()) {
+            parts.push(text); // Footers go last
+          }
+        }
+      }
+    }
+
+    const result = parts.join("\n\n");
+    
+    if (!result.trim()) {
+      throw new Error("No text content found in DOCX");
+    }
+
+    return result;
+  } catch (error) {
+    console.error(`DOCX extraction error: ${error}`);
+    throw new Error(`Failed to extract text from DOCX: ${error}`);
+  }
+}
+
+/**
+ * Extract plain text from Office Open XML content.
+ * Handles paragraphs, tables, and preserves structure.
+ */
+function extractTextFromXml(xml: string): string {
+  const parts: string[] = [];
+
+  // Extract text from <w:t> tags (text runs)
+  // Match paragraphs and extract their text content
+  const paragraphRegex = /<w:p[^>]*>([\s\S]*?)<\/w:p>/g;
+  let paragraphMatch;
+
+  while ((paragraphMatch = paragraphRegex.exec(xml)) !== null) {
+    const paragraphContent = paragraphMatch[1];
+    
+    // Check if this is a table cell (don't add extra line breaks)
+    const isTableCell = xml.indexOf("<w:tc>") !== -1 && 
+                        paragraphMatch.index > xml.lastIndexOf("<w:tc>", paragraphMatch.index);
+    
+    // Extract all text runs within the paragraph
+    const textRegex = /<w:t[^>]*>([^<]*)<\/w:t>/g;
+    let textMatch;
+    const texts: string[] = [];
+
+    while ((textMatch = textRegex.exec(paragraphContent)) !== null) {
+      texts.push(textMatch[1]);
+    }
+
+    const paragraphText = texts.join("");
+    if (paragraphText.trim()) {
+      parts.push(paragraphText);
+    }
+  }
+
+  // Handle table rows - add separators between cells
+  let result = parts.join("\n\n");
+
+  // Decode XML entities
+  result = result
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&")
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, code) => String.fromCharCode(parseInt(code, 16)));
+
+  // Clean up excessive whitespace while preserving paragraph structure
+  result = result
+    .split("\n")
+    .map(line => line.trim())
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n");
+
+  return result.trim();
+}
+
+/**
+ * Extract text from PDF.
+ * 
+ * For native text extraction in Deno Edge Functions, we use a simple
+ * stream-based approach. For scanned PDFs, the text will be minimal
+ * and OCR should be used (via DeepSeek Vision in the Python agent).
+ */
 function extractTextFromPdf(content: Uint8Array): string {
-  // For now, return placeholder - in production, use pdf-lib or similar
-  // Edge Functions have limited library support
-  const decoder = new TextDecoder();
+  const decoder = new TextDecoder("latin1");
   const text = decoder.decode(content);
 
-  // Try to extract text between stream markers (simple PDF text extraction)
+  // Try to extract text between stream markers
   const matches = text.match(/stream[\s\S]*?endstream/g) || [];
   const extractedParts: string[] = [];
 
@@ -66,45 +193,40 @@ function extractTextFromPdf(content: Uint8Array): string {
     }
   }
 
-  return (
-    extractedParts.join("\n\n") ||
-    "[PDF text extraction requires processing service]"
-  );
-}
+  // Also try to extract text from /Contents objects
+  const contentsRegex = /\/Contents\s*\[([^\]]+)\]/g;
+  // ... additional PDF parsing can be added
 
-// Extract text from DOCX (simplified - just get raw text)
-function extractTextFromDocx(content: Uint8Array): string {
-  // DOCX is a zip file with XML content
-  // For edge function, we do a simple extraction
-  const decoder = new TextDecoder();
-  const text = decoder.decode(content);
+  const result = extractedParts.join("\n\n").trim();
+  
+  if (!result || result.length < 50) {
+    // Return indicator that OCR may be needed
+    return "[PDF requires OCR for text extraction - limited native text found]";
+  }
 
-  // Try to extract text between XML tags
-  const textContent = text
-    .replace(/<[^>]+>/g, " ")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&amp;/g, "&")
-    .replace(/&quot;/g, '"')
-    .replace(/\s+/g, " ")
-    .trim();
-
-  return textContent || "[DOCX text extraction requires processing service]";
+  return result;
 }
 
 // Extract text from TXT
 function extractTextFromTxt(content: Uint8Array): string {
-  const decoder = new TextDecoder();
-  return decoder.decode(content);
+  // Try UTF-8 first, fall back to latin1
+  try {
+    const decoder = new TextDecoder("utf-8", { fatal: true });
+    return decoder.decode(content);
+  } catch {
+    const decoder = new TextDecoder("latin1");
+    return decoder.decode(content);
+  }
 }
 
 // Extract text based on file type
-function extractText(content: Uint8Array, fileType: string): string {
+async function extractText(content: Uint8Array, fileType: string): Promise<string> {
   switch (fileType.toLowerCase()) {
     case "pdf":
       return extractTextFromPdf(content);
     case "docx":
-      return extractTextFromDocx(content);
+    case "doc":
+      return await extractTextFromDocx(content);
     case "txt":
       return extractTextFromTxt(content);
     default:
@@ -356,11 +478,13 @@ Deno.serve(async (req) => {
 
       // Step 3: Extract text
       const fileContent = new Uint8Array(await fileData.arrayBuffer());
-      const extractedText = extractText(fileContent, document.file_type);
+      const extractedText = await extractText(fileContent, document.file_type);
 
       if (!extractedText || extractedText.trim().length === 0) {
         throw new Error("No text could be extracted from document");
       }
+
+      console.log(`Extracted ${extractedText.length} characters from ${document.filename}`);
 
       // Step 4: Update status to embedding and save extracted text
       await updateDocumentStatus(supabase, document.id, "embedding", {

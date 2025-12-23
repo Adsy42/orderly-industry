@@ -118,3 +118,4 @@ Identify tasks that can run simultaneously:
 - Plan Template: `.specify/templates/plan-template.md`
 - Tasks Template: `.specify/templates/tasks-template.md`
 - Project Structure: `README.md`
+

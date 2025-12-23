@@ -258,3 +258,4 @@ Research quality is evaluated on:
 3. Structure - appropriate report format for question type
 4. Efficiency - minimal unnecessary tool calls
 5. Clarity - professional writing without self-reference
+

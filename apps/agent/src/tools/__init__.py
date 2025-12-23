@@ -1,5 +1,10 @@
 """Agent tools for document analysis using Isaacus Legal AI."""
 
+from .get_document_text import (
+    GetDocumentTextInput,
+    GetDocumentTextOutput,
+    get_document_text,
+)
 from .isaacus_classify import (
     DEFAULT_CLAUSE_TYPES,
     ClassifiedClause,
@@ -19,8 +24,21 @@ from .isaacus_search import (
     SearchResult,
     isaacus_search,
 )
+from .list_matter_documents import (
+    DocumentInfo,
+    ListDocumentsOutput,
+    list_matter_documents,
+)
 
 __all__ = [
+    # List documents tool
+    "list_matter_documents",
+    "ListDocumentsOutput",
+    "DocumentInfo",
+    # Get document text tool
+    "get_document_text",
+    "GetDocumentTextInput",
+    "GetDocumentTextOutput",
     # Search tool
     "isaacus_search",
     "IsaacusSearchInput",
@@ -39,10 +57,12 @@ __all__ = [
     "DEFAULT_CLAUSE_TYPES",
 ]
 
-# List of all Isaacus tools for registration with the agent
-# These are now proper LangChain tool functions decorated with @tool
+# List of all document tools for registration with the agent
+# These are proper LangChain tool functions decorated with @tool
 ISAACUS_TOOLS = [
-    isaacus_search,
-    isaacus_extract,
-    isaacus_classify,
+    list_matter_documents,
+    get_document_text,  # Direct document access (fast, no embedding needed)
+    isaacus_search,  # Semantic search (requires embeddings)
+    isaacus_extract,  # Extractive QA
+    isaacus_classify,  # Clause classification
 ]

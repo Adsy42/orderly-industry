@@ -97,3 +97,4 @@ Document any research needed:
 - Database Schema: `.specify/specs/database-schema.md`
 - Frontend UI: `.specify/specs/frontend-chat-ui.md`
 - Cursor Rules: `.cursor/rules/`
+

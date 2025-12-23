@@ -291,3 +291,4 @@ supabase db reset
 # Generate types
 supabase gen types typescript --local > types/supabase.ts
 ```
+

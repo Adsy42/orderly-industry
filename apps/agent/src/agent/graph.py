@@ -47,22 +47,24 @@ research_sub_agent = {
     "tools": [tavily_search, think_tool],
 }
 
-# Create document analysis sub-agent
-# Note: The matter_id from context.matter_id should be passed when delegating
+# Create document analysis sub-agent with hybrid retrieval capabilities
+# Note: The matter_id UUID from the [CONTEXT] message should be passed when delegating
+# Enhanced with think_tool for strategic planning (Deep Agent pattern)
 document_sub_agent = {
     "name": "document-agent",
     "description": """Delegate document analysis to this specialist agent when users ask about:
-- Finding information in uploaded documents
+- Listing documents in a matter (e.g., "What documents are in this matter?", "Show me files")
+- Finding information in uploaded documents (e.g., "Find references to indemnity")
 - Answering questions about document contents (e.g., "What does the contract say about IP?")
 - Identifying specific clauses, terms, or provisions
 - Analyzing contracts, agreements, or legal documents
 - Searching for definitions, obligations, or conditions
 
-**IMPORTANT:** When delegating, include the matter_id in your task description.
-Get the matter_id from context.matter_id if the user selected a matter in the chat,
-or ask the user which matter they want to search.""",
+**IMPORTANT:** When delegating, include the matter_id UUID in your task description.
+Look for a [CONTEXT] message in the conversation that contains the matter_id UUID.
+If no [CONTEXT] message exists, ask the user which matter they want to search.""",
     "system_prompt": DOCUMENT_AGENT_INSTRUCTIONS,
-    "tools": ISAACUS_TOOLS,
+    "tools": ISAACUS_TOOLS + [think_tool],  # Include think_tool for strategic planning
 }
 
 # Model options - uncomment the one you want to use:

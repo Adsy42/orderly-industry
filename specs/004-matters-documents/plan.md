@@ -122,13 +122,16 @@ specs/004-matters-documents/
 apps/frontend/
 ├── src/
 │   ├── app/
-│   │   ├── protected/
-│   │   │   ├── matters/
-│   │   │   │   ├── page.tsx           # Matters list
-│   │   │   │   └── [matterId]/
-│   │   │   │       ├── page.tsx       # Matter detail
-│   │   │   │       └── documents/
-│   │   │   │           └── page.tsx   # Documents view
+│   │   ├── api/
+│   │   │   └── embed/
+│   │   │       └── route.ts           # Query embedding endpoint
+│   │   └── protected/
+│   │       ├── matters/
+│   │       │   ├── page.tsx           # Matters list
+│   │       │   └── [matterId]/
+│   │       │       └── page.tsx       # Matter detail + documents
+│   │       └── chat/
+│   │           └── page.tsx           # Chat with matter context
 │   ├── components/
 │   │   ├── matters/
 │   │   │   ├── matter-card.tsx
@@ -144,7 +147,8 @@ apps/frontend/
 │   ├── hooks/
 │   │   ├── use-supabase-upload.ts     # From Supabase UI
 │   │   ├── use-matters.ts
-│   │   └── use-documents.ts
+│   │   ├── use-documents.ts
+│   │   └── use-participants.ts
 │   └── lib/
 │       └── supabase/
 │           └── types.ts               # Generated types
@@ -154,22 +158,36 @@ apps/agent/
 │   ├── agent/
 │   │   ├── graph.py                   # Extended with document tools
 │   │   ├── prompts.py                 # Extended with Document Agent prompts
-│   │   └── tools.py                   # Extended with Isaacus tools
+│   │   └── tools.py                   # Core tools (Tavily)
+│   ├── agents/
+│   │   └── document_agent.py          # Document Agent subagent config
 │   ├── tools/
-│   │   ├── isaacus_search.py          # NEW: Semantic search tool
-│   │   ├── isaacus_extract.py         # NEW: Extractive QA tool
-│   │   └── isaacus_classify.py        # NEW: Clause classification tool
-│   └── services/
-│       ├── isaacus_client.py          # NEW: Isaacus API wrapper
-│       └── document_processor.py      # NEW: Text extraction service
+│   │   ├── isaacus_search.py          # Semantic search + reranking
+│   │   ├── isaacus_extract.py         # Extractive QA with citations
+│   │   ├── isaacus_classify.py        # Clause classification
+│   │   ├── get_document_text.py       # Retrieve document text from Supabase
+│   │   └── list_matter_documents.py   # List documents in a matter
+│   ├── services/
+│   │   ├── isaacus_client.py          # Isaacus API wrapper
+│   │   ├── document_processor.py      # Text extraction (PDF/DOCX/TXT)
+│   │   └── deepseek_ocr.py            # OCR for scanned documents
+│   └── security/
+│       └── auth.py                    # JWT validation
 
 supabase/
 ├── migrations/
-│   ├── 20251223110000_create_profiles.sql        # Existing
-│   ├── 20251223120000_create_matters.sql         # NEW
-│   ├── 20251223120100_create_documents.sql       # NEW
-│   ├── 20251223120200_create_matter_participants.sql  # NEW
-│   └── 20251223120300_create_document_embeddings.sql  # NEW
+│   ├── 20251223110000_create_profiles.sql
+│   ├── 20251223120000_create_matters.sql
+│   ├── 20251223120100_create_matter_participants.sql
+│   ├── 20251223120200_create_documents.sql
+│   ├── 20251223120300_create_document_embeddings.sql
+│   ├── 20251223120400_create_storage_bucket.sql
+│   ├── 20251223140000_fix_match_document_embeddings_function.sql
+│   ├── 20251223150000_fix_embedding_dimension.sql
+│   └── 20251223160000_fix_docx_extraction.sql
+├── functions/
+│   └── process-document/
+│       └── index.ts                   # Document processing Edge Function
 └── config.toml
 ```
 

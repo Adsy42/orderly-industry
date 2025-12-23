@@ -56,9 +56,7 @@ export function useFileUpload({
     );
 
     if (invalidFiles.length > 0) {
-      const pdfFiles = invalidFiles.filter(
-        (f) => f.type === "application/pdf",
-      );
+      const pdfFiles = invalidFiles.filter((f) => f.type === "application/pdf");
       if (pdfFiles.length > 0) {
         toast.error(
           "PDFs cannot be attached to chat messages. Upload PDFs to a Matter's Documents section instead, then ask the AI to search or analyze them.",
@@ -246,9 +244,7 @@ export function useFileUpload({
     const duplicateFiles = validFiles.filter(isDuplicateFile);
     const uniqueFiles = validFiles.filter((file) => !isDuplicateFile(file));
     if (invalidFiles.length > 0) {
-      const pdfFiles = invalidFiles.filter(
-        (f) => f.type === "application/pdf",
-      );
+      const pdfFiles = invalidFiles.filter((f) => f.type === "application/pdf");
       if (pdfFiles.length > 0) {
         toast.error(
           "PDFs cannot be pasted into chat. Upload PDFs to a Matter's Documents section instead.",

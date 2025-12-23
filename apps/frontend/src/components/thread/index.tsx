@@ -12,7 +12,6 @@ import {
   DO_NOT_RENDER_ID_PREFIX,
   ensureToolCallsHaveResponses,
 } from "@/lib/ensure-tool-responses";
-import { OrderlyIcon } from "../icons/orderly";
 import { TooltipIconButton } from "./tooltip-icon-button";
 import {
   ArrowDown,
@@ -21,7 +20,6 @@ import {
   PanelRightClose,
   SquarePen,
   XIcon,
-  Plus,
   Briefcase,
 } from "lucide-react";
 import { useQueryState, parseAsBoolean, parseAsString } from "nuqs";
@@ -203,8 +201,22 @@ export function Thread() {
         ? { ...artifactContext, ...matterContext }
         : undefined;
 
+    // Build context message so LLM can see the matter_id UUID
+    const contextMessages: Message[] = [];
+    const selectedMatter = matters.find((m) => m.id === selectedMatterId);
+    if (selectedMatter) {
+      contextMessages.push({
+        id: `${DO_NOT_RENDER_ID_PREFIX}context-${uuidv4()}`,
+        type: "system",
+        content: `[CONTEXT] The user has selected matter "${selectedMatter.title}" (matter_id: ${selectedMatter.id}). Use this matter_id UUID for any document searches.`,
+      } as Message);
+    }
+
     stream.submit(
-      { messages: [...toolMessages, newHumanMessage], context },
+      {
+        messages: [...toolMessages, ...contextMessages, newHumanMessage],
+        context,
+      },
       {
         streamMode: ["values"],
         streamSubgraphs: true,
@@ -215,6 +227,7 @@ export function Thread() {
           messages: [
             ...(prev.messages ?? []),
             ...toolMessages,
+            ...contextMessages,
             newHumanMessage,
           ],
         }),
@@ -245,7 +258,7 @@ export function Thread() {
   );
 
   return (
-    <div className="flex h-screen w-full overflow-hidden">
+    <div className="flex h-[calc(100vh-3.5rem)] w-full overflow-hidden">
       <div className="relative hidden lg:flex">
         <motion.div
           className="absolute z-20 h-full overflow-hidden border-r bg-white"
@@ -318,43 +331,20 @@ export function Thread() {
           )}
           {chatStarted && (
             <div className="relative z-10 flex items-center justify-between gap-3 p-2">
-              <div className="relative flex items-center justify-start gap-2">
-                <div className="absolute left-0 z-10">
-                  {(!chatHistoryOpen || !isLargeScreen) && (
-                    <Button
-                      className="hover:bg-gray-100"
-                      variant="ghost"
-                      onClick={() => setChatHistoryOpen((p) => !p)}
-                    >
-                      {chatHistoryOpen ? (
-                        <PanelRightOpen className="size-5" />
-                      ) : (
-                        <PanelRightClose className="size-5" />
-                      )}
-                    </Button>
-                  )}
-                </div>
-                <motion.button
-                  className="flex cursor-pointer items-center gap-2"
-                  onClick={() => setThreadId(null)}
-                  animate={{
-                    marginLeft: !chatHistoryOpen ? 48 : 0,
-                  }}
-                  transition={{
-                    type: "spring",
-                    stiffness: 300,
-                    damping: 30,
-                  }}
-                >
-                  <OrderlyIcon
-                    width={32}
-                    height={32}
-                    className="text-primary"
-                  />
-                  <span className="text-xl font-semibold tracking-tight">
-                    Orderly
-                  </span>
-                </motion.button>
+              <div className="flex items-center gap-2">
+                {(!chatHistoryOpen || !isLargeScreen) && (
+                  <Button
+                    className="hover:bg-gray-100"
+                    variant="ghost"
+                    onClick={() => setChatHistoryOpen((p) => !p)}
+                  >
+                    {chatHistoryOpen ? (
+                      <PanelRightOpen className="size-5" />
+                    ) : (
+                      <PanelRightClose className="size-5" />
+                    )}
+                  </Button>
+                )}
               </div>
 
               <div className="flex items-center gap-4">
@@ -418,15 +408,6 @@ export function Thread() {
               }
               footer={
                 <div className="sticky bottom-0 flex flex-col items-center gap-8 bg-white">
-                  {!chatStarted && (
-                    <div className="flex items-center gap-3">
-                      <OrderlyIcon className="text-primary h-8 flex-shrink-0" />
-                      <h1 className="text-2xl font-semibold tracking-tight">
-                        Orderly
-                      </h1>
-                    </div>
-                  )}
-
                   <ScrollToBottom className="animate-in fade-in-0 zoom-in-95 absolute bottom-full left-1/2 mb-4 -translate-x-1/2" />
 
                   <div
@@ -487,7 +468,10 @@ export function Thread() {
                                 </span>
                               </SelectItem>
                               {matters.map((matter) => (
-                                <SelectItem key={matter.id} value={matter.id}>
+                                <SelectItem
+                                  key={matter.id}
+                                  value={matter.id}
+                                >
                                   {matter.title}
                                 </SelectItem>
                               ))}
@@ -509,23 +493,6 @@ export function Thread() {
                           </Label>
                         </div>
 
-                        <Label
-                          htmlFor="file-input"
-                          className="flex cursor-pointer items-center gap-2"
-                        >
-                          <Plus className="size-5 text-gray-600" />
-                          <span className="text-sm text-gray-600">
-                            Add Image
-                          </span>
-                        </Label>
-                        <input
-                          id="file-input"
-                          type="file"
-                          onChange={handleFileUpload}
-                          multiple
-                          accept="image/jpeg,image/png,image/gif,image/webp"
-                          className="hidden"
-                        />
                         {stream.isLoading ? (
                           <Button
                             key="stop"
