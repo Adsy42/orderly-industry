@@ -12,7 +12,6 @@ import {
   DO_NOT_RENDER_ID_PREFIX,
   ensureToolCallsHaveResponses,
 } from "@/lib/ensure-tool-responses";
-import { OrderlyIcon } from "../icons/orderly";
 import { TooltipIconButton } from "./tooltip-icon-button";
 import {
   ArrowDown,
@@ -21,9 +20,9 @@ import {
   PanelRightClose,
   SquarePen,
   XIcon,
-  Plus,
+  Briefcase,
 } from "lucide-react";
-import { useQueryState, parseAsBoolean } from "nuqs";
+import { useQueryState, parseAsBoolean, parseAsString } from "nuqs";
 import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
 import ThreadHistory from "./history";
 import { toast } from "sonner";
@@ -38,6 +37,14 @@ import {
   ArtifactTitle,
   useArtifactContext,
 } from "./artifact";
+import { useMatters } from "@/hooks/use-matters";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
 
 function StickyToBottomContent(props: {
   content: ReactNode;
@@ -80,7 +87,6 @@ function ScrollToBottom(props: { className?: string }) {
   );
 }
 
-
 export function Thread() {
   const [artifactContext, setArtifactContext] = useArtifactContext();
   const [artifactOpen, closeArtifact] = useArtifactOpen();
@@ -94,6 +100,11 @@ export function Thread() {
     "hideToolCalls",
     parseAsBoolean.withDefault(false),
   );
+  const [selectedMatterId, setSelectedMatterId] = useQueryState(
+    "matterId",
+    parseAsString.withDefault(""),
+  );
+  const { matters } = useMatters();
   const [input, setInput] = useState("");
   const {
     contentBlocks,
@@ -181,11 +192,31 @@ export function Thread() {
 
     const toolMessages = ensureToolCallsHaveResponses(stream.messages);
 
+    // Build context including matter_id if selected
+    const matterContext = selectedMatterId
+      ? { matter_id: selectedMatterId }
+      : {};
     const context =
-      Object.keys(artifactContext).length > 0 ? artifactContext : undefined;
+      Object.keys(artifactContext).length > 0 || selectedMatterId
+        ? { ...artifactContext, ...matterContext }
+        : undefined;
+
+    // Build context message so LLM can see the matter_id UUID
+    const contextMessages: Message[] = [];
+    const selectedMatter = matters.find((m) => m.id === selectedMatterId);
+    if (selectedMatter) {
+      contextMessages.push({
+        id: `${DO_NOT_RENDER_ID_PREFIX}context-${uuidv4()}`,
+        type: "system",
+        content: `[CONTEXT] The user has selected matter "${selectedMatter.title}" (matter_id: ${selectedMatter.id}). Use this matter_id UUID for any document searches.`,
+      } as Message);
+    }
 
     stream.submit(
-      { messages: [...toolMessages, newHumanMessage], context },
+      {
+        messages: [...toolMessages, ...contextMessages, newHumanMessage],
+        context,
+      },
       {
         streamMode: ["values"],
         streamSubgraphs: true,
@@ -196,6 +227,7 @@ export function Thread() {
           messages: [
             ...(prev.messages ?? []),
             ...toolMessages,
+            ...contextMessages,
             newHumanMessage,
           ],
         }),
@@ -226,7 +258,7 @@ export function Thread() {
   );
 
   return (
-    <div className="flex h-screen w-full overflow-hidden">
+    <div className="flex h-[calc(100vh-3.5rem)] w-full overflow-hidden">
       <div className="relative hidden lg:flex">
         <motion.div
           className="absolute z-20 h-full overflow-hidden border-r bg-white"
@@ -299,43 +331,20 @@ export function Thread() {
           )}
           {chatStarted && (
             <div className="relative z-10 flex items-center justify-between gap-3 p-2">
-              <div className="relative flex items-center justify-start gap-2">
-                <div className="absolute left-0 z-10">
-                  {(!chatHistoryOpen || !isLargeScreen) && (
-                    <Button
-                      className="hover:bg-gray-100"
-                      variant="ghost"
-                      onClick={() => setChatHistoryOpen((p) => !p)}
-                    >
-                      {chatHistoryOpen ? (
-                        <PanelRightOpen className="size-5" />
-                      ) : (
-                        <PanelRightClose className="size-5" />
-                      )}
-                    </Button>
-                  )}
-                </div>
-                <motion.button
-                  className="flex cursor-pointer items-center gap-2"
-                  onClick={() => setThreadId(null)}
-                  animate={{
-                    marginLeft: !chatHistoryOpen ? 48 : 0,
-                  }}
-                  transition={{
-                    type: "spring",
-                    stiffness: 300,
-                    damping: 30,
-                  }}
-                >
-                  <OrderlyIcon
-                    width={32}
-                    height={32}
-                    className="text-primary"
-                  />
-                  <span className="text-xl font-semibold tracking-tight">
-                    Orderly
-                  </span>
-                </motion.button>
+              <div className="flex items-center gap-2">
+                {(!chatHistoryOpen || !isLargeScreen) && (
+                  <Button
+                    className="hover:bg-gray-100"
+                    variant="ghost"
+                    onClick={() => setChatHistoryOpen((p) => !p)}
+                  >
+                    {chatHistoryOpen ? (
+                      <PanelRightOpen className="size-5" />
+                    ) : (
+                      <PanelRightClose className="size-5" />
+                    )}
+                  </Button>
+                )}
               </div>
 
               <div className="flex items-center gap-4">
@@ -399,15 +408,6 @@ export function Thread() {
               }
               footer={
                 <div className="sticky bottom-0 flex flex-col items-center gap-8 bg-white">
-                  {!chatStarted && (
-                    <div className="flex items-center gap-3">
-                      <OrderlyIcon className="h-8 flex-shrink-0 text-primary" />
-                      <h1 className="text-2xl font-semibold tracking-tight">
-                        Orderly
-                      </h1>
-                    </div>
-                  )}
-
                   <ScrollToBottom className="animate-in fade-in-0 zoom-in-95 absolute bottom-full left-1/2 mb-4 -translate-x-1/2" />
 
                   <div
@@ -448,39 +448,51 @@ export function Thread() {
                         className="field-sizing-content resize-none border-none bg-transparent p-3.5 pb-0 shadow-none ring-0 outline-none focus:ring-0 focus:outline-none"
                       />
 
-                      <div className="flex items-center gap-6 p-2 pt-4">
-                        <div>
-                          <div className="flex items-center space-x-2">
-                            <Switch
-                              id="render-tool-calls"
-                              checked={hideToolCalls ?? false}
-                              onCheckedChange={setHideToolCalls}
-                            />
-                            <Label
-                              htmlFor="render-tool-calls"
-                              className="text-sm text-gray-600"
-                            >
-                              Hide Tool Calls
-                            </Label>
-                          </div>
+                      <div className="flex flex-wrap items-center gap-4 p-2 pt-4">
+                        {/* Matter Selector */}
+                        <div className="flex items-center gap-2">
+                          <Briefcase className="size-4 text-gray-500" />
+                          <Select
+                            value={selectedMatterId || "none"}
+                            onValueChange={(value) =>
+                              setSelectedMatterId(value === "none" ? "" : value)
+                            }
+                          >
+                            <SelectTrigger className="h-8 w-[180px] text-xs">
+                              <SelectValue placeholder="Select matter..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">
+                                <span className="text-gray-500">
+                                  No matter selected
+                                </span>
+                              </SelectItem>
+                              {matters.map((matter) => (
+                                <SelectItem
+                                  key={matter.id}
+                                  value={matter.id}
+                                >
+                                  {matter.title}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </div>
-                        <Label
-                          htmlFor="file-input"
-                          className="flex cursor-pointer items-center gap-2"
-                        >
-                          <Plus className="size-5 text-gray-600" />
-                          <span className="text-sm text-gray-600">
-                            Upload PDF or Image
-                          </span>
-                        </Label>
-                        <input
-                          id="file-input"
-                          type="file"
-                          onChange={handleFileUpload}
-                          multiple
-                          accept="image/jpeg,image/png,image/gif,image/webp,application/pdf"
-                          className="hidden"
-                        />
+
+                        <div className="flex items-center space-x-2">
+                          <Switch
+                            id="render-tool-calls"
+                            checked={hideToolCalls ?? false}
+                            onCheckedChange={setHideToolCalls}
+                          />
+                          <Label
+                            htmlFor="render-tool-calls"
+                            className="text-sm text-gray-600"
+                          >
+                            Hide Tool Calls
+                          </Label>
+                        </div>
+
                         {stream.isLoading ? (
                           <Button
                             key="stop"

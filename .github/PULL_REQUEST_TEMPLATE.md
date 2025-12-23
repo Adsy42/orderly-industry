@@ -5,6 +5,7 @@
 ## Linked Specification
 
 <!-- Link to the spec file for this feature (required for feature PRs) -->
+
 - **Spec**: `specs/###-feature-name/spec.md`
 - **Plan**: `specs/###-feature-name/plan.md`
 - **Tasks**: `specs/###-feature-name/tasks.md`
@@ -32,22 +33,26 @@
 ## Implementation Checklist
 
 ### Code Quality
+
 - [ ] Code follows project constitution (`.specify/memory/constitution.md`)
 - [ ] No unnecessary complexity added
 - [ ] Self-reviewed the diff before requesting review
 
 ### Database (if applicable)
+
 - [ ] Migration file follows naming convention (`YYYYMMDDHHmmss_description.sql`)
 - [ ] RLS policies added for new tables
 - [ ] Indexes added for columns used in RLS
 - [ ] Table comments added
 
 ### Security
+
 - [ ] No secrets committed
 - [ ] New endpoints are authenticated
 - [ ] RLS policies tested
 
 ### Testing
+
 - [ ] Tested locally
 - [ ] Edge cases considered
 - [ ] No regressions in existing functionality
@@ -72,7 +77,7 @@
 ---
 
 **Reviewer Notes:**
+
 - Review against the linked spec for completeness
 - Check constitution compliance
 - Verify all tasks are marked complete
-

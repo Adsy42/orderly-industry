@@ -3,12 +3,14 @@ import { toast } from "sonner";
 import { ContentBlock } from "@langchain/core/messages";
 import { fileToContentBlock } from "@/lib/multimodal-utils";
 
+// Note: PDFs are NOT supported in chat because OpenAI's Chat Completions API
+// doesn't support file attachments. Use Matters > Documents for PDF uploads
+// and the document agent tools (isaacus_search, isaacus_extract) instead.
 export const SUPPORTED_FILE_TYPES = [
   "image/jpeg",
   "image/png",
   "image/gif",
   "image/webp",
-  "application/pdf",
 ];
 
 interface UseFileUploadOptions {
@@ -25,14 +27,6 @@ export function useFileUpload({
   const dragCounter = useRef(0);
 
   const isDuplicate = (file: File, blocks: ContentBlock.Multimodal.Data[]) => {
-    if (file.type === "application/pdf") {
-      return blocks.some(
-        (b) =>
-          b.type === "file" &&
-          b.mimeType === "application/pdf" &&
-          b.metadata?.filename === file.name,
-      );
-    }
     if (SUPPORTED_FILE_TYPES.includes(file.type)) {
       return blocks.some(
         (b) =>
@@ -62,9 +56,16 @@ export function useFileUpload({
     );
 
     if (invalidFiles.length > 0) {
-      toast.error(
-        "You have uploaded invalid file type. Please upload a JPEG, PNG, GIF, WEBP image or a PDF.",
-      );
+      const pdfFiles = invalidFiles.filter((f) => f.type === "application/pdf");
+      if (pdfFiles.length > 0) {
+        toast.error(
+          "PDFs cannot be attached to chat messages. Upload PDFs to a Matter's Documents section instead, then ask the AI to search or analyze them.",
+        );
+      } else {
+        toast.error(
+          "Unsupported file type. Please upload a JPEG, PNG, GIF, or WEBP image.",
+        );
+      }
     }
     if (duplicateFiles.length > 0) {
       toast.error(
@@ -122,9 +123,18 @@ export function useFileUpload({
       );
 
       if (invalidFiles.length > 0) {
-        toast.error(
-          "You have uploaded invalid file type. Please upload a JPEG, PNG, GIF, WEBP image or a PDF.",
+        const pdfFiles = invalidFiles.filter(
+          (f) => f.type === "application/pdf",
         );
+        if (pdfFiles.length > 0) {
+          toast.error(
+            "PDFs cannot be attached to chat messages. Upload PDFs to a Matter's Documents section instead, then ask the AI to search or analyze them.",
+          );
+        } else {
+          toast.error(
+            "Unsupported file type. Please upload a JPEG, PNG, GIF, or WEBP image.",
+          );
+        }
       }
       if (duplicateFiles.length > 0) {
         toast.error(
@@ -220,15 +230,7 @@ export function useFileUpload({
     const invalidFiles = files.filter(
       (file) => !SUPPORTED_FILE_TYPES.includes(file.type),
     );
-    const isDuplicate = (file: File) => {
-      if (file.type === "application/pdf") {
-        return contentBlocks.some(
-          (b) =>
-            b.type === "file" &&
-            b.mimeType === "application/pdf" &&
-            b.metadata?.filename === file.name,
-        );
-      }
+    const isDuplicateFile = (file: File) => {
       if (SUPPORTED_FILE_TYPES.includes(file.type)) {
         return contentBlocks.some(
           (b) =>
@@ -239,12 +241,19 @@ export function useFileUpload({
       }
       return false;
     };
-    const duplicateFiles = validFiles.filter(isDuplicate);
-    const uniqueFiles = validFiles.filter((file) => !isDuplicate(file));
+    const duplicateFiles = validFiles.filter(isDuplicateFile);
+    const uniqueFiles = validFiles.filter((file) => !isDuplicateFile(file));
     if (invalidFiles.length > 0) {
-      toast.error(
-        "You have pasted an invalid file type. Please paste a JPEG, PNG, GIF, WEBP image or a PDF.",
-      );
+      const pdfFiles = invalidFiles.filter((f) => f.type === "application/pdf");
+      if (pdfFiles.length > 0) {
+        toast.error(
+          "PDFs cannot be pasted into chat. Upload PDFs to a Matter's Documents section instead.",
+        );
+      } else {
+        toast.error(
+          "Unsupported file type. Please paste a JPEG, PNG, GIF, or WEBP image.",
+        );
+      }
     }
     if (duplicateFiles.length > 0) {
       toast.error(

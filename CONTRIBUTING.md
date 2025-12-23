@@ -47,9 +47,9 @@ pnpm dev:all
 ## Development Workflow
 
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                         Spec-Driven Development Workflow                     │
-└─────────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────────────────────┐
+│                              Spec-Driven Development Workflow                                 │
+└─────────────────────────────────────────────────────────────────────────────────────────────┘
 
   ┌──────────────┐     ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
   │   1. ISSUE   │────▶│   2. SPEC    │────▶│   3. PLAN    │────▶│  4. TASKS    │
@@ -58,17 +58,26 @@ pnpm dev:all
   │ Request      │     │ .specify     │     │ .plan        │     │ .tasks       │
   └──────────────┘     └──────────────┘     └──────────────┘     └──────────────┘
                                                                         │
-  ┌──────────────┐     ┌──────────────┐     ┌──────────────┐            │
-  │   7. MERGE   │◀────│   6. PR      │◀────│ 5. IMPLEMENT │◀───────────┘
-  │              │     │              │     │              │
-  │ Squash &     │     │ Code Review  │     │ /speckit     │
-  │ Merge        │     │ + Spec Check │     │ .implement   │
-  └──────────────┘     └──────────────┘     └──────────────┘
+  ┌──────────────┐     ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
+  │   9. MERGE   │◀────│   7. PR      │◀────│  6. COMMIT   │◀────│ 5. IMPLEMENT │◀──┘
+  │              │     │              │     │              │     │              │
+  │ Squash &     │     │ /speckit     │     │ /speckit     │     │ /speckit     │
+  │ Merge        │     │ .pr          │     │ .commit      │     │ .implement   │
+  └──────────────┘     └──────────────┘     └──────────────┘     └──────────────┘
+                              │
+                              ▼
+                       ┌──────────────┐
+                       │   8. DEBUG   │ ◀─── Issues? CI Failures?
+                       │              │      Review Feedback?
+                       │ /speckit     │
+                       │ .debug       │ ────▶ Fix → Commit → Re-review
+                       └──────────────┘
 ```
 
 ## Spec-Driven Development
 
 All features must go through the SDD workflow. This ensures:
+
 - Requirements are clear before coding
 - Implementation matches expectations
 - Reviews have a reference document
@@ -81,6 +90,7 @@ All features must go through the SDD workflow. This ensures:
 ```
 
 This creates:
+
 - Feature branch: `001-user-profiles`
 - Spec file: `specs/001-user-profiles/spec.md`
 
@@ -91,6 +101,7 @@ This creates:
 ```
 
 This generates:
+
 - `plan.md` - Technical approach
 - `data-model.md` - Database schema
 - `contracts/` - API specifications
@@ -102,6 +113,7 @@ This generates:
 ```
 
 This creates:
+
 - `tasks.md` - Ordered, actionable tasks
 
 ### 4. Implement
@@ -114,26 +126,31 @@ Or manually work through `tasks.md`, marking each complete.
 
 ### Available Commands
 
-| Command | Purpose |
-|---------|---------|
-| `/speckit.specify` | Create feature specification |
-| `/speckit.clarify` | Clarify ambiguous requirements |
-| `/speckit.plan` | Create technical plan |
-| `/speckit.tasks` | Break plan into tasks |
-| `/speckit.implement` | Execute implementation |
-| `/speckit.analyze` | Check consistency |
-| `/speckit.checklist` | Generate quality checklist |
-| `/speckit.taskstoissues` | Export tasks to GitHub Issues |
+| Command                  | Purpose                                      |
+| ------------------------ | -------------------------------------------- |
+| `/speckit.specify`       | Create feature specification                 |
+| `/speckit.clarify`       | Clarify ambiguous requirements               |
+| `/speckit.plan`          | Create technical plan                        |
+| `/speckit.tasks`         | Break plan into tasks                        |
+| `/speckit.implement`     | Execute implementation                       |
+| `/speckit.commit`        | Verify quality gates & create commits        |
+| `/speckit.pr`            | Create pull request with spec references     |
+| `/speckit.debug`         | Debug CI failures & review feedback          |
+| `/speckit.analyze`       | Check consistency                            |
+| `/speckit.checklist`     | Generate quality checklist                   |
+| `/speckit.taskstoissues` | Export tasks to GitHub Issues                |
 
 ## Git Workflow
 
 ### Branch Naming
 
 Branches are created automatically by SDD:
+
 - Format: `###-feature-name` (e.g., `001-user-auth`)
 - Numbers auto-increment based on existing branches
 
 For non-feature work:
+
 - `fix/###-description` - Bug fixes
 - `docs/description` - Documentation
 - `chore/description` - Maintenance
@@ -155,7 +172,7 @@ main (protected)
 
 ## Commit Conventions
 
-We use [Conventional Commits](https://www.conventionalcommits.org/). 
+We use [Conventional Commits](https://www.conventionalcommits.org/).
 
 ### Format
 
@@ -169,29 +186,29 @@ We use [Conventional Commits](https://www.conventionalcommits.org/).
 
 ### Types
 
-| Type | Description |
-|------|-------------|
-| `feat` | New feature |
-| `fix` | Bug fix |
-| `docs` | Documentation |
-| `style` | Formatting (no code change) |
-| `refactor` | Code restructuring |
-| `perf` | Performance improvement |
-| `test` | Adding tests |
-| `chore` | Build, CI, dependencies |
-| `ci` | CI configuration |
+| Type       | Description                 |
+| ---------- | --------------------------- |
+| `feat`     | New feature                 |
+| `fix`      | Bug fix                     |
+| `docs`     | Documentation               |
+| `style`    | Formatting (no code change) |
+| `refactor` | Code restructuring          |
+| `perf`     | Performance improvement     |
+| `test`     | Adding tests                |
+| `chore`    | Build, CI, dependencies     |
+| `ci`       | CI configuration            |
 
 ### Scopes
 
-| Scope | Description |
-|-------|-------------|
-| `frontend` | Next.js app |
-| `agent` | Python agent |
-| `db` | Database/migrations |
-| `auth` | Authentication |
-| `api` | API routes |
-| `ui` | UI components |
-| `deps` | Dependencies |
+| Scope      | Description         |
+| ---------- | ------------------- |
+| `frontend` | Next.js app         |
+| `agent`    | Python agent        |
+| `db`       | Database/migrations |
+| `auth`     | Authentication      |
+| `api`      | API routes          |
+| `ui`       | UI components       |
+| `deps`     | Dependencies        |
 
 ### Examples
 
@@ -217,17 +234,66 @@ git config commit.template .gitmessage
 
 ## Pull Request Process
 
+### Creating a Pull Request
+
+After committing your changes with `/speckit.commit`, use `/speckit.pr` to create a pull request:
+
+```bash
+# Create PR with auto-generated description from spec
+/speckit.pr
+
+# Create as draft
+/speckit.pr --draft
+
+# Add specific reviewers
+/speckit.pr --reviewer @teammate1
+```
+
+The command will:
+1. Verify your branch is pushed to remote
+2. Check for preview deployments (Vercel, LangSmith, Supabase)
+3. Generate a PR description from your spec files
+4. Include testing checklist and preview URLs
+5. Create the PR via GitHub CLI
+
+### Debugging PR Issues
+
+If CI fails or reviewers request changes, use `/speckit.debug`:
+
+```bash
+# Debug all issues
+/speckit.debug
+
+# Focus on CI failures
+/speckit.debug --ci
+
+# Focus on review feedback
+/speckit.debug --reviews
+
+# Debug agent issues (uses LangSmith MCP)
+/speckit.debug --agent
+
+# Debug database issues (uses Supabase MCP)
+/speckit.debug --db
+```
+
+The command uses MCP tools to diagnose issues:
+- **LangSmith**: Analyze agent traces, run errors, and experiments
+- **Supabase**: Check migrations, RLS policies, logs, and security advisors
+- **Vercel**: Parse build logs and deployment failures
+
 ### Preview Deployments
 
 When you open a PR with agent changes, **automatic preview deployments** are triggered:
 
-| Service | Trigger | Preview Type |
-|---------|---------|--------------|
-| **Vercel** | Any PR | Frontend preview URL |
-| **Supabase** | PR with `supabase/` changes | Branch database |
+| Service       | Trigger                       | Preview Type           |
+| ------------- | ----------------------------- | ---------------------- |
+| **Vercel**    | Any PR                        | Frontend preview URL   |
+| **Supabase**  | PR with `supabase/` changes   | Branch database        |
 | **LangSmith** | PR with `apps/agent/` changes | Preview agent revision |
 
 **LangSmith Preview Flow:**
+
 1. Open PR with agent changes → Preview deployment starts
 2. After ~3-5 minutes → Comment posted with preview URL
 3. Test using URL params: `?apiUrl=PREVIEW_URL&assistantId=deep_research`
@@ -240,12 +306,18 @@ When you open a PR with agent changes, **automatic preview deployments** are tri
    - Plan completed
    - All tasks in `tasks.md` marked `[x]`
 
-2. **Self-review your code**
+2. **Run quality gates with `/speckit.commit`**
+   - Linting passes (ESLint, Ruff)
+   - Formatting passes (Prettier, Ruff format)
+   - Build succeeds (Next.js build)
+   - Tests pass (if configured)
+
+3. **Self-review your code**
    - Check against constitution (`.specify/memory/constitution.md`)
    - Verify no secrets committed
-   - Run linters and formatters
+   - Conventional commit messages used
 
-3. **Test your changes**
+4. **Test your changes**
    - Local testing completed
    - Preview deployments verified (if applicable)
    - No regressions
@@ -260,6 +332,7 @@ When you open a PR with agent changes, **automatic preview deployments** are tri
 ### Review Checklist
 
 Reviewers should verify:
+
 - [ ] Implementation matches spec
 - [ ] Constitution principles followed
 - [ ] Database changes have RLS
@@ -271,6 +344,7 @@ Reviewers should verify:
 ### Read the Constitution
 
 The project constitution defines all coding standards:
+
 ```
 .specify/memory/constitution.md
 ```
@@ -310,4 +384,3 @@ The project constitution defines all coding standards:
 ## License
 
 MIT
-

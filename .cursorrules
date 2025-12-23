@@ -1,0 +1,87 @@
+# Deep Research Agent - Cursor Project Rules
+
+## Project Overview
+
+This is a full-stack AI research assistant monorepo with:
+- **Frontend** (`apps/frontend/`): Next.js 15 chat interface with Supabase Auth
+- **Agent** (`apps/agent/`): Python LangGraph deep research agent
+- **Database** (`supabase/`): PostgreSQL with migrations and RLS
+
+## Tech Stack
+
+### Frontend
+- Next.js 15 with App Router
+- React 19, TypeScript 5
+- Tailwind CSS 3
+- Supabase SSR for auth
+- LangGraph SDK for agent communication
+
+### Agent
+- Python 3.11+
+- LangGraph for agent orchestration
+- LangChain for LLM abstractions
+- Tavily for web search
+
+### Infrastructure
+- Supabase: Auth, PostgreSQL, Storage
+- Vercel: Frontend hosting
+- LangSmith: Agent deployment and monitoring
+
+## Development Workflow
+
+This project uses **Spec-Driven Development (SDD)**. Features must go through:
+1. `/speckit.specify` - Create specification
+2. `/speckit.plan` - Technical planning
+3. `/speckit.tasks` - Break into tasks
+4. `/speckit.implement` - Execute implementation
+
+See `CONTRIBUTING.md` for full workflow.
+
+## Key Conventions
+
+### SQL & Database
+- Use `snake_case` for tables and columns
+- Enable RLS on ALL tables
+- Use `(select auth.uid())` instead of `auth.uid()` for performance
+- Follow rules in `.cursor/rules/` for migrations, RLS, functions
+
+### TypeScript (Frontend)
+- Use path aliases (`@/components`, `@/lib`)
+- React Server Components by default, `"use client"` only when needed
+- Props interfaces named `{ComponentName}Props`
+
+### Python (Agent)
+- Type hints on all function signatures
+- Docstrings for public functions
+- Async/await for I/O operations
+- Use `@tool` decorator with `parse_docstring=True`
+
+### Commit Messages
+Format: `<type>(<scope>): <subject>`
+Types: feat, fix, docs, style, refactor, perf, test, chore, ci
+Scopes: frontend, agent, db, auth, api, ui, deps
+
+## Important Files
+
+- `.specify/memory/constitution.md` - Core principles and standards
+- `CONTRIBUTING.md` - Development workflow and conventions
+- `.cursor/rules/` - Database and SQL coding rules
+- `.cursor/commands/` - SpecKit slash commands
+- `specs/` - Feature specifications and plans
+
+## Authentication
+
+- All endpoints require authentication
+- Frontend: Supabase Auth with cookie-based sessions
+- Agent: JWT validation against Supabase
+- All resources scoped to authenticated user
+
+## Security Requirements
+
+- All tables MUST have Row Level Security (RLS)
+- Use `SECURITY INVOKER` for functions unless `SECURITY DEFINER` is required
+- Never commit secrets - use environment variables
+- JWT tokens validated server-side
+
+
+

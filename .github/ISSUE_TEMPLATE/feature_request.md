@@ -3,7 +3,7 @@ name: Feature Request
 about: Propose a new feature (will be converted to SDD spec)
 title: "[FEATURE] "
 labels: enhancement
-assignees: ''
+assignees: ""
 ---
 
 ## Feature Summary
@@ -27,11 +27,13 @@ assignees: ''
 <!-- Describe how users would interact with this feature -->
 
 ### Primary Flow
+
 1. User does X
 2. System responds with Y
 3. User sees Z
 
 ### Edge Cases
+
 - What if...
 - What if...
 
@@ -71,6 +73,7 @@ Once approved, this feature request will be converted to a specification:
 3. Follow the SDD workflow (plan → tasks → implement)
 
 **For Maintainers:**
+
 - [ ] Reviewed and approved
 - [ ] Converted to spec via `/speckit.specify`
 - [ ] Linked to spec branch: `###-feature-name`

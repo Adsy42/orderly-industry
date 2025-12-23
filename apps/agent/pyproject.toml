@@ -18,6 +18,14 @@ dependencies = [
     "markdownify>=1.2.0",
     "python-dotenv>=1.0.0",
     "pyjwt>=2.8.0",
+    # Document processing
+    "pypdf>=4.0.0",
+    "python-docx>=1.1.0",
+    "pymupdf>=1.24.0",  # Better PDF extraction + image rendering for OCR
+    "mammoth>=1.8.0",   # DOCX to HTML with structure preservation
+    "striprtf>=0.0.26", # RTF text extraction
+    # Supabase client
+    "supabase>=2.0.0",
 ]
 
 [project.optional-dependencies]

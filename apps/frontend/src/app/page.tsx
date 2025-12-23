@@ -1,23 +1,16 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { Thread } from "@/components/thread";
-import { StreamProvider } from "@/providers/Stream";
-import { ThreadProvider } from "@/providers/Thread";
-import { ArtifactProvider } from "@/components/thread/artifact";
-import { Toaster } from "@/components/ui/sonner";
-import React from "react";
+import { createClient } from "@/lib/supabase/server";
 
-export default function DemoPage(): React.ReactNode {
-  return (
-    <React.Suspense fallback={<div>Loading (layout)...</div>}>
-      <Toaster />
-      <ThreadProvider>
-        <StreamProvider>
-          <ArtifactProvider>
-            <Thread />
-          </ArtifactProvider>
-        </StreamProvider>
-      </ThreadProvider>
-    </React.Suspense>
-  );
+export default async function HomePage() {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase.auth.getClaims();
+  if (error || !data?.claims) {
+    // Not authenticated - redirect to login
+    redirect("/auth/login");
+  }
+
+  // Authenticated users go to matters
+  redirect("/protected/matters");
 }

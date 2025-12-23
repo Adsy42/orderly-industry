@@ -3,7 +3,7 @@ name: Bug Report
 about: Report a bug or unexpected behavior
 title: "[BUG] "
 labels: bug
-assignees: ''
+assignees: ""
 ---
 
 ## Bug Description
@@ -47,11 +47,13 @@ Paste error logs here
 ## Related Specs
 
 <!-- If this relates to a feature spec, link it -->
+
 - Spec: `specs/###-feature-name/spec.md`
 
 ---
 
 **For Maintainers:**
+
 - [ ] Reproduced locally
 - [ ] Root cause identified
 - [ ] Fix approach determined

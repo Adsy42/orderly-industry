@@ -55,38 +55,42 @@ The Deep Research Agent uses Supabase Auth for user authentication with a JWT-ba
 ### Supabase Clients
 
 **Browser Client (`apps/frontend/src/lib/supabase/client.ts`):**
+
 ```typescript
-import { createBrowserClient } from '@supabase/ssr'
+import { createBrowserClient } from "@supabase/ssr";
 
 export function createClient() {
   return createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY!
-  )
+    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY!,
+  );
 }
 ```
 
 **Server Client (`apps/frontend/src/lib/supabase/server.ts`):**
+
 ```typescript
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { createServerClient } from "@supabase/ssr";
+import { cookies } from "next/headers";
 
 export async function createClient() {
-  const cookieStore = await cookies()
+  const cookieStore = await cookies();
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY!,
     {
       cookies: {
-        getAll() { return cookieStore.getAll() },
+        getAll() {
+          return cookieStore.getAll();
+        },
         setAll(cookiesToSet) {
           cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, options)
-          )
+            cookieStore.set(name, value, options),
+          );
         },
       },
-    }
-  )
+    },
+  );
 }
 ```
 
@@ -95,10 +99,12 @@ export async function createClient() {
 **Location:** `apps/frontend/src/middleware.ts`
 
 **Protected Routes:**
+
 - `/protected/*` - Requires authentication
 - `/` - Redirects authenticated users
 
 **Public Routes:**
+
 - `/auth/login`
 - `/auth/sign-up`
 - `/auth/forgot-password`
@@ -107,15 +113,15 @@ export async function createClient() {
 
 ### Auth Pages
 
-| Route | Component | Purpose |
-|-------|-----------|---------|
-| `/auth/login` | `login-form.tsx` | Email/password login |
-| `/auth/sign-up` | `sign-up-form.tsx` | New user registration |
-| `/auth/sign-up-success` | Static page | Confirmation email sent |
-| `/auth/forgot-password` | `forgot-password-form.tsx` | Password reset request |
-| `/auth/update-password` | `update-password-form.tsx` | Set new password |
-| `/auth/confirm` | Route handler | Email verification |
-| `/auth/error` | Error page | Auth error display |
+| Route                   | Component                  | Purpose                 |
+| ----------------------- | -------------------------- | ----------------------- |
+| `/auth/login`           | `login-form.tsx`           | Email/password login    |
+| `/auth/sign-up`         | `sign-up-form.tsx`         | New user registration   |
+| `/auth/sign-up-success` | Static page                | Confirmation email sent |
+| `/auth/forgot-password` | `forgot-password-form.tsx` | Password reset request  |
+| `/auth/update-password` | `update-password-form.tsx` | Set new password        |
+| `/auth/confirm`         | Route handler              | Email verification      |
+| `/auth/error`           | Error page                 | Auth error display      |
 
 ## Agent Authentication
 
@@ -124,17 +130,18 @@ export async function createClient() {
 **Location:** `apps/agent/src/security/auth.py`
 
 **Handler:**
+
 ```python
 @auth.authenticate
 async def authenticate(headers: dict[bytes, bytes]) -> Auth.types.MinimalUserDict:
     # Extract Bearer token
     authorization = headers.get(b"authorization", b"").decode()
-    
+
     if not authorization.startswith("Bearer "):
         raise Auth.exceptions.HTTPException(status_code=401)
-    
+
     token = authorization.replace("Bearer ", "")
-    
+
     # Validate with Supabase
     async with httpx.AsyncClient() as client:
         response = await client.get(
@@ -144,10 +151,10 @@ async def authenticate(headers: dict[bytes, bytes]) -> Auth.types.MinimalUserDic
                 "apikey": SUPABASE_ANON_KEY,
             },
         )
-    
+
     if response.status_code != 200:
         raise Auth.exceptions.HTTPException(status_code=401)
-    
+
     user_data = response.json()
     return {
         "identity": user_data["id"],
@@ -170,6 +177,7 @@ async def add_owner(ctx: Auth.types.AuthContext, value: dict[str, Any]) -> dict[
 ```
 
 **Effect:**
+
 - New resources get `owner: {user_id}` in metadata
 - Queries are filtered to only return user's own resources
 - Users cannot access other users' threads or conversations
@@ -181,6 +189,7 @@ The frontend proxies requests to the agent through Next.js API routes.
 **Location:** `apps/frontend/src/app/api/[..._path]/route.ts`
 
 **Flow:**
+
 1. Client makes request to `/api/{path}`
 2. Next.js extracts session from cookies
 3. Forwards request to `LANGGRAPH_API_URL/{path}`
@@ -199,16 +208,19 @@ The frontend proxies requests to the agent through Next.js API routes.
 ### Token Refresh
 
 The middleware refreshes expired sessions:
+
 ```typescript
 // In middleware.ts
-const { data: { session } } = await supabase.auth.getSession()
+const {
+  data: { session },
+} = await supabase.auth.getSession();
 // Session is automatically refreshed if needed
 ```
 
 ### Logout
 
 ```typescript
-await supabase.auth.signOut()
+await supabase.auth.signOut();
 // Cookies are cleared, user redirected to login
 ```
 
@@ -224,18 +236,21 @@ await supabase.auth.signOut()
 ### Email Templates
 
 Configure in Supabase Dashboard:
+
 - **Sign up confirmation**: Redirect to `/auth/confirm`
 - **Password reset**: Redirect to `/auth/confirm?type=recovery`
 
 ## Environment Variables
 
 ### Frontend
+
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://xxx.supabase.co
 NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY=eyJhbG...
 ```
 
 ### Agent
+
 ```
 SUPABASE_URL=https://xxx.supabase.co
 SUPABASE_ANON_KEY=eyJhbG...
@@ -251,11 +266,11 @@ SUPABASE_ANON_KEY=eyJhbG...
 
 ## Error Handling
 
-| HTTP Status | Meaning | User Experience |
-|-------------|---------|-----------------|
-| 401 | Token missing or invalid | Redirect to login |
-| 403 | Token valid but unauthorized | Access denied message |
-| 503 | Supabase unavailable | Retry message |
+| HTTP Status | Meaning                      | User Experience       |
+| ----------- | ---------------------------- | --------------------- |
+| 401         | Token missing or invalid     | Redirect to login     |
+| 403         | Token valid but unauthorized | Access denied message |
+| 503         | Supabase unavailable         | Retry message         |
 
 ## Extension Points
 
