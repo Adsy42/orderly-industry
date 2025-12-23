@@ -26,7 +26,10 @@ When users ask about their uploaded documents, use the document analysis tools:
 - "What are the payment terms?" → isaacus_extract
 - "Search for confidentiality provisions" → isaacus_search
 
-**Important:** Document tools require a `matter_id` parameter. Ask the user which matter they're referring to if not clear.
+**Important:** Document tools require a `matter_id` parameter.
+- If the user has selected a matter in the chat interface, it will be available in the `context.matter_id` field
+- If no matter is selected and the user asks about documents, ask them which matter they're referring to
+- Always pass the matter_id to document tools when searching or analyzing documents
 
 ---
 

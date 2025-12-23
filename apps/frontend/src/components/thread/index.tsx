@@ -22,8 +22,9 @@ import {
   SquarePen,
   XIcon,
   Plus,
+  Briefcase,
 } from "lucide-react";
-import { useQueryState, parseAsBoolean } from "nuqs";
+import { useQueryState, parseAsBoolean, parseAsString } from "nuqs";
 import { StickToBottom, useStickToBottomContext } from "use-stick-to-bottom";
 import ThreadHistory from "./history";
 import { toast } from "sonner";
@@ -38,6 +39,14 @@ import {
   ArtifactTitle,
   useArtifactContext,
 } from "./artifact";
+import { useMatters } from "@/hooks/use-matters";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "../ui/select";
 
 function StickyToBottomContent(props: {
   content: ReactNode;
@@ -93,6 +102,11 @@ export function Thread() {
     "hideToolCalls",
     parseAsBoolean.withDefault(false),
   );
+  const [selectedMatterId, setSelectedMatterId] = useQueryState(
+    "matterId",
+    parseAsString.withDefault(""),
+  );
+  const { matters } = useMatters();
   const [input, setInput] = useState("");
   const {
     contentBlocks,
@@ -180,8 +194,14 @@ export function Thread() {
 
     const toolMessages = ensureToolCallsHaveResponses(stream.messages);
 
+    // Build context including matter_id if selected
+    const matterContext = selectedMatterId
+      ? { matter_id: selectedMatterId }
+      : {};
     const context =
-      Object.keys(artifactContext).length > 0 ? artifactContext : undefined;
+      Object.keys(artifactContext).length > 0 || selectedMatterId
+        ? { ...artifactContext, ...matterContext }
+        : undefined;
 
     stream.submit(
       { messages: [...toolMessages, newHumanMessage], context },
@@ -447,29 +467,55 @@ export function Thread() {
                         className="field-sizing-content resize-none border-none bg-transparent p-3.5 pb-0 shadow-none ring-0 outline-none focus:ring-0 focus:outline-none"
                       />
 
-                      <div className="flex items-center gap-6 p-2 pt-4">
-                        <div>
-                          <div className="flex items-center space-x-2">
-                            <Switch
-                              id="render-tool-calls"
-                              checked={hideToolCalls ?? false}
-                              onCheckedChange={setHideToolCalls}
-                            />
-                            <Label
-                              htmlFor="render-tool-calls"
-                              className="text-sm text-gray-600"
-                            >
-                              Hide Tool Calls
-                            </Label>
-                          </div>
+                      <div className="flex flex-wrap items-center gap-4 p-2 pt-4">
+                        {/* Matter Selector */}
+                        <div className="flex items-center gap-2">
+                          <Briefcase className="size-4 text-gray-500" />
+                          <Select
+                            value={selectedMatterId || "none"}
+                            onValueChange={(value) =>
+                              setSelectedMatterId(value === "none" ? "" : value)
+                            }
+                          >
+                            <SelectTrigger className="h-8 w-[180px] text-xs">
+                              <SelectValue placeholder="Select matter..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="none">
+                                <span className="text-gray-500">
+                                  No matter selected
+                                </span>
+                              </SelectItem>
+                              {matters.map((matter) => (
+                                <SelectItem key={matter.id} value={matter.id}>
+                                  {matter.title}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </div>
+
+                        <div className="flex items-center space-x-2">
+                          <Switch
+                            id="render-tool-calls"
+                            checked={hideToolCalls ?? false}
+                            onCheckedChange={setHideToolCalls}
+                          />
+                          <Label
+                            htmlFor="render-tool-calls"
+                            className="text-sm text-gray-600"
+                          >
+                            Hide Tool Calls
+                          </Label>
+                        </div>
+
                         <Label
                           htmlFor="file-input"
                           className="flex cursor-pointer items-center gap-2"
                         >
                           <Plus className="size-5 text-gray-600" />
                           <span className="text-sm text-gray-600">
-                            Upload PDF or Image
+                            Add Image
                           </span>
                         </Label>
                         <input
@@ -477,7 +523,7 @@ export function Thread() {
                           type="file"
                           onChange={handleFileUpload}
                           multiple
-                          accept="image/jpeg,image/png,image/gif,image/webp,application/pdf"
+                          accept="image/jpeg,image/png,image/gif,image/webp"
                           className="hidden"
                         />
                         {stream.isLoading ? (

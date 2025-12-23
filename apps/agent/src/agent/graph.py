@@ -48,6 +48,7 @@ research_sub_agent = {
 }
 
 # Create document analysis sub-agent
+# Note: The matter_id from context.matter_id should be passed when delegating
 document_sub_agent = {
     "name": "document-agent",
     "description": """Delegate document analysis to this specialist agent when users ask about:
@@ -56,7 +57,10 @@ document_sub_agent = {
 - Identifying specific clauses, terms, or provisions
 - Analyzing contracts, agreements, or legal documents
 - Searching for definitions, obligations, or conditions
-Always provide the matter_id when delegating document queries.""",
+
+**IMPORTANT:** When delegating, include the matter_id in your task description.
+Get the matter_id from context.matter_id if the user selected a matter in the chat,
+or ask the user which matter they want to search.""",
     "system_prompt": DOCUMENT_AGENT_INSTRUCTIONS,
     "tools": ISAACUS_TOOLS,
 }

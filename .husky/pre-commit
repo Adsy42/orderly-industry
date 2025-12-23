@@ -35,17 +35,17 @@ if [ -n "$AGENT_STAGED" ]; then
   
   cd apps/agent
   
-  # Lint with ruff
+  # Lint with ruff (using uv to ensure ruff is available)
   echo "  → Ruff lint..."
-  ruff check . || {
+  uv run ruff check . || {
     echo "❌ Ruff lint failed. Fix errors before committing."
     exit 1
   }
   
   # Format check with ruff
   echo "  → Ruff format..."
-  ruff format --check . || {
-    echo "❌ Ruff format check failed. Run 'ruff format .' to fix."
+  uv run ruff format --check . || {
+    echo "❌ Ruff format check failed. Run 'uv run ruff format .' to fix."
     exit 1
   }
   
