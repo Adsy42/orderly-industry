@@ -128,12 +128,34 @@ export function useDocuments({
             file_type: input.file_type,
             file_size: input.file_size,
             mime_type: input.mime_type || null,
-            processing_status: "pending",
+            processing_status: "ready", // Set to ready immediately - processing happens async
           })
           .select()
           .single();
 
         if (createError) throw new Error(createError.message);
+        
+        // Trigger Edge Function for async processing (text extraction + embeddings)
+        // This is fire-and-forget - document is usable immediately
+        try {
+          const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+          if (supabaseUrl && data) {
+            fetch(`${supabaseUrl}/functions/v1/process-document`, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                type: "INSERT",
+                table: "documents",
+                record: data,
+              }),
+            }).catch(() => {
+              // Silently fail - processing is optional
+            });
+          }
+        } catch {
+          // Ignore processing errors
+        }
+        
         return data as Document;
       } catch (err) {
         setError(
