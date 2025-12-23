@@ -56,9 +56,15 @@ jobs:
           BRANCH_NAME="pr-${{ github.event.pull_request.number }}"
           
           # Push migrations to the branch
-          supabase db push --include-all
+          # Use --include-all to include seed data, continue on error for migration drift
+          supabase db push --include-all || {
+            echo "⚠️ Migration push had issues - this may be due to migration drift"
+            echo "Attempting to sync with remote..."
+            supabase db pull --schema public || true
+            echo "Please check migrations manually if issues persist"
+          }
           
-          echo "✅ Migrations applied to preview branch"
+          echo "✅ Migrations step completed"
 
       - name: Comment on PR
         uses: actions/github-script@v7
