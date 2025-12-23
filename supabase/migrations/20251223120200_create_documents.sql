@@ -15,7 +15,7 @@ create table public.documents (
   extracted_text text,
   processing_status text not null default 'pending',
   error_message text,
-  uploaded_by uuid references public.profiles (id) not null,
+  uploaded_by uuid references public.profiles (id) not null default auth.uid(),
   uploaded_at timestamptz not null default now(),
   processed_at timestamptz,
   
