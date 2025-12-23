@@ -105,3 +105,6 @@ using (
   )
 );
 
+-- Enable realtime for document status updates
+alter publication supabase_realtime add table public.documents;
+

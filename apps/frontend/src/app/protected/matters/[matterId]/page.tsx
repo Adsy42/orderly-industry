@@ -67,6 +67,7 @@ export default function MatterDetailPage() {
     isLoading: isLoadingDocuments,
     deleteDocument,
     getSignedUrl,
+    refetch: refetchDocuments,
   } = useDocuments({ matterId });
 
   const handleDownloadDocument = async (doc: Document) => {
@@ -389,7 +390,8 @@ export default function MatterDetailPage() {
             <DocumentUpload
               matterId={matterId}
               onUploadComplete={() => {
-                // Optionally close dialog after upload
+                // Refetch documents to show the new upload
+                refetchDocuments();
               }}
             />
             <div className="mt-6 flex justify-end">
