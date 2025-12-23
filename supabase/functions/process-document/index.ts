@@ -224,11 +224,18 @@ async function generateEmbeddings(
 
         const data = await response.json();
         console.log(`Isaacus response keys: ${Object.keys(data).join(', ')}`);
-        // Isaacus returns { embeddings: [[...], [...], ...] } or { data: [{ embedding: [...] }, ...] }
+        // Isaacus returns { embeddings: [{ index: 0, embedding: [...] }, ...] }
         let batchEmbeddings: number[][];
-        if (data.embeddings) {
-          batchEmbeddings = data.embeddings;
-        } else if (data.data) {
+        if (data.embeddings && Array.isArray(data.embeddings)) {
+          // Check if embeddings are objects with 'embedding' field or direct arrays
+          if (data.embeddings[0] && typeof data.embeddings[0] === 'object' && 'embedding' in data.embeddings[0]) {
+            // Format: { embeddings: [{ index: 0, embedding: [...] }, ...] }
+            batchEmbeddings = data.embeddings.map((item: { embedding: number[] }) => item.embedding);
+          } else {
+            // Format: { embeddings: [[...], [...], ...] }
+            batchEmbeddings = data.embeddings;
+          }
+        } else if (data.data && Array.isArray(data.data)) {
           batchEmbeddings = data.data.map((item: { embedding: number[] }) => item.embedding);
         } else {
           throw new Error(`Unexpected Isaacus response format: ${JSON.stringify(data).slice(0, 200)}`);
@@ -379,9 +386,15 @@ Deno.serve(async (req) => {
         { headers: { "Content-Type": "application/json" } },
       );
     } catch (error) {
-      // Update status to error
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      // Update status to error - handle object errors properly
+      let errorMessage: string;
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      } else if (typeof error === "object" && error !== null) {
+        errorMessage = JSON.stringify(error);
+      } else {
+        errorMessage = String(error);
+      }
       console.error(`Document processing failed: ${errorMessage}`);
 
       await updateDocumentStatus(supabase, document.id, "error", {
