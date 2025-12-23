@@ -295,8 +295,20 @@ async function storeEmbeddings(
   }
 }
 
+// CORS headers
+const corsHeaders = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+
 // Main handler
 Deno.serve(async (req) => {
+  // Handle CORS preflight
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
+  }
+
   try {
     // Parse webhook payload
     const payload: WebhookPayload = await req.json();
@@ -305,7 +317,7 @@ Deno.serve(async (req) => {
     if (payload.type !== "INSERT") {
       return new Response(
         JSON.stringify({ message: "Skipping non-INSERT event" }),
-        { headers: { "Content-Type": "application/json" } },
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
@@ -314,7 +326,7 @@ Deno.serve(async (req) => {
     if (document.processing_status !== "pending") {
       return new Response(
         JSON.stringify({ message: "Document not in pending status" }),
-        { headers: { "Content-Type": "application/json" } },
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
 
@@ -383,7 +395,7 @@ Deno.serve(async (req) => {
 
       return new Response(
         JSON.stringify({ success: true, documentId: document.id }),
-        { headers: { "Content-Type": "application/json" } },
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     } catch (error) {
       // Update status to error - handle object errors properly
@@ -403,14 +415,14 @@ Deno.serve(async (req) => {
 
       return new Response(
         JSON.stringify({ success: false, error: errorMessage }),
-        { status: 500, headers: { "Content-Type": "application/json" } },
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     }
   } catch (error) {
     console.error(`Request handling failed: ${error}`);
     return new Response(JSON.stringify({ error: "Invalid request" }), {
       status: 400,
-      headers: { "Content-Type": "application/json" },
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 });
