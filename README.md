@@ -1,280 +1,229 @@
-# Deep Research Agent
+# Orderly - AI Legal Research Platform
 
-A full-stack AI research assistant combining a Next.js chat interface with a LangGraph-powered deep research agent.
+An AI-powered legal research and document analysis platform for Australian legal professionals.
 
-## Architecture
+## 🎯 What This Is
+
+**Orderly** is a full-stack AI assistant that helps lawyers:
+- **Research** legal topics with web search and AI synthesis
+- **Analyze documents** uploaded to client matters with semantic search
+- **Extract answers** from contracts with precise citations
+- **Classify clauses** in legal documents automatically
+
+## ✅ Current Status
+
+### Already Set Up (Production Ready)
+| Component | Status | Location |
+|-----------|--------|----------|
+| **Supabase** | ✅ Running | `diqhctrkufrmoflvfuoh.supabase.co` |
+| **Database** | ✅ Migrated | Profiles, Matters, Documents, Embeddings tables |
+| **Storage** | ✅ Configured | `documents` bucket with RLS |
+| **Edge Function** | ✅ Deployed | `process-document` for text extraction |
+| **Frontend** | ✅ Deployable | Vercel preview on PRs |
+| **Agent** | 🔄 Local only | Needs LangSmith Cloud deployment |
+
+### Feature Status
+| Feature | Status | Notes |
+|---------|--------|-------|
+| User Auth | ✅ Working | Email/password with Supabase |
+| Matters CRUD | ✅ Working | Create, list, view matters |
+| Document Upload | ✅ Working | PDF, DOCX, TXT support |
+| Text Extraction | ✅ Working | Automatic on upload |
+| Semantic Search | ✅ Working | Isaacus embeddings |
+| Chat Interface | ✅ Working | LangGraph streaming |
+| Document Analysis | ✅ Working | `get_document_text`, `isaacus_search`, etc. |
+
+## 🏗️ Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         Monorepo Structure                           │
-├─────────────────────────────────────────────────────────────────────┤
-│                                                                      │
-│  apps/frontend (Next.js)              apps/agent (Python)            │
-│  ─────────────────────                ───────────────────            │
-│  • Chat UI                            • Deep Research Agent          │
-│  • Supabase Auth                      • JWT Validation               │
-│  • API Passthrough                    • Web Search Tools             │
-│  → Deployed to Vercel                 → Deployed to LangSmith        │
-│                                                                      │
-└─────────────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-                    ┌─────────────────┐
-                    │    Supabase     │
-                    │  (Auth + JWT)   │
-                    └─────────────────┘
+┌─────────────────────────────────────────────────────────────────┐
+│                        ORDERLY PLATFORM                          │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                  │
+│  apps/frontend (Next.js 15)          apps/agent (Python 3.11)   │
+│  ──────────────────────────          ─────────────────────────  │
+│  • Chat UI with streaming            • LangGraph orchestrator    │
+│  • Matter & Document mgmt            • Document Agent (Isaacus)  │
+│  • Supabase Auth (cookies)           • Research Agent (Tavily)   │
+│  → Deploys to Vercel                 → Deploys to LangSmith      │
+│                                                                  │
+└───────────────────────────┬──────────────────────────────────────┘
+                            │
+              ┌─────────────┼─────────────┐
+              │             │             │
+     ┌────────▼────┐  ┌─────▼─────┐  ┌────▼────────┐
+     │  Supabase   │  │  Isaacus  │  │   Tavily    │
+     │  Auth + DB  │  │  Legal AI │  │  Web Search │
+     │  + Storage  │  │  API      │  │   API       │
+     └─────────────┘  └───────────┘  └─────────────┘
 ```
 
-## Prerequisites
+## 🚀 Quick Start (For Development)
 
-- **Node.js** >= 20.0.0
-- **pnpm** >= 9.0.0
-- **Python** >= 3.11
-- **Supabase Account** (for authentication)
-- **LangSmith Account** (for agent deployment)
-- **API Keys**: Anthropic or OpenAI, Tavily (for web search)
+### Prerequisites
+- Node.js 20+, pnpm 9+, Python 3.11+
+- Access to Supabase project (ask Adam)
+- Your own API keys for Anthropic/OpenAI, Tavily
 
-## Quick Start
-
-> 📋 **New to the project?** See [ONBOARDING.md](ONBOARDING.md) for a quick setup guide.
-
-### 1. Clone and Install
+### 1. Clone & Install
 
 ```bash
-# Install dependencies
+git clone https://github.com/Adsy42/orderly-industry.git
+cd orderly-industry
 pnpm install
 
-# Install Python dependencies
 cd apps/agent
-pip install -e ".[dev]"
+pip install -e ".[dev]"  # or: uv sync
 cd ../..
 ```
 
-### 2. Configure Environment Variables
+### 2. Environment Setup
 
-**Frontend** (`apps/frontend/.env.local`):
+Get `.env` files from Adam or copy examples:
 
 ```bash
 cp apps/frontend/.env.example apps/frontend/.env.local
-# Edit with your Supabase credentials
-```
-
-**Agent** (`apps/agent/.env`):
-
-```bash
 cp apps/agent/.env.example apps/agent/.env
-# Edit with your API keys
 ```
 
-### 3. Set Up Supabase
+**Key variables already configured:**
+- `SUPABASE_URL` / `SUPABASE_ANON_KEY` - Shared project credentials
+- `ISAACUS_API_KEY` - Legal AI API (shared)
 
-1. Create a new project at [supabase.com](https://supabase.com)
-2. Go to **Project Settings → API**
-3. Copy the **Project URL** and **anon public** key
-4. Add them to both `.env.local` (frontend) and `.env` (agent)
+**You need your own:**
+- `OPENAI_API_KEY` or `ANTHROPIC_API_KEY`
+- `TAVILY_API_KEY` (free tier available)
+- `LANGSMITH_API_KEY` (for tracing)
 
-**Note:** The frontend uses `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY` for the Supabase key.
-
-#### Optional: Local Supabase Development
-
-```bash
-# Install Supabase CLI
-npm install -g supabase
-
-# Start local Supabase
-supabase start
-
-# Apply migrations
-supabase db reset
-```
-
-### 4. Run Locally
+### 3. Run Locally
 
 ```bash
-# Terminal 1: Start the agent server
-pnpm dev:agent
+# Terminal 1: Start agent
+cd apps/agent && langgraph dev
 
-# Terminal 2: Start the frontend
+# Terminal 2: Start frontend  
 pnpm dev
 
-# Or run both together
+# Or both together:
 pnpm dev:all
 ```
 
-- Frontend: http://localhost:3000
-- Agent API: http://localhost:2024
+- **Frontend**: http://localhost:3000
+- **Agent API**: http://localhost:2024
+- **LangGraph Studio**: Opens automatically
 
-## Project Structure
+## 📁 Project Structure
 
 ```
-.
+orderly-industry/
 ├── apps/
-│   ├── frontend/                 # Next.js Chat UI
-│   │   ├── src/
-│   │   │   ├── app/
-│   │   │   │   ├── api/          # API passthrough routes
-│   │   │   │   ├── auth/         # Auth pages (Supabase UI block)
-│   │   │   │   │   ├── login/
-│   │   │   │   │   ├── sign-up/
-│   │   │   │   │   ├── forgot-password/
-│   │   │   │   │   ├── update-password/
-│   │   │   │   │   ├── confirm/  # Email verification
-│   │   │   │   │   └── error/
-│   │   │   │   └── chat/         # Main chat page
-│   │   │   ├── components/       # React components
-│   │   │   ├── lib/
-│   │   │   │   └── supabase/     # Supabase client (browser/server)
-│   │   │   └── providers/        # Context providers
-│   │   ├── middleware.ts         # Auth protection middleware
-│   │   └── package.json
+│   ├── frontend/              # Next.js 15 Chat UI
+│   │   ├── src/app/
+│   │   │   ├── auth/          # Login, signup, password reset
+│   │   │   └── protected/
+│   │   │       ├── chat/      # Main chat interface
+│   │   │       └── matters/   # Matter & document management
+│   │   └── src/components/
+│   │       ├── documents/     # Upload, list, search
+│   │       ├── matters/       # Matter CRUD
+│   │       └── thread/        # Chat components
 │   │
-│   └── agent/                    # Deep Research Agent
-│       ├── src/
-│       │   ├── agent/
-│       │   │   ├── graph.py      # Main graph definition
-│       │   │   ├── prompts.py    # System prompts
-│       │   │   └── tools.py      # Search tools
-│       │   └── security/
-│       │       └── auth.py       # JWT validation
-│       ├── langgraph.json        # LangSmith config
-│       └── pyproject.toml
+│   └── agent/                 # Python LangGraph Agent
+│       └── src/
+│           ├── agent/         # Main orchestrator graph
+│           ├── agents/        # Subagents (document, research)
+│           ├── tools/         # Isaacus tools, Tavily, etc.
+│           └── services/      # API clients
 │
 ├── supabase/
-│   ├── config.toml               # Local dev config
-│   └── migrations/               # Database migrations
-│       └── 20251223110000_create_profiles.sql
+│   ├── migrations/            # Database schema (already applied)
+│   └── functions/             # Edge functions
+│       └── process-document/  # Text extraction on upload
 │
-├── package.json                  # Root workspace config
-├── pnpm-workspace.yaml
-└── README.md
+└── specs/                     # Feature specifications
+    └── 004-matters-documents/ # Current feature docs
 ```
 
-## Development
+## 🔧 Key Files to Know
 
-### Available Scripts
+| File | Purpose |
+|------|---------|
+| `apps/agent/src/agent/graph.py` | Main agent with subagents |
+| `apps/agent/src/agent/prompts.py` | System prompts - customize behavior |
+| `apps/agent/src/tools/*.py` | Document analysis tools |
+| `apps/frontend/src/providers/Stream.tsx` | Chat streaming logic |
+| `supabase/functions/process-document/` | Document processing edge function |
 
-| Command          | Description                    |
-| ---------------- | ------------------------------ |
-| `pnpm dev`       | Start frontend (port 3000)     |
-| `pnpm dev:agent` | Start agent server (port 2024) |
-| `pnpm dev:all`   | Start both concurrently        |
-| `pnpm build`     | Build frontend for production  |
-| `pnpm lint`      | Run ESLint on frontend         |
+## 🧪 Testing Document Analysis
 
-### Testing the Agent
+1. Log in at http://localhost:3000
+2. Create a matter (or use existing "Test Case")
+3. Upload a PDF or DOCX document
+4. Wait for status to change from "Processing" to "Ready"
+5. Open chat, select the matter from dropdown
+6. Ask: "What's in this document?" or "Summarize the agreement"
 
-You can test the agent directly using the LangGraph CLI:
+## 🚢 Deployment
 
-```bash
-cd apps/agent
-langgraph dev
-```
+### Frontend → Vercel (Automatic)
+- PRs get preview deployments
+- Merges to `main` deploy to production
+- Environment variables configured in Vercel dashboard
 
-Then open http://localhost:2024/docs to see the API documentation.
-
-## Deployment
-
-### Frontend → Vercel
-
-1. Push your code to GitHub
-2. Import the repository in [Vercel](https://vercel.com)
-3. Set **Root Directory** to `apps/frontend`
-4. Add environment variables:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - `NEXT_PUBLIC_API_URL` (your domain + `/api`)
-   - `NEXT_PUBLIC_ASSISTANT_ID` (`deep_research`)
-   - `LANGGRAPH_API_URL` (from LangSmith deployment)
-   - `LANGSMITH_API_KEY`
+### Agent → LangSmith Cloud (Manual)
+1. Go to [smith.langchain.com](https://smith.langchain.com) → Deployments
+2. Create new deployment, connect GitHub repo
+3. Set path to `apps/agent`
+4. Add environment variables
 5. Deploy
 
-### Agent → LangSmith
+**Current Blocker**: The staging environment is using an old agent deployment with different tools. Need to redeploy to sync.
 
-1. Push your code to GitHub
-2. Go to [smith.langchain.com](https://smith.langchain.com) → **Deployments**
-3. Click **+ New Deployment**
-4. Connect your GitHub repository
-5. Set **Path to LangGraph API** to `apps/agent`
-6. Add environment variables from `apps/agent/.env.example`
-7. Deploy (takes ~15 minutes)
+### Database → Supabase (Automatic)
+- PRs get preview branches (via `preview-supabase.yml`)
+- Migrations applied automatically
 
-### Environment Variables Summary
+## 🔑 Environment Variables
 
-#### Frontend (Vercel)
-
-| Variable                                       | Description                | Required   |
-| ---------------------------------------------- | -------------------------- | ---------- |
-| `NEXT_PUBLIC_SUPABASE_URL`                     | Supabase project URL       | Yes        |
-| `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY` | Supabase anon key          | Yes        |
-| `NEXT_PUBLIC_API_URL`                          | API endpoint URL           | Yes        |
-| `NEXT_PUBLIC_ASSISTANT_ID`                     | Graph ID (`deep_research`) | Yes        |
-| `LANGGRAPH_API_URL`                            | LangSmith deployment URL   | Production |
-| `LANGSMITH_API_KEY`                            | LangSmith API key          | Production |
-
-#### Agent (LangSmith)
-
-| Variable            | Description           | Required |
-| ------------------- | --------------------- | -------- |
-| `SUPABASE_URL`      | Supabase project URL  | Yes      |
-| `SUPABASE_ANON_KEY` | Supabase anon key     | Yes      |
-| `ANTHROPIC_API_KEY` | Anthropic API key     | Yes      |
-| `TAVILY_API_KEY`    | Tavily search API key | Yes      |
-| `LANGSMITH_API_KEY` | LangSmith API key     | Auto-set |
-
-## Authentication Flow
-
-The authentication is built using the [Supabase UI password-based auth block](https://supabase.com/ui/docs/nextjs/password-based-auth) which provides:
-
-- Login / Sign up / Forgot password / Update password pages
-- Email confirmation flow
-- Middleware-based route protection
-- Server and client Supabase clients
-
-```
-1. User → Frontend: Login with email/password
-2. Frontend → Supabase: Authenticate user
-3. Supabase → Frontend: Return JWT token (stored in cookies)
-4. Frontend → Agent: Request with JWT in Authorization header
-5. Agent → Supabase: Validate JWT token
-6. Agent → Frontend: Return response (scoped to user)
+### Frontend (Vercel)
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://diqhctrkufrmoflvfuoh.supabase.co
+NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY=sb_publishable_...
+NEXT_PUBLIC_API_URL=http://localhost:2024  # or LangSmith URL
+NEXT_PUBLIC_ASSISTANT_ID=deep_research
+LANGGRAPH_API_URL=<LangSmith deployment URL>  # for production
+LANGSMITH_API_KEY=<your key>
 ```
 
-All threads and conversations are automatically scoped to the authenticated user.
-
-### Email Templates
-
-Configure email templates in your Supabase project for:
-
-- **Sign up confirmation**: Redirect to `/auth/confirm`
-- **Password reset**: Redirect to `/auth/confirm` with type=recovery
-
-See the [Supabase docs](https://supabase.com/ui/docs/nextjs/password-based-auth#adding-email-templates) for template examples.
-
-## Customization
-
-### Changing the LLM Model
-
-Edit `apps/agent/src/agent/graph.py`:
-
-```python
-# Use Claude Sonnet
-model = init_chat_model(model="anthropic:claude-sonnet-4-5-20250929")
-
-# Or use GPT-4
-model = init_chat_model(model="openai:gpt-4o")
-
-# Or use Gemini
-model = ChatGoogleGenerativeAI(model="gemini-3-pro-preview")
+### Agent (LangSmith)
+```env
+SUPABASE_URL=https://diqhctrkufrmoflvfuoh.supabase.co
+SUPABASE_ANON_KEY=<key>
+SUPABASE_SERVICE_ROLE_KEY=<key>  # Required for document tools
+OPENAI_API_KEY=<your key>
+TAVILY_API_KEY=<your key>
+ISAACUS_API_KEY=<shared key>
+LANGSMITH_API_KEY=<your key>
 ```
 
-### Adding Custom Tools
+## 📚 Documentation
 
-Edit `apps/agent/src/agent/tools.py` to add new tools, then register them in `graph.py`.
+| Doc | Purpose |
+|-----|---------|
+| [ONBOARDING.md](ONBOARDING.md) | Quick setup for new devs |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | Dev workflow & conventions |
+| [specs/004-matters-documents/](specs/004-matters-documents/) | Current feature docs |
 
-### Modifying System Prompts
+## 🐛 Known Issues
 
-Edit `apps/agent/src/agent/prompts.py` to customize the agent's behavior.
+1. **Staging agent has wrong tools** - LangSmith deployment needs resyncing with GitHub
+2. **Search threshold** - Default 0.3 may miss some results, consider lowering
+
+## 👥 Team
+
+- **Adam** - Full-stack, AI agent development
+- Ask Adam for Supabase/Vercel/LangSmith access
 
 ## License
 
-MIT
+Private - All rights reserved
