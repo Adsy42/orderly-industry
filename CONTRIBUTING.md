@@ -59,11 +59,19 @@ pnpm dev:all
   └──────────────┘     └──────────────┘     └──────────────┘     └──────────────┘
                                                                         │
   ┌──────────────┐     ┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-  │   8. MERGE   │◀────│   7. PR      │◀────│  6. COMMIT   │◀────│ 5. IMPLEMENT │◀──┘
+  │   9. MERGE   │◀────│   7. PR      │◀────│  6. COMMIT   │◀────│ 5. IMPLEMENT │◀──┘
   │              │     │              │     │              │     │              │
-  │ Squash &     │     │ Code Review  │     │ /speckit     │     │ /speckit     │
-  │ Merge        │     │ + Spec Check │     │ .commit      │     │ .implement   │
+  │ Squash &     │     │ /speckit     │     │ /speckit     │     │ /speckit     │
+  │ Merge        │     │ .pr          │     │ .commit      │     │ .implement   │
   └──────────────┘     └──────────────┘     └──────────────┘     └──────────────┘
+                              │
+                              ▼
+                       ┌──────────────┐
+                       │   8. DEBUG   │ ◀─── Issues? CI Failures?
+                       │              │      Review Feedback?
+                       │ /speckit     │
+                       │ .debug       │ ────▶ Fix → Commit → Re-review
+                       └──────────────┘
 ```
 
 ## Spec-Driven Development
@@ -118,17 +126,19 @@ Or manually work through `tasks.md`, marking each complete.
 
 ### Available Commands
 
-| Command                  | Purpose                               |
-| ------------------------ | ------------------------------------- |
-| `/speckit.specify`       | Create feature specification          |
-| `/speckit.clarify`       | Clarify ambiguous requirements        |
-| `/speckit.plan`          | Create technical plan                 |
-| `/speckit.tasks`         | Break plan into tasks                 |
-| `/speckit.implement`     | Execute implementation                |
-| `/speckit.commit`        | Verify quality gates & create commits |
-| `/speckit.analyze`       | Check consistency                     |
-| `/speckit.checklist`     | Generate quality checklist            |
-| `/speckit.taskstoissues` | Export tasks to GitHub Issues         |
+| Command                  | Purpose                                      |
+| ------------------------ | -------------------------------------------- |
+| `/speckit.specify`       | Create feature specification                 |
+| `/speckit.clarify`       | Clarify ambiguous requirements               |
+| `/speckit.plan`          | Create technical plan                        |
+| `/speckit.tasks`         | Break plan into tasks                        |
+| `/speckit.implement`     | Execute implementation                       |
+| `/speckit.commit`        | Verify quality gates & create commits        |
+| `/speckit.pr`            | Create pull request with spec references     |
+| `/speckit.debug`         | Debug CI failures & review feedback          |
+| `/speckit.analyze`       | Check consistency                            |
+| `/speckit.checklist`     | Generate quality checklist                   |
+| `/speckit.taskstoissues` | Export tasks to GitHub Issues                |
 
 ## Git Workflow
 
@@ -223,6 +233,54 @@ git config commit.template .gitmessage
 ```
 
 ## Pull Request Process
+
+### Creating a Pull Request
+
+After committing your changes with `/speckit.commit`, use `/speckit.pr` to create a pull request:
+
+```bash
+# Create PR with auto-generated description from spec
+/speckit.pr
+
+# Create as draft
+/speckit.pr --draft
+
+# Add specific reviewers
+/speckit.pr --reviewer @teammate1
+```
+
+The command will:
+1. Verify your branch is pushed to remote
+2. Check for preview deployments (Vercel, LangSmith, Supabase)
+3. Generate a PR description from your spec files
+4. Include testing checklist and preview URLs
+5. Create the PR via GitHub CLI
+
+### Debugging PR Issues
+
+If CI fails or reviewers request changes, use `/speckit.debug`:
+
+```bash
+# Debug all issues
+/speckit.debug
+
+# Focus on CI failures
+/speckit.debug --ci
+
+# Focus on review feedback
+/speckit.debug --reviews
+
+# Debug agent issues (uses LangSmith MCP)
+/speckit.debug --agent
+
+# Debug database issues (uses Supabase MCP)
+/speckit.debug --db
+```
+
+The command uses MCP tools to diagnose issues:
+- **LangSmith**: Analyze agent traces, run errors, and experiments
+- **Supabase**: Check migrations, RLS policies, logs, and security advisors
+- **Vercel**: Parse build logs and deployment failures
 
 ### Preview Deployments
 
