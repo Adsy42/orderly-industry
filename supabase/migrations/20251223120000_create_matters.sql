@@ -14,7 +14,7 @@ create table public.matters (
   matter_number text unique not null,
   status text not null default 'active',
   jurisdiction text default 'AU',
-  created_by uuid references public.profiles (id) on delete cascade not null,
+  created_by uuid references public.profiles (id) on delete cascade not null default auth.uid(),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   
