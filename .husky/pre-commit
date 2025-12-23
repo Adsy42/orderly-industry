@@ -1,0 +1,86 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+echo "🔍 Running pre-commit checks..."
+
+# Check if frontend files are staged
+FRONTEND_STAGED=$(git diff --cached --name-only | grep "^apps/frontend/" || true)
+if [ -n "$FRONTEND_STAGED" ]; then
+  echo "📦 Frontend changes detected - running checks..."
+  
+  cd apps/frontend
+  
+  # Lint
+  echo "  → ESLint..."
+  pnpm lint || {
+    echo "❌ ESLint failed. Fix errors before committing."
+    exit 1
+  }
+  
+  # Type check
+  echo "  → TypeScript..."
+  pnpm tsc --noEmit || {
+    echo "❌ TypeScript check failed. Fix errors before committing."
+    exit 1
+  }
+  
+  cd ../..
+  echo "✅ Frontend checks passed"
+fi
+
+# Check if agent files are staged
+AGENT_STAGED=$(git diff --cached --name-only | grep "^apps/agent/" || true)
+if [ -n "$AGENT_STAGED" ]; then
+  echo "🐍 Agent changes detected - running checks..."
+  
+  cd apps/agent
+  
+  # Lint with ruff
+  echo "  → Ruff lint..."
+  ruff check . || {
+    echo "❌ Ruff lint failed. Fix errors before committing."
+    exit 1
+  }
+  
+  # Format check with ruff
+  echo "  → Ruff format..."
+  ruff format --check . || {
+    echo "❌ Ruff format check failed. Run 'ruff format .' to fix."
+    exit 1
+  }
+  
+  cd ../..
+  echo "✅ Agent checks passed"
+fi
+
+# Check if database files are staged
+DB_STAGED=$(git diff --cached --name-only | grep "^supabase/migrations/" || true)
+if [ -n "$DB_STAGED" ]; then
+  echo "🗄️ Database changes detected - validating migrations..."
+  
+  # Check migration naming
+  for file in $(git diff --cached --name-only | grep "^supabase/migrations/.*\.sql$"); do
+    filename=$(basename "$file")
+    if ! echo "$filename" | grep -qE '^[0-9]{14}_[a-z_]+\.sql$'; then
+      echo "❌ Invalid migration name: $filename"
+      echo "   Expected format: YYYYMMDDHHmmss_description.sql"
+      exit 1
+    fi
+  done
+  
+  # Check for RLS in new tables
+  for file in $(git diff --cached --name-only | grep "^supabase/migrations/.*\.sql$"); do
+    if git diff --cached "$file" | grep -qi "create table"; then
+      if ! git diff --cached "$file" | grep -qi "enable row level security"; then
+        echo "❌ $file creates table but doesn't enable RLS"
+        echo "   Constitution requires: All tables MUST have RLS enabled"
+        exit 1
+      fi
+    fi
+  done
+  
+  echo "✅ Database checks passed"
+fi
+
+echo "🎉 All pre-commit checks passed!"
+

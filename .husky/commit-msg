@@ -1,0 +1,29 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+# Validate commit message follows Conventional Commits
+commit_msg=$(cat "$1")
+
+# Pattern: type(scope): description
+# type is required, scope is optional
+pattern="^(feat|fix|docs|style|refactor|perf|test|chore|ci|revert)(\([a-z-]+\))?: .{1,50}"
+
+if ! echo "$commit_msg" | grep -qE "$pattern"; then
+  echo "❌ Invalid commit message format!"
+  echo ""
+  echo "Expected: <type>(<scope>): <description>"
+  echo ""
+  echo "Types: feat, fix, docs, style, refactor, perf, test, chore, ci, revert"
+  echo "Scopes: frontend, agent, db, auth, api, ui, deps (optional)"
+  echo ""
+  echo "Examples:"
+  echo "  feat(frontend): add user profile page"
+  echo "  fix(agent): handle search timeout"
+  echo "  docs: update README"
+  echo ""
+  echo "Your message: $commit_msg"
+  exit 1
+fi
+
+echo "✅ Commit message format valid"
+
