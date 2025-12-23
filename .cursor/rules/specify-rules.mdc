@@ -1,0 +1,29 @@
+# testv4 Development Guidelines
+
+Auto-generated from all feature plans. Last updated: 2025-12-23
+
+## Active Technologies
+
+- YAML (GitHub Actions), Bash (scripts) + LangGraph CLI, LangSmith Control Plane API, GitHub Actions (001-langsmith-preview-deploys)
+
+## Project Structure
+
+```text
+src/
+tests/
+```
+
+## Commands
+
+# Add commands for YAML (GitHub Actions), Bash (scripts)
+
+## Code Style
+
+YAML (GitHub Actions), Bash (scripts): Follow standard conventions
+
+## Recent Changes
+
+- 001-langsmith-preview-deploys: Added YAML (GitHub Actions), Bash (scripts) + LangGraph CLI, LangSmith Control Plane API, GitHub Actions
+
+<!-- MANUAL ADDITIONS START -->
+<!-- MANUAL ADDITIONS END -->
