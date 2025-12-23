@@ -18,10 +18,10 @@ Before using preview deployments, ensure you have:
 
 Go to **Settings → Secrets and variables → Actions** and add:
 
-| Secret                   | Value               | How to Get                                                            |
-| ------------------------ | ------------------- | --------------------------------------------------------------------- |
-| `LANGSMITH_API_KEY`      | `lsv2_...`          | [LangSmith Settings → API Keys](https://smith.langchain.com/settings) |
-| `LANGSMITH_WORKSPACE_ID` | `xxxxxxxx-xxxx-...` | From LangSmith URL after `/o/`                                        |
+| Secret | Value | How to Get |
+|--------|-------|------------|
+| `LANGSMITH_API_KEY` | `lsv2_...` | [LangSmith Settings → API Keys](https://smith.langchain.com/settings) |
+| `LANGSMITH_WORKSPACE_ID` | `xxxxxxxx-xxxx-...` | From LangSmith URL after `/o/` |
 
 ### 2. Verify Workflows Are in Place
 
@@ -57,7 +57,6 @@ Your `apps/agent/langgraph.json` should look like:
 1. **Make agent changes** in `apps/agent/`
 
 2. **Commit and push** to your feature branch:
-
    ```bash
    git add .
    git commit -m "feat(agent): add new research capability"
@@ -87,7 +86,6 @@ Your `apps/agent/langgraph.json` should look like:
 1. **Get PR approved** and ensure all checks pass
 
 2. **Merge to main**:
-
    ```bash
    git checkout main
    git merge 001-my-feature
@@ -116,7 +114,6 @@ langgraph dev  # Should start without auth errors
 **Cause**: The agent is trying to connect to a database that doesn't exist in LangSmith.
 
 **Check**: Your agent code for hardcoded database connections:
-
 ```python
 # Bad - hardcoded connection
 pool = psycopg_pool.AsyncConnectionPool("postgresql://...")
@@ -133,8 +130,7 @@ pool = psycopg_pool.AsyncConnectionPool("postgresql://...")
 
 ### PR Comment Not Posted
 
-**Check**:
-
+**Check**: 
 - Workflow has `write` permissions for issues
 - No errors in the "Comment on PR" step
 
@@ -174,3 +170,4 @@ After merging:
 1. **Verify production**: Test the production deployment
 2. **Update frontend env**: Ensure `NEXT_PUBLIC_API_URL` points to production
 3. **Monitor**: Check LangSmith for traces and performance
+

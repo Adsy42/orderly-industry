@@ -25,9 +25,9 @@
 
 **Purpose**: Configure GitHub repository with required secrets and permissions
 
-- [ ] T001 Add `LANGSMITH_API_KEY` secret to GitHub repository settings _(manual step - do in GitHub UI)_
-- [ ] T002 Add `LANGSMITH_WORKSPACE_ID` secret to GitHub repository settings _(manual step - do in GitHub UI)_
-- [ ] T003 Verify workflow permissions allow issue comments in Settings → Actions → General _(manual step - do in GitHub UI)_
+- [ ] T001 Add `LANGSMITH_API_KEY` secret to GitHub repository settings *(manual step - do in GitHub UI)*
+- [ ] T002 Add `LANGSMITH_WORKSPACE_ID` secret to GitHub repository settings *(manual step - do in GitHub UI)*
+- [ ] T003 Verify workflow permissions allow issue comments in Settings → Actions → General *(manual step - do in GitHub UI)*
 
 ---
 
@@ -37,9 +37,9 @@
 
 **⚠️ CRITICAL**: Preview deployment workflows cannot work until these are verified
 
-- [ ] T004 Verify `apps/agent/langgraph.json` is valid by running `cd apps/agent && langgraph dev` locally _(manual step)_
-- [ ] T005 Verify agent deploys manually via `langgraph deploy --config langgraph.json` locally _(manual step)_
-- [x] T006 [P] Create `.github/scripts/` directory structure _(not needed - using inline scripts)_
+- [ ] T004 Verify `apps/agent/langgraph.json` is valid by running `cd apps/agent && langgraph dev` locally *(manual step)*
+- [ ] T005 Verify agent deploys manually via `langgraph deploy --config langgraph.json` locally *(manual step)*
+- [x] T006 [P] Create `.github/scripts/` directory structure *(not needed - using inline scripts)*
 
 **Checkpoint**: Foundation ready - user story implementation can now begin
 
@@ -129,9 +129,9 @@
 **Purpose**: Documentation and final validation
 
 - [x] T032 [P] Update CONTRIBUTING.md with LangSmith preview workflow documentation
-- [x] T033 [P] Add GitHub secrets setup instructions to README or docs _(included in quickstart.md)_
-- [ ] T034 Run end-to-end validation: open PR → verify preview → merge → verify production _(manual step after merge)_
-- [x] T035 Update constitution.md if any new patterns were established _(no new patterns - using existing deployment strategy)_
+- [x] T033 [P] Add GitHub secrets setup instructions to README or docs *(included in quickstart.md)*
+- [ ] T034 Run end-to-end validation: open PR → verify preview → merge → verify production *(manual step after merge)*
+- [x] T035 Update constitution.md if any new patterns were established *(no new patterns - using existing deployment strategy)*
 
 ---
 
@@ -157,7 +157,7 @@ Phase 2: Foundational
     ├──→ Phase 3: US1 (P1) ──→ Phase 4: US2 (P2) ──→ Phase 6: US4 (P3)
     │
     └──→ Phase 5: US3 (P2) [can run in parallel with US1/US2]
-
+    
 All stories → Phase 7: Polish
 ```
 
@@ -218,3 +218,4 @@ US3 can be done in parallel by another developer or after US1:
 - No automated tests needed - manual PR validation is the test
 - Commit after each user story phase for clean history
 - Stop at any checkpoint to validate story independently
+

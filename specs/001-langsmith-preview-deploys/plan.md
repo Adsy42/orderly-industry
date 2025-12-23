@@ -21,18 +21,18 @@ Implement automated LangSmith preview deployments for pull requests, mirroring t
 
 ## Constitution Check
 
-_GATE: Must pass before Phase 0 research. Re-check after Phase 1 design._
+*GATE: Must pass before Phase 0 research. Re-check after Phase 1 design.*
 
-| Principle                      | Status     | Notes                                                        |
-| ------------------------------ | ---------- | ------------------------------------------------------------ |
-| **Monorepo Architecture**      | ✅ PASS    | Workflows target `apps/agent/` directory specifically        |
-| **Authentication-First**       | ✅ PASS    | Preview deployments include existing custom auth handler     |
-| **Security by Default**        | ✅ PASS    | Secrets managed via GitHub repository secrets, never exposed |
-| **Research Agent Patterns**    | ✅ N/A     | Infrastructure change, not agent logic                       |
-| **Simplicity Over Complexity** | ✅ PASS    | Uses native LangGraph CLI, minimal custom scripting          |
-| **Deployment Strategy**        | ✅ ALIGNED | Extends existing LangSmith deployment pattern                |
-| **Git Workflow**               | ✅ ALIGNED | Integrates with existing PR workflow                         |
-| **Commit Conventions**         | ✅ ALIGNED | CI workflow changes use `ci` type                            |
+| Principle | Status | Notes |
+|-----------|--------|-------|
+| **Monorepo Architecture** | ✅ PASS | Workflows target `apps/agent/` directory specifically |
+| **Authentication-First** | ✅ PASS | Preview deployments include existing custom auth handler |
+| **Security by Default** | ✅ PASS | Secrets managed via GitHub repository secrets, never exposed |
+| **Research Agent Patterns** | ✅ N/A | Infrastructure change, not agent logic |
+| **Simplicity Over Complexity** | ✅ PASS | Uses native LangGraph CLI, minimal custom scripting |
+| **Deployment Strategy** | ✅ ALIGNED | Extends existing LangSmith deployment pattern |
+| **Git Workflow** | ✅ ALIGNED | Integrates with existing PR workflow |
+| **Commit Conventions** | ✅ ALIGNED | CI workflow changes use `ci` type |
 
 **Gate Status**: ✅ PASSED - No violations, proceed to Phase 0
 
