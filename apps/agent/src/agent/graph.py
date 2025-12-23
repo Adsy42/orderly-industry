@@ -2,6 +2,8 @@
 
 This module creates a deep research agent with custom tools and prompts
 for conducting web research with strategic thinking and context management.
+
+Version: 1.0.1 - Added CI/CD preview deployment support
 """
 
 from datetime import datetime
