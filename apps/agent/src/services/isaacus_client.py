@@ -67,7 +67,7 @@ class IsaacusClient:
             List of embedding vectors (1792 dimensions each for kanon-2-embedder)
         """
         # Run sync SDK call in thread to avoid blocking event loop
-        response = await asyncio.to_thread(
+        response = await asyncio.to_thread(  # noqa: F821
             self._client.embeddings.create,
             model=model,
             texts=texts,
@@ -115,7 +115,7 @@ class IsaacusClient:
             kwargs["top_k"] = top_k
 
         # Run sync SDK call in thread to avoid blocking event loop
-        response = await asyncio.to_thread(
+        response = await asyncio.to_thread(  # noqa: F821
             lambda: self._client.rerankings.create(**kwargs)
         )
 
@@ -149,7 +149,7 @@ class IsaacusClient:
             Dict with 'answer', 'confidence', 'start', 'end' keys
         """
         # Run sync SDK call in thread to avoid blocking event loop
-        response = await asyncio.to_thread(
+        response = await asyncio.to_thread(  # noqa: F821
             self._client.extractions.qa.create,
             question=question,
             context=context,
@@ -187,7 +187,7 @@ class IsaacusClient:
             sorted by score descending
         """
         # Run sync SDK call in thread to avoid blocking event loop
-        response = await asyncio.to_thread(
+        response = await asyncio.to_thread(  # noqa: F821
             self._client.classifications.universal.create,
             text=text,
             labels=labels,
@@ -255,7 +255,7 @@ class IsaacusClient:
         # IQL queries use the universal classification endpoint with query parameter
         # API requires 'texts' (plural array), not 'text' (singular)
         # Run sync SDK call in thread to avoid blocking event loop
-        response = await asyncio.to_thread(
+        response = await asyncio.to_thread(  # noqa: F821
             self._client.classifications.universal.create,
             query=query,
             texts=[text],  # API requires 'texts' as an array
