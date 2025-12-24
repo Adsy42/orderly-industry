@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Briefcase, MessageSquare, Settings } from "lucide-react";
+import { Briefcase, MessageSquare, FileSearch } from "lucide-react";
 import { OrderlyIcon } from "@/components/icons/orderly";
 import { LogoutButton } from "@/components/logout-button";
 import { cn } from "@/lib/utils";
@@ -13,6 +13,11 @@ const navigation = [
     name: "Matters",
     href: "/protected/matters",
     icon: Briefcase,
+  },
+  {
+    name: "IQL Analyzer",
+    href: "/protected/iql-analyzer",
+    icon: FileSearch,
   },
   {
     name: "Chat",
