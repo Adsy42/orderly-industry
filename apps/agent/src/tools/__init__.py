@@ -5,18 +5,17 @@ from .get_document_text import (
     GetDocumentTextOutput,
     get_document_text,
 )
-from .isaacus_classify import (
-    DEFAULT_CLAUSE_TYPES,
-    ClassifiedClause,
-    IsaacusClassifyInput,
-    IsaacusClassifyOutput,
-    isaacus_classify,
-)
 from .isaacus_extract import (
     Citation,
     IsaacusExtractInput,
     IsaacusExtractOutput,
     isaacus_extract,
+)
+from .isaacus_iql import (
+    IQLMatch,
+    IsaacusIQLInput,
+    IsaacusIQLOutput,
+    isaacus_iql,
 )
 from .isaacus_search import (
     IsaacusSearchInput,
@@ -49,20 +48,20 @@ __all__ = [
     "IsaacusExtractInput",
     "IsaacusExtractOutput",
     "Citation",
-    # Classify tool
-    "isaacus_classify",
-    "IsaacusClassifyInput",
-    "IsaacusClassifyOutput",
-    "ClassifiedClause",
-    "DEFAULT_CLAUSE_TYPES",
+    # IQL tool (replaces classify - uses better model with pre-optimized templates)
+    "isaacus_iql",
+    "IsaacusIQLInput",
+    "IsaacusIQLOutput",
+    "IQLMatch",
 ]
 
 # List of all document tools for registration with the agent
 # These are proper LangChain tool functions decorated with @tool
+# Note: isaacus_classify removed - IQL is more accurate with pre-optimized templates
 ISAACUS_TOOLS = [
     list_matter_documents,
     get_document_text,  # Direct document access (fast, no embedding needed)
     isaacus_search,  # Semantic search (requires embeddings)
     isaacus_extract,  # Extractive QA
-    isaacus_classify,  # Clause classification
+    isaacus_iql,  # IQL - clause finding/classification (uses kanon-universal-classifier)
 ]

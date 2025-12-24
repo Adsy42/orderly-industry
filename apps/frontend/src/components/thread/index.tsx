@@ -45,6 +45,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../ui/select";
+import { createClient } from "@/lib/supabase/client";
 
 function StickyToBottomContent(props: {
   content: ReactNode;
@@ -104,7 +105,12 @@ export function Thread() {
     "matterId",
     parseAsString.withDefault(""),
   );
+  const [selectedDocumentId, setSelectedDocumentId] = useQueryState(
+    "documentId",
+    parseAsString.withDefault(""),
+  );
   const { matters } = useMatters();
+  const [documentName, setDocumentName] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const {
     contentBlocks,
@@ -175,6 +181,37 @@ export function Thread() {
     prevMessageLength.current = messages.length;
   }, [messages]);
 
+  // Fetch document name when documentId is available
+  useEffect(() => {
+    async function fetchDocumentName() {
+      if (!selectedDocumentId) {
+        setDocumentName(null);
+        return;
+      }
+
+      try {
+        const supabase = createClient();
+        const { data, error } = await supabase
+          .from("documents")
+          .select("filename")
+          .eq("id", selectedDocumentId)
+          .single();
+
+        if (error || !data) {
+          console.error("Error fetching document:", error);
+          setDocumentName(null);
+        } else {
+          setDocumentName(data.filename);
+        }
+      } catch (err) {
+        console.error("Error fetching document name:", err);
+        setDocumentName(null);
+      }
+    }
+
+    fetchDocumentName();
+  }, [selectedDocumentId]);
+
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if ((input.trim().length === 0 && contentBlocks.length === 0) || isLoading)
@@ -201,14 +238,21 @@ export function Thread() {
         ? { ...artifactContext, ...matterContext }
         : undefined;
 
-    // Build context message so LLM can see the matter_id UUID
+    // Build context message so LLM can see the matter_id UUID and optional document_id
     const contextMessages: Message[] = [];
     const selectedMatter = matters.find((m) => m.id === selectedMatterId);
     if (selectedMatter) {
+      let contextContent = `[CONTEXT] The user has selected matter "${selectedMatter.title}" (matter_id: ${selectedMatter.id}).`;
+
+      // Add document context if viewing a specific document
+      if (selectedDocumentId && documentName) {
+        contextContent += `\nThe user is currently viewing document "${documentName}" (document_id: ${selectedDocumentId}).`;
+      }
+
       contextMessages.push({
         id: `${DO_NOT_RENDER_ID_PREFIX}context-${uuidv4()}`,
         type: "system",
-        content: `[CONTEXT] The user has selected matter "${selectedMatter.title}" (matter_id: ${selectedMatter.id}). Use this matter_id UUID for any document searches.`,
+        content: contextContent,
       } as Message);
     }
 

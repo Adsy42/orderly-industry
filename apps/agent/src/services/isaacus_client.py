@@ -4,6 +4,7 @@ Provides embedding, reranking, extractive QA, and classification
 capabilities optimized for Australian legal documents.
 
 Uses the official Isaacus Python SDK.
+Note: SDK is synchronous, so we use asyncio.to_thread() for async compatibility.
 """
 
 import os
@@ -65,7 +66,9 @@ class IsaacusClient:
         Returns:
             List of embedding vectors (1792 dimensions each for kanon-2-embedder)
         """
-        response = self._client.embeddings.create(
+        # Run sync SDK call in thread to avoid blocking event loop
+        response = await asyncio.to_thread(  # noqa: F821
+            self._client.embeddings.create,
             model=model,
             texts=texts,
             task=task,
@@ -111,7 +114,10 @@ class IsaacusClient:
         if top_k is not None:
             kwargs["top_k"] = top_k
 
-        response = self._client.rerankings.create(**kwargs)
+        # Run sync SDK call in thread to avoid blocking event loop
+        response = await asyncio.to_thread(  # noqa: F821
+            lambda: self._client.rerankings.create(**kwargs)
+        )
 
         # Convert SDK response objects to dicts
         return [
@@ -142,7 +148,9 @@ class IsaacusClient:
         Returns:
             Dict with 'answer', 'confidence', 'start', 'end' keys
         """
-        response = self._client.extractions.qa.create(
+        # Run sync SDK call in thread to avoid blocking event loop
+        response = await asyncio.to_thread(  # noqa: F821
+            self._client.extractions.qa.create,
             question=question,
             context=context,
             model=model,
@@ -178,7 +186,9 @@ class IsaacusClient:
             List of dicts with 'label' and 'score' keys,
             sorted by score descending
         """
-        response = self._client.classifications.universal.create(
+        # Run sync SDK call in thread to avoid blocking event loop
+        response = await asyncio.to_thread(  # noqa: F821
+            self._client.classifications.universal.create,
             text=text,
             labels=labels,
             model=model,
@@ -244,7 +254,9 @@ class IsaacusClient:
         """
         # IQL queries use the universal classification endpoint with query parameter
         # API requires 'texts' (plural array), not 'text' (singular)
-        response = self._client.classifications.universal.create(
+        # Run sync SDK call in thread to avoid blocking event loop
+        response = await asyncio.to_thread(  # noqa: F821
+            self._client.classifications.universal.create,
             query=query,
             texts=[text],  # API requires 'texts' as an array
             model=model,
