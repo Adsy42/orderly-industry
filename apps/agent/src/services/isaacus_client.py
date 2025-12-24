@@ -2,22 +2,23 @@
 
 Provides embedding, reranking, extractive QA, and classification
 capabilities optimized for Australian legal documents.
+
+Uses the official Isaacus Python SDK.
 """
 
-import asyncio
 import os
 from typing import Any
 
-import httpx
+from isaacus import Isaacus
 
 
 class IsaacusClient:
-    """Client for Isaacus Legal AI API."""
+    """Client for Isaacus Legal AI API using official SDK."""
 
     def __init__(
         self,
         api_key: str | None = None,
-        base_url: str = "https://api.isaacus.com",
+        base_url: str | None = None,
         max_retries: int = 3,
         timeout: float = 30.0,
     ):
@@ -25,82 +26,29 @@ class IsaacusClient:
 
         Args:
             api_key: Isaacus API key. Defaults to ISAACUS_API_KEY env var.
-            base_url: Base URL for the API. Defaults to ISAACUS_BASE_URL env var or production URL.
-            max_retries: Maximum number of retry attempts for failed requests.
-            timeout: Request timeout in seconds.
+            base_url: Base URL for the API. Defaults to ISAACUS_BASE_URL env var or SDK default.
+            max_retries: Maximum number of retry attempts (not used by SDK, kept for compatibility).
+            timeout: Request timeout in seconds (not used by SDK, kept for compatibility).
         """
         self.api_key = api_key or os.getenv("ISAACUS_API_KEY")
         self.base_url = os.getenv("ISAACUS_BASE_URL", base_url)
         self.max_retries = max_retries
         self.timeout = timeout
-        self._client: httpx.AsyncClient | None = None
-
-    async def _get_client(self) -> httpx.AsyncClient:
-        """Get or create the HTTP client."""
-        if self._client is None or self._client.is_closed:
-            self._client = httpx.AsyncClient(
-                timeout=self.timeout,
-                headers={
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json",
-                },
-            )
-        return self._client
+        
+        # Initialize official SDK client
+        # SDK automatically uses ISAACUS_API_KEY env var if api_key is None
+        self._client = Isaacus(api_key=self.api_key)
 
     async def close(self) -> None:
-        """Close the HTTP client."""
-        if self._client is not None and not self._client.is_closed:
-            await self._client.aclose()
-            self._client = None
-
-    async def _request(
-        self,
-        method: str,
-        endpoint: str,
-        json_data: dict[str, Any] | None = None,
-    ) -> dict[str, Any]:
-        """Make an API request with retry logic.
-
-        Args:
-            method: HTTP method (GET, POST, etc.)
-            endpoint: API endpoint path
-            json_data: Optional JSON body
-
-        Returns:
-            JSON response data
-
-        Raises:
-            httpx.HTTPError: If all retries fail
-        """
-        client = await self._get_client()
-        url = f"{self.base_url}{endpoint}"
-        last_error: Exception | None = None
-
-        for attempt in range(self.max_retries):
-            try:
-                response = await client.request(method, url, json=json_data)
-                response.raise_for_status()
-                return response.json()
-            except httpx.HTTPStatusError as e:
-                last_error = e
-                # Don't retry on client errors (4xx)
-                if 400 <= e.response.status_code < 500:
-                    raise
-                # Exponential backoff for server errors
-                await asyncio.sleep(2**attempt)
-            except httpx.RequestError as e:
-                last_error = e
-                await asyncio.sleep(2**attempt)
-
-        # If we exhausted retries, raise the last error
-        if last_error:
-            raise last_error
-        raise RuntimeError("Request failed with no error captured")
+        """Close the HTTP client (no-op for SDK)."""
+        # SDK handles connection management internally
+        pass
 
     async def embed(
         self,
         texts: list[str],
         model: str = "kanon-2-embedder",
+        task: str = "retrieval/document",
     ) -> list[list[float]]:
         """Generate embeddings for texts.
 
@@ -112,33 +60,26 @@ class IsaacusClient:
         Args:
             texts: List of text strings to embed
             model: Embedding model to use (default: kanon-2-embedder)
+            task: Task type - "retrieval/query" or "retrieval/document" (default: retrieval/document)
 
         Returns:
             List of embedding vectors (1792 dimensions each for kanon-2-embedder)
         """
-        response = await self._request(
-            "POST",
-            "/v1/embeddings",
-            json_data={
-                "texts": texts,  # Isaacus uses 'texts' field
-                "model": model,
-            },
+        response = self._client.embeddings.create(
+            model=model,
+            texts=texts,
+            task=task,
         )
-        # Isaacus returns { embeddings: [{"index": 0, "embedding": [...]}, ...] }
-        # or potentially { embeddings: [[...], [...], ...] } - handle both formats
-        embeddings_data = response.get("embeddings", [])
-
+        
+        # SDK returns response with embeddings array
+        embeddings_data = response.embeddings
+        
         if not embeddings_data:
             return []
-
-        # Check if first item is an object with 'embedding' field or a raw array
-        first_item = embeddings_data[0]
-        if isinstance(first_item, dict) and "embedding" in first_item:
-            # Format: [{"index": 0, "embedding": [...]}, ...]
-            return [item["embedding"] for item in embeddings_data]
-        else:
-            # Format: [[...], [...], ...] - already raw arrays
-            return embeddings_data
+        
+        # Extract embedding vectors from response objects
+        # SDK returns list of objects with .embedding attribute
+        return [item.embedding for item in embeddings_data]
 
     async def rerank(
         self,
@@ -162,16 +103,25 @@ class IsaacusClient:
             List of dicts with 'index', 'score', and 'text' keys,
             sorted by relevance score descending
         """
-        json_data: dict[str, Any] = {
+        kwargs: dict[str, Any] = {
             "query": query,
             "documents": documents,
             "model": model,
         }
         if top_k is not None:
-            json_data["top_k"] = top_k
+            kwargs["top_k"] = top_k
 
-        response = await self._request("POST", "/rerank", json_data=json_data)
-        return response.get("results", [])
+        response = self._client.rerankings.create(**kwargs)
+        
+        # Convert SDK response objects to dicts
+        return [
+            {
+                "index": item.index,
+                "score": item.score,
+                "text": item.text if hasattr(item, "text") else documents[item.index],
+            }
+            for item in response.results
+        ]
 
     async def extract(
         self,
@@ -192,16 +142,19 @@ class IsaacusClient:
         Returns:
             Dict with 'answer', 'confidence', 'start', 'end' keys
         """
-        response = await self._request(
-            "POST",
-            "/extract",
-            json_data={
-                "question": question,
-                "context": context,
-                "model": model,
-            },
+        response = self._client.extractions.qa.create(
+            question=question,
+            context=context,
+            model=model,
         )
-        return response
+        
+        # Convert SDK response to dict
+        return {
+            "answer": response.answer,
+            "confidence": getattr(response, "confidence", 1.0),
+            "start": getattr(response, "start", 0),
+            "end": getattr(response, "end", len(context)),
+        }
 
     async def classify(
         self,
@@ -225,17 +178,121 @@ class IsaacusClient:
             List of dicts with 'label' and 'score' keys,
             sorted by score descending
         """
-        response = await self._request(
-            "POST",
-            "/classify",
-            json_data={
-                "text": text,
-                "labels": labels,
-                "model": model,
-                "multi_label": multi_label,
-            },
+        response = self._client.classifications.universal.create(
+            text=text,
+            labels=labels,
+            model=model,
+            multi_label=multi_label,
         )
-        return response.get("classifications", [])
+        
+        # Convert SDK response objects to dicts
+        return [
+            {"label": item.label, "score": item.score}
+            for item in response.classifications
+        ]
+
+    def _extract_start_index(self, obj: Any) -> int:
+        """Extract start index from various API response formats.
+        
+        Isaacus API may return 'start', 'start_index', or 'startIndex'.
+        This ensures consistent handling across different response formats.
+        """
+        # Try each possible field name
+        for field in ("start", "start_index", "startIndex"):
+            value = getattr(obj, field, None)
+            if value is not None:
+                return int(value)
+        return 0
+
+    def _extract_end_index(self, obj: Any) -> int:
+        """Extract end index from various API response formats.
+        
+        Isaacus API may return 'end', 'end_index', or 'endIndex'.
+        This ensures consistent handling across different response formats.
+        """
+        # Try each possible field name
+        for field in ("end", "end_index", "endIndex"):
+            value = getattr(obj, field, None)
+            if value is not None:
+                return int(value)
+        return 0
+
+    async def classify_iql(
+        self,
+        query: str,
+        text: str,
+        model: str = "kanon-universal-classifier",
+    ) -> dict[str, Any]:
+        """Execute an IQL (Isaacus Query Language) query against document text.
+
+        Uses Isaacus IQL to analyze legal documents and identify clauses,
+        obligations, and rights matching the query criteria.
+
+        API docs: https://docs.isaacus.com/iql/introduction
+
+        Args:
+            query: IQL query string (e.g., "{IS confidentiality clause}")
+            text: Document text to analyze
+            model: Classification model to use (kanon-universal-classifier or kanon-universal-classifier-mini)
+
+        Returns:
+            Dict with 'score' (0-1) and 'matches' list containing:
+            - 'text': Matching excerpt
+            - 'start_index': Character position start (snake_case for Python convention)
+            - 'end_index': Character position end (snake_case for Python convention)
+            - 'score': Confidence score for this match
+        """
+        # IQL queries use the universal classification endpoint with query parameter
+        # API requires 'texts' (plural array), not 'text' (singular)
+        response = self._client.classifications.universal.create(
+            query=query,
+            texts=[text],  # API requires 'texts' as an array
+            model=model,
+        )
+        
+        # Handle response format
+        # The universal classification endpoint returns:
+        # { classifications: [{ index, score, chunks: [{ index, start, end, score, text }] }] }
+        result: dict[str, Any] = {
+            "score": 0.0,
+            "matches": [],
+        }
+        
+        # Extract from classifications response format (primary format)
+        if hasattr(response, "classifications") and response.classifications:
+            classification = response.classifications[0]
+            if classification:
+                result["score"] = float(getattr(classification, "score", 0.0))
+                
+                # Extract chunks as matches
+                if hasattr(classification, "chunks") and classification.chunks:
+                    result["matches"] = [
+                        {
+                            "text": getattr(chunk, "text", ""),
+                            "start_index": self._extract_start_index(chunk),
+                            "end_index": self._extract_end_index(chunk),
+                            "score": float(getattr(chunk, "score", result["score"])),
+                        }
+                        for chunk in classification.chunks
+                    ]
+        elif hasattr(response, "score"):
+            # Fallback: direct score/matches format
+            result["score"] = float(getattr(response, "score", 0.0))
+            if hasattr(response, "matches") and response.matches:
+                result["matches"] = [
+                    {
+                        "text": getattr(match, "text", str(match)),
+                        "start_index": self._extract_start_index(match),
+                        "end_index": self._extract_end_index(match),
+                        "score": float(getattr(match, "score", result["score"])),
+                    }
+                    for match in response.matches
+                ]
+        
+        # Sort matches by score descending for consistency with frontend
+        result["matches"].sort(key=lambda m: m["score"], reverse=True)
+        
+        return result
 
     async def __aenter__(self) -> "IsaacusClient":
         """Async context manager entry."""

@@ -62,7 +62,7 @@ export function MatterCard({
   return (
     <Card
       className={cn(
-        "group hover:border-primary/50 relative overflow-hidden transition-all hover:shadow-md",
+        "group hover:border-primary/50 relative transition-all hover:shadow-md",
         className,
       )}
     >
@@ -76,18 +76,22 @@ export function MatterCard({
             <p className="text-muted-foreground mb-1 text-xs font-medium">
               {matter.matter_number}
             </p>
-            <h3 className="text-foreground group-hover:text-primary truncate text-lg font-semibold">
+            <h3 className="text-foreground group-hover:text-primary truncate pr-8 text-lg font-semibold">
               {matter.title}
             </h3>
           </div>
-          <span
-            className={cn(
-              "shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize",
-              statusColors[matter.status],
-            )}
-          >
-            {matter.status}
-          </span>
+          <div className="flex shrink-0 items-center gap-2">
+            <span
+              className={cn(
+                "rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize",
+                statusColors[matter.status],
+              )}
+            >
+              {matter.status}
+            </span>
+            {/* Spacer for actions button */}
+            <div className="w-8" />
+          </div>
         </div>
 
         {/* Description */}
@@ -113,7 +117,7 @@ export function MatterCard({
       {/* Actions Menu */}
       <div
         ref={actionsRef}
-        className="absolute top-3 right-3"
+        className="absolute top-4 right-4"
       >
         <Button
           variant="ghost"
@@ -130,7 +134,7 @@ export function MatterCard({
         </Button>
 
         {showActions && (
-          <div className="bg-popover absolute top-full right-0 z-10 mt-1 min-w-[140px] rounded-md border p-1 shadow-md">
+          <div className="bg-popover absolute top-full right-0 z-50 mt-1 min-w-[140px] rounded-md border p-1 shadow-lg">
             {onEdit && (
               <button
                 className="hover:bg-accent flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm"
