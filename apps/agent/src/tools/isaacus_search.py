@@ -1,4 +1,4 @@
-"""Isaacus semantic search tool for document queries within matters."""
+"""Isaacus semantic search tool with reranking for document queries within matters."""
 
 import os
 from typing import List
@@ -17,7 +17,11 @@ class SearchResult(BaseModel):
     document_id: str = Field(description="UUID of the source document")
     filename: str = Field(description="Name of the source file")
     chunk_text: str = Field(description="The matching text excerpt")
-    similarity: float = Field(description="Similarity score (0-1)")
+    similarity: float = Field(description="Vector similarity score (0-1)")
+    rerank_score: float | None = Field(
+        default=None,
+        description="Reranking score from Isaacus (0-1), higher is more relevant",
+    )
 
 
 class IsaacusSearchInput(BaseModel):
@@ -52,6 +56,10 @@ class IsaacusSearchOutput(BaseModel):
     )
     query: str = Field(description="The original search query")
     matter_id: str = Field(description="The matter that was searched")
+    reranked: bool = Field(
+        default=False,
+        description="Whether results were reranked by Isaacus",
+    )
 
 
 @tool(parse_docstring=True)
@@ -61,16 +69,17 @@ def isaacus_search(
     max_results: int = 5,
     threshold: float = 0.3,
 ) -> dict:
-    """Search for relevant document chunks within a matter using semantic similarity.
+    """Search for relevant document chunks within a matter using semantic similarity and AI reranking.
 
-    This tool uses Isaacus embedding models optimized for Australian legal documents
+    This tool uses Isaacus embedding models optimized for legal documents
     to find the most relevant passages matching a natural language query.
+    Results are reranked using Isaacus's universal classifier for improved accuracy.
 
     Args:
         matter_id: The UUID of the matter to search within.
         query: A natural language question or search query.
         max_results: Maximum number of results to return (1-20). Defaults to 5.
-        threshold: Minimum similarity score (0-1) for results. Defaults to 0.5.
+        threshold: Minimum similarity score (0-1) for results. Defaults to 0.3.
 
     Returns:
         A dictionary with matching document chunks and their sources.
@@ -92,9 +101,9 @@ async def _isaacus_search_async(
     matter_id: str,
     query: str,
     max_results: int = 5,
-    threshold: float = 0.5,
+    threshold: float = 0.3,
 ) -> dict:
-    """Internal async implementation of isaacus_search."""
+    """Internal async implementation of isaacus_search with reranking."""
     # Check for required env vars
     api_key = os.getenv("ISAACUS_API_KEY")
     base_url = os.getenv("ISAACUS_BASE_URL", "https://api.isaacus.com")
@@ -109,6 +118,7 @@ async def _isaacus_search_async(
             "total_found": 0,
             "query": query,
             "matter_id": matter_id,
+            "reranked": False,
             "error": "ISAACUS_API_KEY not configured",
         }
 
@@ -118,30 +128,34 @@ async def _isaacus_search_async(
             "total_found": 0,
             "query": query,
             "matter_id": matter_id,
+            "reranked": False,
             "error": "Supabase credentials not configured",
         }
 
     client = IsaacusClient(api_key=api_key, base_url=base_url)
 
     try:
-        # Generate embedding for the query
-        embeddings = await client.embed([query])
+        # Step 1: Generate embedding for the query using retrieval/query task
+        embeddings = await client.embed([query], task="retrieval/query")
         if not embeddings or len(embeddings) == 0:
             return {
                 "results": [],
                 "total_found": 0,
                 "query": query,
                 "matter_id": matter_id,
+                "reranked": False,
                 "error": "Failed to generate query embedding",
             }
 
         query_embedding = embeddings[0]
-        print(f"Query embedding dimension: {len(query_embedding)}")
+        print(f"[Isaacus Search] Query embedding dimension: {len(query_embedding)}")
 
-        # Format embedding as string for pgvector (PostgREST expects string format)
+        # Format embedding as string for pgvector
         embedding_str = "[" + ",".join(str(x) for x in query_embedding) + "]"
 
-        # Call Supabase RPC function to find similar documents
+        # Step 2: Vector search - get more candidates for reranking
+        candidate_count = min(max_results * 3, 20)  # Get 3x for reranking
+        
         async with httpx.AsyncClient() as http_client:
             response = await http_client.post(
                 f"{supabase_url}/rest/v1/rpc/match_document_embeddings",
@@ -154,101 +168,151 @@ async def _isaacus_search_async(
                     "query_embedding": embedding_str,
                     "matter_uuid": matter_id,
                     "match_threshold": threshold,
-                    "match_count": max_results,
+                    "match_count": candidate_count,
                 },
             )
 
             if response.status_code != 200:
-                # Log the actual error for debugging
                 error_detail = response.text
-                print(f"Supabase RPC error: {response.status_code} - {error_detail}")
-                print(f"Query embedding dimension: {len(query_embedding)}")
+                print(f"[Isaacus Search] Supabase RPC error: {response.status_code} - {error_detail}")
                 return {
                     "results": [],
                     "total_found": 0,
                     "query": query,
                     "matter_id": matter_id,
-                    "error": f"Supabase RPC error: {response.status_code} - {error_detail}",
+                    "reranked": False,
+                    "error": f"Supabase RPC error: {response.status_code}",
                 }
 
-            data = response.json()
+            candidates = response.json()
 
-            if data:
+        if not candidates:
+            # No results found - provide smart fallback
+            return await _handle_no_results(matter_id, query)
+
+        print(f"[Isaacus Search] Found {len(candidates)} vector candidates")
+
+        # Step 3: Rerank candidates if we have more than one
+        reranked = False
+        results = []
+
+        if len(candidates) > 1:
+            try:
+                print(f"[Isaacus Search] Reranking {len(candidates)} candidates")
+                rerank_results = await client.rerank(
+                    query=query,
+                    documents=[c["chunk_text"] for c in candidates],
+                    model="kanon-universal-classifier",
+                    top_k=max_results,
+                )
+
+                # Map rerank scores back to candidates
+                results = []
+                for r in rerank_results:
+                    candidate = candidates[r["index"]]
+                    results.append({
+                        "document_id": candidate["document_id"],
+                        "filename": candidate["filename"],
+                        "chunk_text": candidate["chunk_text"],
+                        "similarity": candidate["similarity"],
+                        "rerank_score": r["score"],
+                    })
+
+                reranked = True
+                print(f"[Isaacus Search] Reranking complete, top score: {results[0]['rerank_score']:.3f}")
+            except Exception as e:
+                print(f"[Isaacus Search] Reranking failed, using vector scores: {e}")
+                # Fall back to vector similarity order
                 results = [
                     {
                         "document_id": row["document_id"],
                         "filename": row["filename"],
                         "chunk_text": row["chunk_text"],
                         "similarity": row["similarity"],
+                        "rerank_score": None,
                     }
-                    for row in data
+                    for row in candidates[:max_results]
                 ]
-
-                return {
-                    "results": results,
-                    "total_found": len(results),
-                    "query": query,
-                    "matter_id": matter_id,
+        else:
+            # Single result, no reranking needed
+            results = [
+                {
+                    "document_id": candidates[0]["document_id"],
+                    "filename": candidates[0]["filename"],
+                    "chunk_text": candidates[0]["chunk_text"],
+                    "similarity": candidates[0]["similarity"],
+                    "rerank_score": None,
                 }
+            ]
 
-            # No results found - provide smart fallback with available documents
-            available_docs = await get_matter_documents_list(matter_id)
-
-            if available_docs:
-                # Documents exist but no content matches the query
-                ready_docs = [
-                    {"filename": doc["filename"], "status": doc["processing_status"]}
-                    for doc in available_docs
-                    if doc["processing_status"] == "ready"
-                ]
-                processing_docs = [
-                    {"filename": doc["filename"], "status": doc["processing_status"]}
-                    for doc in available_docs
-                    if doc["processing_status"]
-                    in ["pending", "extracting", "embedding"]
-                ]
-
-                return {
-                    "results": [],
-                    "total_found": 0,
-                    "query": query,
-                    "matter_id": matter_id,
-                    "available_documents": ready_docs,
-                    "processing_documents": processing_docs,
-                    "hint": (
-                        f"No content matched your query '{query}'. "
-                        f"There are {len(ready_docs)} searchable document(s) in this matter. "
-                        "Try a different search query, or use list_matter_documents to see all files."
-                    )
-                    if ready_docs
-                    else (
-                        f"Documents are still being processed ({len(processing_docs)} pending). "
-                        "Please wait for processing to complete before searching."
-                    ),
-                }
-            else:
-                # No documents exist in this matter at all
-                return {
-                    "results": [],
-                    "total_found": 0,
-                    "query": query,
-                    "matter_id": matter_id,
-                    "available_documents": [],
-                    "hint": "No documents have been uploaded to this matter yet. Upload documents first to search them.",
-                }
+        return {
+            "results": results,
+            "total_found": len(results),
+            "query": query,
+            "matter_id": matter_id,
+            "reranked": reranked,
+        }
 
     except Exception as e:
-        print(f"Isaacus search error: {e}")
+        print(f"[Isaacus Search] Error: {e}")
         return {
             "results": [],
             "total_found": 0,
             "query": query,
             "matter_id": matter_id,
+            "reranked": False,
             "error": str(e),
         }
     finally:
         await client.close()
 
 
-# Export the tool function directly - no dict wrapper needed
+async def _handle_no_results(matter_id: str, query: str) -> dict:
+    """Handle case when no search results are found."""
+    available_docs = await get_matter_documents_list(matter_id)
+
+    if available_docs:
+        ready_docs = [
+            {"filename": doc["filename"], "status": doc["processing_status"]}
+            for doc in available_docs
+            if doc["processing_status"] == "ready"
+        ]
+        processing_docs = [
+            {"filename": doc["filename"], "status": doc["processing_status"]}
+            for doc in available_docs
+            if doc["processing_status"] in ["pending", "extracting", "embedding"]
+        ]
+
+        return {
+            "results": [],
+            "total_found": 0,
+            "query": query,
+            "matter_id": matter_id,
+            "reranked": False,
+            "available_documents": ready_docs,
+            "processing_documents": processing_docs,
+            "hint": (
+                f"No content matched your query '{query}'. "
+                f"There are {len(ready_docs)} searchable document(s) in this matter. "
+                "Try a different search query, or use list_matter_documents to see all files."
+            )
+            if ready_docs
+            else (
+                f"Documents are still being processed ({len(processing_docs)} pending). "
+                "Please wait for processing to complete before searching."
+            ),
+        }
+    else:
+        return {
+            "results": [],
+            "total_found": 0,
+            "query": query,
+            "matter_id": matter_id,
+            "reranked": False,
+            "available_documents": [],
+            "hint": "No documents have been uploaded to this matter yet.",
+        }
+
+
+# Export the tool function directly
 ISAACUS_SEARCH_TOOL = isaacus_search
