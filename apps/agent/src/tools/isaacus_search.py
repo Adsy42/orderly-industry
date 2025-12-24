@@ -155,7 +155,7 @@ async def _isaacus_search_async(
 
         # Step 2: Vector search - get more candidates for reranking
         candidate_count = min(max_results * 3, 20)  # Get 3x for reranking
-        
+
         async with httpx.AsyncClient() as http_client:
             response = await http_client.post(
                 f"{supabase_url}/rest/v1/rpc/match_document_embeddings",
@@ -174,7 +174,9 @@ async def _isaacus_search_async(
 
             if response.status_code != 200:
                 error_detail = response.text
-                print(f"[Isaacus Search] Supabase RPC error: {response.status_code} - {error_detail}")
+                print(
+                    f"[Isaacus Search] Supabase RPC error: {response.status_code} - {error_detail}"
+                )
                 return {
                     "results": [],
                     "total_found": 0,
@@ -210,16 +212,20 @@ async def _isaacus_search_async(
                 results = []
                 for r in rerank_results:
                     candidate = candidates[r["index"]]
-                    results.append({
-                        "document_id": candidate["document_id"],
-                        "filename": candidate["filename"],
-                        "chunk_text": candidate["chunk_text"],
-                        "similarity": candidate["similarity"],
-                        "rerank_score": r["score"],
-                    })
+                    results.append(
+                        {
+                            "document_id": candidate["document_id"],
+                            "filename": candidate["filename"],
+                            "chunk_text": candidate["chunk_text"],
+                            "similarity": candidate["similarity"],
+                            "rerank_score": r["score"],
+                        }
+                    )
 
                 reranked = True
-                print(f"[Isaacus Search] Reranking complete, top score: {results[0]['rerank_score']:.3f}")
+                print(
+                    f"[Isaacus Search] Reranking complete, top score: {results[0]['rerank_score']:.3f}"
+                )
             except Exception as e:
                 print(f"[Isaacus Search] Reranking failed, using vector scores: {e}")
                 # Fall back to vector similarity order

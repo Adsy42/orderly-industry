@@ -42,8 +42,12 @@ class IsaacusIQLOutput(BaseModel):
     document_results: List[dict] = Field(
         description="Results for each document analyzed"
     )
-    total_matches: int = Field(description="Total number of matches across all documents")
-    average_score: float = Field(description="Average confidence score across all matches")
+    total_matches: int = Field(
+        description="Total number of matches across all documents"
+    )
+    average_score: float = Field(
+        description="Average confidence score across all matches"
+    )
 
 
 @tool(parse_docstring=True)
@@ -167,26 +171,30 @@ async def _isaacus_iql_async(
                 matches = result.get("matches", [])
                 score = result.get("score", 0.0)
 
-                document_results.append({
-                    "document_id": doc.get("id"),
-                    "filename": doc.get("filename"),
-                    "score": score,
-                    "matches": matches,
-                    "match_count": len(matches),
-                })
+                document_results.append(
+                    {
+                        "document_id": doc.get("id"),
+                        "filename": doc.get("filename"),
+                        "score": score,
+                        "matches": matches,
+                        "match_count": len(matches),
+                    }
+                )
 
                 total_matches += len(matches)
                 if matches:
                     total_score += sum(m.get("score", score) for m in matches)
             except Exception as e:
-                document_results.append({
-                    "document_id": doc.get("id"),
-                    "filename": doc.get("filename"),
-                    "error": str(e),
-                    "score": 0.0,
-                    "matches": [],
-                    "match_count": 0,
-                })
+                document_results.append(
+                    {
+                        "document_id": doc.get("id"),
+                        "filename": doc.get("filename"),
+                        "error": str(e),
+                        "score": 0.0,
+                        "matches": [],
+                        "match_count": 0,
+                    }
+                )
 
         await isaacus_client.close()
 
@@ -202,4 +210,3 @@ async def _isaacus_iql_async(
 
 # Export the tool function
 ISAACUS_IQL_TOOL = isaacus_iql
-

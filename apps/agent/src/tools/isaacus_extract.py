@@ -157,7 +157,9 @@ async def _isaacus_extract_async(
 
             if response.status_code != 200:
                 error_detail = response.text
-                print(f"[Isaacus Extract] Supabase error: {response.status_code} - {error_detail}")
+                print(
+                    f"[Isaacus Extract] Supabase error: {response.status_code} - {error_detail}"
+                )
                 return {
                     "answer": "Error querying documents",
                     "confidence": 0.0,
@@ -198,7 +200,9 @@ async def _isaacus_extract_async(
                     chunk["rerank_score"] = r["score"]
                     reranked_chunks.append(chunk)
 
-                print(f"[Isaacus Extract] Top rerank score: {reranked_chunks[0]['rerank_score']:.3f}")
+                print(
+                    f"[Isaacus Extract] Top rerank score: {reranked_chunks[0]['rerank_score']:.3f}"
+                )
             except Exception as e:
                 print(f"[Isaacus Extract] Reranking failed, using vector order: {e}")
                 reranked_chunks = chunks[:5]
@@ -218,21 +222,23 @@ async def _isaacus_extract_async(
 
         if result and result.get("answer"):
             answer_text = result["answer"]
-            
+
             # Build citations from the chunks used
             citations = []
             for chunk in top_chunks:
                 # Check if this chunk contains the answer
                 contains_answer = answer_text.lower() in chunk["chunk_text"].lower()
-                
-                citations.append({
-                    "document_id": chunk["document_id"],
-                    "filename": chunk["filename"],
-                    "text_excerpt": chunk["chunk_text"][:500],
-                    "position": f"Chunk {chunk.get('chunk_index', 'N/A')}",
-                    "relevance_score": chunk.get("rerank_score"),
-                })
-                
+
+                citations.append(
+                    {
+                        "document_id": chunk["document_id"],
+                        "filename": chunk["filename"],
+                        "text_excerpt": chunk["chunk_text"][:500],
+                        "position": f"Chunk {chunk.get('chunk_index', 'N/A')}",
+                        "relevance_score": chunk.get("rerank_score"),
+                    }
+                )
+
                 # Prioritize citations that contain the answer
                 if contains_answer:
                     # Move to front

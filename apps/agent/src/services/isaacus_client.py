@@ -34,7 +34,7 @@ class IsaacusClient:
         self.base_url = os.getenv("ISAACUS_BASE_URL", base_url)
         self.max_retries = max_retries
         self.timeout = timeout
-        
+
         # Initialize official SDK client
         # SDK automatically uses ISAACUS_API_KEY env var if api_key is None
         self._client = Isaacus(api_key=self.api_key)
@@ -70,13 +70,13 @@ class IsaacusClient:
             texts=texts,
             task=task,
         )
-        
+
         # SDK returns response with embeddings array
         embeddings_data = response.embeddings
-        
+
         if not embeddings_data:
             return []
-        
+
         # Extract embedding vectors from response objects
         # SDK returns list of objects with .embedding attribute
         return [item.embedding for item in embeddings_data]
@@ -112,7 +112,7 @@ class IsaacusClient:
             kwargs["top_k"] = top_k
 
         response = self._client.rerankings.create(**kwargs)
-        
+
         # Convert SDK response objects to dicts
         return [
             {
@@ -147,7 +147,7 @@ class IsaacusClient:
             context=context,
             model=model,
         )
-        
+
         # Convert SDK response to dict
         return {
             "answer": response.answer,
@@ -184,7 +184,7 @@ class IsaacusClient:
             model=model,
             multi_label=multi_label,
         )
-        
+
         # Convert SDK response objects to dicts
         return [
             {"label": item.label, "score": item.score}
@@ -193,7 +193,7 @@ class IsaacusClient:
 
     def _extract_start_index(self, obj: Any) -> int:
         """Extract start index from various API response formats.
-        
+
         Isaacus API may return 'start', 'start_index', or 'startIndex'.
         This ensures consistent handling across different response formats.
         """
@@ -206,7 +206,7 @@ class IsaacusClient:
 
     def _extract_end_index(self, obj: Any) -> int:
         """Extract end index from various API response formats.
-        
+
         Isaacus API may return 'end', 'end_index', or 'endIndex'.
         This ensures consistent handling across different response formats.
         """
@@ -249,7 +249,7 @@ class IsaacusClient:
             texts=[text],  # API requires 'texts' as an array
             model=model,
         )
-        
+
         # Handle response format
         # The universal classification endpoint returns:
         # { classifications: [{ index, score, chunks: [{ index, start, end, score, text }] }] }
@@ -257,13 +257,13 @@ class IsaacusClient:
             "score": 0.0,
             "matches": [],
         }
-        
+
         # Extract from classifications response format (primary format)
         if hasattr(response, "classifications") and response.classifications:
             classification = response.classifications[0]
             if classification:
                 result["score"] = float(getattr(classification, "score", 0.0))
-                
+
                 # Extract chunks as matches
                 if hasattr(classification, "chunks") and classification.chunks:
                     result["matches"] = [
@@ -288,10 +288,10 @@ class IsaacusClient:
                     }
                     for match in response.matches
                 ]
-        
+
         # Sort matches by score descending for consistency with frontend
         result["matches"].sort(key=lambda m: m["score"], reverse=True)
-        
+
         return result
 
     async def __aenter__(self) -> "IsaacusClient":
