@@ -41,7 +41,7 @@ export function ThreadProvider({ children }: { children: ReactNode }) {
 
   const getThreads = useCallback(async (): Promise<Thread[]> => {
     if (!apiUrl || !assistantId) return [];
-    const client = createClient(apiUrl, getApiKey() ?? undefined);
+    const client = createClient(apiUrl, getApiKey() || undefined);
 
     const threads = await client.threads.search({
       metadata: {

@@ -311,8 +311,12 @@ async function generateEmbeddings(
 ): Promise<number[][]> {
   const allEmbeddings: number[][] = [];
   
-  // Isaacus API uses /v1/embeddings endpoint (plural, with v1 prefix)
-  const endpoint = `${isaacusBaseUrl}/v1/embeddings`;
+  // Isaacus API base URL includes /v1, so endpoint is just /embeddings
+  // Base URL should be https://api.isaacus.com/v1
+  const baseUrl = isaacusBaseUrl.endsWith('/v1') 
+    ? isaacusBaseUrl 
+    : `${isaacusBaseUrl}/v1`;
+  const endpoint = `${baseUrl}/embeddings`;
   console.log(`Calling Isaacus API: ${endpoint} for ${texts.length} chunks`);
 
   // Process in smaller batches to avoid token limits
@@ -333,6 +337,7 @@ async function generateEmbeddings(
           body: JSON.stringify({
             texts: batch, // Isaacus uses 'texts' field
             model: "kanon-2-embedder",
+            task: "retrieval/document", // Add task parameter for embeddings
           }),
         });
 
