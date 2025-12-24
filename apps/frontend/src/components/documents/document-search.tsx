@@ -1,7 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { Search, Loader2, X, FileText, ExternalLink } from "lucide-react";
+import {
+  Search,
+  Loader2,
+  X,
+  FileText,
+  ExternalLink,
+  Sparkles,
+} from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -13,6 +20,7 @@ interface SearchResult {
   chunk_text: string;
   filename: string;
   similarity: number;
+  rerank_score?: number;
 }
 
 interface DocumentSearchProps {
@@ -31,6 +39,7 @@ export function DocumentSearch({
   const [isSearching, setIsSearching] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [hasSearched, setHasSearched] = React.useState(false);
+  const [wasReranked, setWasReranked] = React.useState(false);
 
   const handleSearch = async () => {
     if (!query.trim()) return;
@@ -39,42 +48,33 @@ export function DocumentSearch({
     setError(null);
     setResults([]);
     setHasSearched(true);
+    setWasReranked(false);
 
     try {
-      // Step 1: Get embedding for query
-      const embedResponse = await fetch("/api/embed", {
+      // Use new search API with vector search + reranking
+      const response = await fetch("/api/search", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: query }),
+        body: JSON.stringify({
+          matterId,
+          query: query.trim(),
+          limit: 10,
+          threshold: 0.3,
+          useReranking: true,
+        }),
       });
 
-      if (!embedResponse.ok) {
-        // Fallback to full-text search if embedding fails
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        console.error("Search API error:", errorData);
+        // Fallback to full-text search if API fails
         await fallbackSearch(query);
         return;
       }
 
-      const { embedding } = await embedResponse.json();
-
-      // Step 2: Search using RPC
-      const supabase = createClient();
-      const { data, error: searchError } = await supabase.rpc(
-        "match_document_embeddings",
-        {
-          query_embedding: embedding,
-          matter_uuid: matterId,
-          match_threshold: 0.5,
-          match_count: 10,
-        },
-      );
-
-      if (searchError) {
-        console.error("Semantic search error:", searchError);
-        await fallbackSearch(query);
-        return;
-      }
-
-      setResults((data as SearchResult[]) || []);
+      const data = await response.json();
+      setResults(data.results || []);
+      setWasReranked(data.reranked || false);
     } catch (err) {
       console.error("Search error:", err);
       await fallbackSearch(query);
@@ -167,6 +167,11 @@ export function DocumentSearch({
     });
   };
 
+  // Get the display score (prefer rerank_score if available)
+  const getDisplayScore = (result: SearchResult): number => {
+    return result.rerank_score ?? result.similarity;
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter") {
       handleSearch();
@@ -178,6 +183,7 @@ export function DocumentSearch({
     setResults([]);
     setError(null);
     setHasSearched(false);
+    setWasReranked(false);
   };
 
   return (
@@ -234,10 +240,18 @@ export function DocumentSearch({
             </div>
           ) : (
             <div className="space-y-3">
-              <p className="text-muted-foreground text-sm">
-                Found {results.length} relevant excerpt
-                {results.length === 1 ? "" : "s"}
-              </p>
+              <div className="flex items-center justify-between">
+                <p className="text-muted-foreground text-sm">
+                  Found {results.length} relevant excerpt
+                  {results.length === 1 ? "" : "s"}
+                </p>
+                {wasReranked && (
+                  <span className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400">
+                    <Sparkles className="h-3 w-3" />
+                    AI-reranked
+                  </span>
+                )}
+              </div>
               {results.map((result) => (
                 <div
                   key={result.id}
@@ -250,8 +264,15 @@ export function DocumentSearch({
                       <span className="font-medium">{result.filename}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="bg-primary/10 text-primary rounded px-2 py-0.5 text-xs font-medium">
-                        {Math.round(result.similarity * 100)}% match
+                      <span
+                        className={cn(
+                          "rounded px-2 py-0.5 text-xs font-medium",
+                          result.rerank_score !== undefined
+                            ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
+                            : "bg-primary/10 text-primary",
+                        )}
+                      >
+                        {Math.round(getDisplayScore(result) * 100)}% match
                       </span>
                       <ExternalLink className="text-muted-foreground h-4 w-4 opacity-0 transition-opacity group-hover:opacity-100" />
                     </div>

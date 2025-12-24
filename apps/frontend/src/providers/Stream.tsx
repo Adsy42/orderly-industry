@@ -114,7 +114,7 @@ const StreamSession = ({
 
   const streamValue = useTypedStream({
     apiUrl,
-    apiKey: apiKey ?? undefined,
+    apiKey: apiKey || undefined, // Use || to treat empty string as undefined
     assistantId,
     threadId: threadId ?? null,
     fetchStateHistory: true,
@@ -296,7 +296,7 @@ export const StreamProvider: React.FC<{ children: ReactNode }> = ({
 
   return (
     <StreamSession
-      apiKey={apiKey}
+      apiKey={apiKey || null}
       apiUrl={apiUrl}
       assistantId={assistantId}
     >
