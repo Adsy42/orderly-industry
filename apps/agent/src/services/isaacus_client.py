@@ -7,7 +7,6 @@ Uses the official Isaacus Python SDK.
 Note: SDK is synchronous, so we use asyncio.to_thread() for async compatibility.
 """
 
-import asyncio
 import os
 from typing import Any
 
