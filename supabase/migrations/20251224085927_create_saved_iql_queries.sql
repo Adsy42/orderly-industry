@@ -78,3 +78,5 @@ before update on public.saved_iql_queries
 for each row
 execute function public.update_saved_iql_queries_updated_at();
 
+
+

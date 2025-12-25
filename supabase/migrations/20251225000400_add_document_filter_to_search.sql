@@ -1,37 +1,20 @@
--- Migration: Create hybrid search infrastructure
--- Purpose: Enable combined vector + keyword search for legal precision
--- Affected tables: public.document_chunks
--- Special considerations: Requires pg_trgm extension
+-- Migration: Add document_ids filter to hybrid search
+-- Purpose: Allow filtering search by specific documents (multi-select UI)
+-- Affected functions: public.hybrid_search_chunks
 
--- Step 1: Enable pg_trgm extension for trigram similarity search
-create extension if not exists pg_trgm with schema extensions;
-
--- Step 2: Create trigram index on content for keyword matching
-create index if not exists idx_chunks_content_trgm 
-  on public.document_chunks 
-  using gin (content extensions.gin_trgm_ops);
-
--- Step 3: Drop and recreate vector index with HNSW for better performance
-drop index if exists document_embeddings_embedding_idx;
-drop index if exists idx_chunks_embedding;
-
-create index idx_chunks_embedding_hnsw 
-  on public.document_chunks 
-  using hnsw (embedding vector_cosine_ops)
-  with (m = 16, ef_construction = 64);
-
--- Step 4: Create hybrid search function
+-- Drop and recreate with new parameter
 create or replace function public.hybrid_search_chunks(
   query_embedding vector(1792),
   query_text text,
   matter_uuid uuid,
+  document_uuids uuid[] default null,  -- NEW: Optional array of document IDs to filter
   semantic_weight float default 0.7,
   match_threshold float default 0.5,
   match_count int default 20,
   include_context boolean default true
 )
 returns table (
-  id uuid,
+  chunk_id uuid,        -- Renamed from 'id' for clarity
   document_id uuid,
   section_id uuid,
   parent_chunk_id uuid,
@@ -57,6 +40,8 @@ begin
     where d.matter_id = matter_uuid
       and d.processing_status = 'ready'
       and dc.chunk_level = 'paragraph'
+      -- Filter by document_ids if provided
+      and (document_uuids is null or d.id = any(document_uuids))
   ),
   keyword_scores as (
     select 
@@ -68,6 +53,8 @@ begin
       and d.processing_status = 'ready'
       and dc.chunk_level = 'paragraph'
       and dc.content % query_text
+      -- Filter by document_ids if provided
+      and (document_uuids is null or d.id = any(document_uuids))
   ),
   scored_chunks as (
     select 
@@ -90,9 +77,11 @@ begin
       and d.processing_status = 'ready'
       and dc.chunk_level = 'paragraph'
       and (ss.semantic_score is not null or ks.keyword_score is not null)
+      -- Filter by document_ids if provided
+      and (document_uuids is null or d.id = any(document_uuids))
   )
   select 
-    sc.id,
+    sc.id as chunk_id,  -- Output as chunk_id for clarity
     sc.document_id,
     sc.section_id,
     sc.parent_chunk_id,
@@ -114,12 +103,5 @@ end;
 $$;
 
 comment on function public.hybrid_search_chunks is 
-  'Hybrid semantic + keyword search for document chunks. Combines vector similarity with trigram matching for precise legal term retrieval.';
-
--- Step 5: Grant execute permission
-grant execute on function public.hybrid_search_chunks to authenticated;
-grant execute on function public.get_section_tree to authenticated;
-grant execute on function public.get_chunk_with_context to authenticated;
-grant execute on function public.match_document_chunks to authenticated;
-
+  'Hybrid semantic + keyword search for document chunks. Combines vector similarity with trigram matching for precise legal term retrieval. Supports filtering by specific document IDs.';
 
