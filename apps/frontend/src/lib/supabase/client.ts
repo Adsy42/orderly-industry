@@ -1,11 +1,10 @@
 import { createBrowserClient } from "@supabase/ssr";
 
 /**
- * Helper to safely get and validate env vars
+ * Helper to validate env var value
  * Returns null if invalid, the trimmed value if valid
  */
-function getEnvVar(name: string): string | null {
-  const value = process.env[name];
+function validateEnvValue(value: string | undefined): string | null {
   if (!value) return null;
   const trimmed = value.trim();
   // Check for common misconfigurations
@@ -22,17 +21,20 @@ function getEnvVar(name: string): string | null {
 }
 
 export function createClient() {
-  const supabaseUrl = getEnvVar("NEXT_PUBLIC_SUPABASE_URL");
+  // IMPORTANT: Use direct property access for NEXT_PUBLIC_* vars
+  // Next.js inlines these at build time - dynamic access like process.env[name] won't work
+  const supabaseUrl = validateEnvValue(process.env.NEXT_PUBLIC_SUPABASE_URL);
   const supabaseKey =
-    getEnvVar("NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY") ||
-    getEnvVar("NEXT_PUBLIC_SUPABASE_ANON_KEY");
+    validateEnvValue(
+      process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY,
+    ) || validateEnvValue(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
 
   if (!supabaseUrl || !supabaseKey) {
     throw new Error(
       `Supabase environment variables not configured or invalid. ` +
         `NEXT_PUBLIC_SUPABASE_URL: ${supabaseUrl ? "✓" : "✗ MISSING"}, ` +
         `NEXT_PUBLIC_SUPABASE_ANON_KEY or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY: ${supabaseKey ? "✓" : "✗ MISSING"}. ` +
-        `Please set these in your environment.`,
+        `Please ensure these variables are set in your Vercel project settings.`,
     );
   }
 

@@ -29,7 +29,6 @@ export function SignUpForm({
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
-    const supabase = createClient();
     setIsLoading(true);
     setError(null);
 
@@ -40,6 +39,21 @@ export function SignUpForm({
     }
 
     try {
+      // Create client with error handling
+      let supabase;
+      try {
+        supabase = createClient();
+      } catch (clientError) {
+        const errorMessage =
+          clientError instanceof Error
+            ? clientError.message
+            : "Failed to initialize Supabase client. Please check your environment configuration.";
+        console.error("[SignUp] Supabase client creation failed:", clientError);
+        setError(errorMessage);
+        setIsLoading(false);
+        return;
+      }
+
       const { error } = await supabase.auth.signUp({
         email,
         password,
@@ -50,7 +64,12 @@ export function SignUpForm({
       if (error) throw error;
       router.push("/auth/sign-up-success");
     } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "An error occurred");
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "An error occurred during sign up";
+      console.error("[SignUp] Authentication error:", error);
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }

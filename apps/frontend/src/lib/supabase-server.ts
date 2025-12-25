@@ -62,7 +62,10 @@ export async function createServerSupabaseClient() {
   }
 
   // Validate URL format
-  if (!supabaseUrl.startsWith("https://") || !supabaseUrl.includes(".supabase.")) {
+  if (
+    !supabaseUrl.startsWith("https://") ||
+    !supabaseUrl.includes(".supabase.")
+  ) {
     const errorMsg = `Invalid NEXT_PUBLIC_SUPABASE_URL format: "${supabaseUrl.substring(0, 50)}...". Expected format: https://xxxxx.supabase.co`;
     console.error("[Supabase Server] " + errorMsg);
     throw new Error(errorMsg);
