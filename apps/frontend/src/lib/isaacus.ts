@@ -422,6 +422,91 @@ export interface LLMExtractionResult {
   clause: string;
   confidence: number;
   reasoning?: string;
+  /** Start position relative to the input text */
+  startIndex?: number;
+  /** End position relative to the input text */
+  endIndex?: number;
+}
+
+/**
+ * A sentence with its position in the source text.
+ */
+export interface SentenceWithPosition {
+  text: string;
+  start: number;
+  end: number;
+  index: number;
+}
+
+/**
+ * Split text into sentences with their character positions.
+ *
+ * Handles common abbreviations to avoid false sentence breaks.
+ * Each sentence includes its start/end position relative to the input text.
+ *
+ * @param text - Text to segment into sentences
+ * @returns Array of sentences with positions
+ */
+export function segmentSentences(text: string): SentenceWithPosition[] {
+  const sentences: SentenceWithPosition[] = [];
+
+  // Common legal/business abbreviations that shouldn't trigger sentence breaks
+  const abbreviationPattern =
+    /\b(?:Mr|Mrs|Ms|Dr|Prof|Inc|Ltd|Corp|Jr|Sr|etc|vs|e\.g|i\.e|No|Art|Sec|Vol|Rev|Ed|al|cf|approx|est|min|max)\./gi;
+
+  // Create a working copy with abbreviation periods replaced by placeholders
+  let workingText = text;
+  const replacements: Array<{ start: number; length: number }> = [];
+
+  let match;
+  while ((match = abbreviationPattern.exec(text)) !== null) {
+    replacements.push({ start: match.index, length: match[0].length });
+  }
+
+  // Replace abbreviation periods with a placeholder character (¶) that won't match sentence end
+  for (let i = replacements.length - 1; i >= 0; i--) {
+    const { start, length } = replacements[i];
+    const abbrev = workingText.slice(start, start + length);
+    // Replace the period at the end with placeholder
+    workingText =
+      workingText.slice(0, start) +
+      abbrev.slice(0, -1) +
+      "¶" +
+      workingText.slice(start + length);
+  }
+
+  // Split on sentence-ending punctuation followed by whitespace or end of string
+  // This regex captures the sentence including its ending punctuation
+  const sentenceEndPattern = /[^.!?]*[.!?]+(?:\s+|$)|[^.!?]+$/g;
+
+  let sentenceMatch;
+  while ((sentenceMatch = sentenceEndPattern.exec(workingText)) !== null) {
+    let sentenceText = sentenceMatch[0];
+    const start = sentenceMatch.index;
+    const end = start + sentenceText.length;
+
+    // Restore placeholder back to periods
+    sentenceText = sentenceText.replace(/¶/g, ".");
+
+    // Get the actual text from the original (not the working copy)
+    const originalText = text.slice(start, end).trim();
+
+    if (originalText.length > 0) {
+      // Find the actual start position (skip leading whitespace)
+      const leadingWhitespace = text.slice(start).match(/^\s*/)?.[0].length || 0;
+      const actualStart = start + leadingWhitespace;
+      const actualEnd = actualStart + originalText.length;
+
+      sentences.push({
+        text: originalText,
+        start: actualStart,
+        end: actualEnd,
+        index: sentences.length,
+      });
+    }
+  }
+
+  return sentences;
 }
 
 /**
@@ -437,37 +522,64 @@ function getOpenAIClient(): OpenAI {
 }
 
 /**
- * Extract the precise clause/sentence from a chunk using LLM.
+ * Extract the precise clause/sentence from a chunk using LLM with sentence-based selection.
  *
- * Uses GPT-4o-mini to identify and extract the most relevant sentence
- * that matches the IQL query from a larger text chunk.
+ * Uses GPT-4o-mini to identify which sentence(s) from a pre-segmented list
+ * best match the IQL query. This avoids the "returns everything" problem
+ * by forcing the LLM to choose from discrete sentence options.
  *
  * @param chunkText - The text chunk from IQL classification
  * @param queryType - What we're looking for (e.g., "termination clause", "confidentiality provision")
- * @returns Extracted clause with confidence and optional reasoning
+ * @param chunkStartOffset - Start position of the chunk in the original document (for position mapping)
+ * @returns Extracted clause with confidence, reasoning, and positions
  */
 export async function extractClauseWithLLM(
   chunkText: string,
   queryType: string,
+  chunkStartOffset: number = 0,
 ): Promise<LLMExtractionResult> {
   const openai = getOpenAIClient();
 
-  const systemPrompt = `You are a legal document analyst. Your task is to extract the single most relevant sentence or clause from the provided text that best represents the requested legal provision.
+  // First, segment the text into sentences
+  const sentences = segmentSentences(chunkText);
+
+  if (sentences.length === 0) {
+    return { clause: "", confidence: 0 };
+  }
+
+  // If only one sentence, return it directly
+  if (sentences.length === 1) {
+    return {
+      clause: sentences[0].text,
+      confidence: 0.8,
+      startIndex: chunkStartOffset + sentences[0].start,
+      endIndex: chunkStartOffset + sentences[0].end,
+    };
+  }
+
+  // Present numbered sentences to the LLM
+  const numberedSentences = sentences
+    .map((s, i) => `[${i}] ${s.text}`)
+    .join("\n\n");
+
+  const systemPrompt = `You are a legal document analyst. You will be given numbered sentences from a legal document. Your task is to identify which sentence(s) best represent the requested legal provision.
 
 Rules:
-1. Return ONLY the exact text from the document - do not paraphrase or summarize
-2. Extract the complete sentence or clause, not a fragment
-3. If multiple sentences are relevant, choose the most specific one
-4. If no relevant clause is found, return an empty string
-5. Respond in JSON format with "clause" and "confidence" (0-1) fields`;
+1. Return the index number(s) of the most relevant sentence(s)
+2. If one sentence clearly contains the provision, return just that index
+3. If the provision spans multiple consecutive sentences, return all their indices
+4. If no sentence is relevant, return an empty array
+5. Respond in JSON format`;
 
-  const userPrompt = `Extract the ${queryType} from this text:
+  const userPrompt = `Which sentence(s) contain the ${queryType}?
 
-"""
-${chunkText}
-"""
+Sentences:
+${numberedSentences}
 
-Return JSON: { "clause": "exact extracted text", "confidence": 0.0-1.0 }`;
+Return JSON: { "indices": [0], "confidence": 0.0-1.0, "reasoning": "brief explanation" }
+- indices: array of sentence indices (0-based) that contain the clause
+- confidence: how confident you are (0.0-1.0)
+- reasoning: brief explanation of your choice`;
 
   try {
     const response = await openai.chat.completions.create({
@@ -478,7 +590,7 @@ Return JSON: { "clause": "exact extracted text", "confidence": 0.0-1.0 }`;
       ],
       response_format: { type: "json_object" },
       temperature: 0,
-      max_tokens: 1000,
+      max_tokens: 500,
     });
 
     const content = response.choices[0]?.message?.content;
@@ -487,10 +599,36 @@ Return JSON: { "clause": "exact extracted text", "confidence": 0.0-1.0 }`;
     }
 
     const parsed = JSON.parse(content);
+    const indices: number[] = parsed.indices || [];
+    const confidence: number = parsed.confidence || 0;
+
+    if (indices.length === 0) {
+      return { clause: "", confidence: 0, reasoning: parsed.reasoning };
+    }
+
+    // Filter valid indices and sort them
+    const validIndices = indices
+      .filter((i: number) => i >= 0 && i < sentences.length)
+      .sort((a: number, b: number) => a - b);
+
+    if (validIndices.length === 0) {
+      return { clause: "", confidence: 0, reasoning: parsed.reasoning };
+    }
+
+    // Combine selected sentences
+    const selectedSentences = validIndices.map((i: number) => sentences[i]);
+    const combinedText = selectedSentences.map((s) => s.text).join(" ");
+
+    // Calculate positions from first to last selected sentence
+    const firstSentence = selectedSentences[0];
+    const lastSentence = selectedSentences[selectedSentences.length - 1];
+
     return {
-      clause: parsed.clause || "",
-      confidence: parsed.confidence || 0,
+      clause: combinedText,
+      confidence,
       reasoning: parsed.reasoning,
+      startIndex: chunkStartOffset + firstSentence.start,
+      endIndex: chunkStartOffset + lastSentence.end,
     };
   } catch (error) {
     console.error("[LLM Extraction] Error:", error);
