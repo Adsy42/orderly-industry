@@ -9,13 +9,13 @@
 
 Five agent tools extend the deep agents framework with Isaacus-powered document intelligence and Supabase document access. These tools are available to the orchestrator and the Document Agent subagent.
 
-| Tool                     | Purpose                                      | Status |
-| ------------------------ | -------------------------------------------- | ------ |
-| `isaacus_search`         | Semantic search + reranking across documents | ✅     |
-| `isaacus_extract`        | Extractive QA with document citations        | ✅     |
-| `isaacus_classify`       | Legal clause classification                  | ✅     |
-| `get_document_text`      | Retrieve full document text from Supabase    | ✅     |
-| `list_matter_documents`  | List all documents in a matter               | ✅     |
+| Tool                    | Purpose                                      | Status |
+| ----------------------- | -------------------------------------------- | ------ |
+| `isaacus_search`        | Semantic search + reranking across documents | ✅     |
+| `isaacus_extract`       | Extractive QA with document citations        | ✅     |
+| `isaacus_classify`      | Legal clause classification                  | ✅     |
+| `get_document_text`     | Retrieve full document text from Supabase    | ✅     |
+| `list_matter_documents` | List all documents in a matter               | ✅     |
 
 ## Tool: isaacus_search
 
@@ -493,10 +493,10 @@ Documents in matter M-2025-001 (3 total):
 
 ### Error Handling
 
-| Error            | Response                                                       |
-| ---------------- | -------------------------------------------------------------- |
-| Matter not found | "Error: Matter {matter_id} not found or you don't have access."|
-| No documents     | "No documents found in this matter."                           |
+| Error            | Response                                                        |
+| ---------------- | --------------------------------------------------------------- |
+| Matter not found | "Error: Matter {matter_id} not found or you don't have access." |
+| No documents     | "No documents found in this matter."                            |
 
 ---
 
@@ -554,4 +554,3 @@ async def _extract_pdf_pymupdf(self, content: bytes) -> str:
 ```
 DEEPSEEK_API_KEY=your_deepseek_key  # Required for OCR functionality
 ```
-

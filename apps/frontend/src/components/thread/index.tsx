@@ -46,6 +46,7 @@ import {
   SelectValue,
 } from "../ui/select";
 import { createClient } from "@/lib/supabase/client";
+import { DocumentSelector } from "@/components/chat/document-selector";
 
 function StickyToBottomContent(props: {
   content: ReactNode;
@@ -111,6 +112,7 @@ export function Thread() {
   );
   const { matters } = useMatters();
   const [documentName, setDocumentName] = useState<string | null>(null);
+  const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
   const [input, setInput] = useState("");
   const {
     contentBlocks,
@@ -247,6 +249,14 @@ export function Thread() {
       // Add document context if viewing a specific document
       if (selectedDocumentId && documentName) {
         contextContent += `\nThe user is currently viewing document "${documentName}" (document_id: ${selectedDocumentId}).`;
+      }
+
+      // Add selected documents filter if any documents are specifically selected
+      if (selectedDocumentIds.length > 0) {
+        contextContent += `\nThe user has selected specific documents to search: document_ids: [${selectedDocumentIds.map((id) => `"${id}"`).join(", ")}].`;
+        contextContent += `\nPass these document_ids to your tools to filter the search scope.`;
+      } else {
+        contextContent += `\nNo specific documents selected - search all documents in the matter.`;
       }
 
       contextMessages.push({
@@ -498,9 +508,13 @@ export function Thread() {
                           <Briefcase className="size-4 text-gray-500" />
                           <Select
                             value={selectedMatterId || "none"}
-                            onValueChange={(value) =>
-                              setSelectedMatterId(value === "none" ? "" : value)
-                            }
+                            onValueChange={(value) => {
+                              setSelectedMatterId(
+                                value === "none" ? "" : value,
+                              );
+                              // Clear document selection when matter changes
+                              setSelectedDocumentIds([]);
+                            }}
                           >
                             <SelectTrigger className="h-8 w-[180px] text-xs">
                               <SelectValue placeholder="Select matter..." />
@@ -522,6 +536,15 @@ export function Thread() {
                             </SelectContent>
                           </Select>
                         </div>
+
+                        {/* Document Selector - only show when matter is selected */}
+                        {selectedMatterId && (
+                          <DocumentSelector
+                            matterId={selectedMatterId}
+                            selectedDocumentIds={selectedDocumentIds}
+                            onSelectionChange={setSelectedDocumentIds}
+                          />
+                        )}
 
                         <div className="flex items-center space-x-2">
                           <Switch

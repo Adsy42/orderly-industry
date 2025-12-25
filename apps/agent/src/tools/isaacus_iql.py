@@ -166,29 +166,78 @@ async def _isaacus_iql_async(
             if not extracted_text.strip():
                 continue
 
+            document_id = doc.get("id", "")
+            filename = doc.get("filename", "Document")
+
             try:
                 result = await isaacus_client.classify_iql(query, extracted_text, model)
                 matches = result.get("matches", [])
                 score = result.get("score", 0.0)
 
+                # Enhance matches with citation formatting including precise positions
+                enhanced_matches = []
+                for i, match in enumerate(matches):
+                    match_text = match.get("text", "")
+                    match_score = match.get("score", score)
+                    start_idx = match.get("start_index", 0)
+                    end_idx = match.get("end_index", 0)
+
+                    # Create permalink with character positions for precise highlighting
+                    # Format: cite:document_id@start-end (no chunk_id since IQL uses full text)
+                    permalink = f"cite:{document_id}@{start_idx}-{end_idx}"
+                    formatted_citation = f"[{filename}]({permalink})"
+
+                    enhanced_matches.append(
+                        {
+                            "text": match_text,
+                            "start_index": start_idx,
+                            "end_index": end_idx,
+                            "score": match_score,
+                            "citation": {
+                                "formatted": filename,
+                                "permalink": permalink,
+                                "markdown": formatted_citation,
+                            },
+                        }
+                    )
+
+                # Use first match for document-level citation with positions
+                first_match = enhanced_matches[0] if enhanced_matches else None
+                doc_permalink = (
+                    first_match["citation"]["permalink"]
+                    if first_match
+                    else f"cite:{document_id}"
+                )
+                doc_markdown = (
+                    first_match["citation"]["markdown"]
+                    if first_match
+                    else f"[{filename}](cite:{document_id})"
+                )
+
                 document_results.append(
                     {
-                        "document_id": doc.get("id"),
-                        "filename": doc.get("filename"),
+                        "document_id": document_id,
+                        "filename": filename,
                         "score": score,
-                        "matches": matches,
-                        "match_count": len(matches),
+                        "matches": enhanced_matches,
+                        "match_count": len(enhanced_matches),
+                        # Add ready-to-use citation for the agent (uses first match's position)
+                        "citation": {
+                            "formatted": filename,
+                            "permalink": doc_permalink,
+                            "markdown": doc_markdown,
+                        },
                     }
                 )
 
-                total_matches += len(matches)
-                if matches:
-                    total_score += sum(m.get("score", score) for m in matches)
+                total_matches += len(enhanced_matches)
+                if enhanced_matches:
+                    total_score += sum(m.get("score", score) for m in enhanced_matches)
             except Exception as e:
                 document_results.append(
                     {
-                        "document_id": doc.get("id"),
-                        "filename": doc.get("filename"),
+                        "document_id": document_id,
+                        "filename": filename,
                         "error": str(e),
                         "score": 0.0,
                         "matches": [],
@@ -200,11 +249,19 @@ async def _isaacus_iql_async(
 
         average_score = total_score / total_matches if total_matches > 0 else 0.0
 
+        # Add citation usage hint for the agent
+        citation_hint = (
+            "CITATION FORMAT: When reporting these results, use the 'citation.markdown' "
+            "field directly in your response. Example: "
+            "'The termination clause [Document.pdf](cite:abc123) states...'"
+        )
+
         return {
             "query": query,
             "document_results": document_results,
             "total_matches": total_matches,
             "average_score": average_score,
+            "_citation_hint": citation_hint,
         }
 
 

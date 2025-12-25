@@ -24,3 +24,6 @@ where document_id in (
 comment on table public.documents is 'Legal documents with improved DOCX/PDF text extraction. DOCX uses JSZip for proper XML parsing, PDF supports OCR fallback.';
 
 
+
+
+

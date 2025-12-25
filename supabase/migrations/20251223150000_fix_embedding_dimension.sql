@@ -71,3 +71,6 @@ where processing_status = 'ready';
 truncate public.document_embeddings;
 
 
+
+
+

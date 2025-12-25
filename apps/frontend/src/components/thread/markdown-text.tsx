@@ -18,8 +18,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import Link from "next/link";
-import { useParams } from "next/navigation";
+import { useParams, useSearchParams } from "next/navigation";
 
 import "katex/dist/katex.min.css";
 
@@ -84,19 +83,47 @@ const InlineCitation: FC<InlineCitationProps> = ({
   children,
   matterId,
 }) => {
-  // Extract document ID and chunk ID from cite:document-id#chunk-id format
+  // Parse citation format: cite:document_id#chunk_id@start-end
+  // Formats supported:
+  // - cite:doc_id
+  // - cite:doc_id#chunk_id
+  // - cite:doc_id#chunk_id@start-end
+  // - cite:doc_id@start-end (IQL case)
   const citePart = href.replace("cite:", "");
-  const [documentId, chunkId] = citePart.split("#");
+
+  // Extract position info first (after @)
+  let positions: { start: number; end: number } | null = null;
+  let baseRef = citePart;
+
+  if (citePart.includes("@")) {
+    const [ref, posStr] = citePart.split("@");
+    baseRef = ref;
+    const [startStr, endStr] = posStr.split("-");
+    if (startStr && endStr) {
+      positions = { start: parseInt(startStr, 10), end: parseInt(endStr, 10) };
+    }
+  }
+
+  // Extract document ID and chunk ID
+  const [documentId, chunkId] = baseRef.split("#");
   const citationText = String(children);
 
   // State for chunk content preview
   const [chunkContent, setChunkContent] = useState<string | null>(null);
   const [isLoadingPreview, setIsLoadingPreview] = useState(false);
 
-  // Build the document link with chunk highlight parameter
+  // Build the document link with chunk and position highlight parameters
+  const queryParams = new URLSearchParams();
+  if (chunkId) queryParams.set("highlight", chunkId);
+  if (positions) {
+    queryParams.set("start", String(positions.start));
+    queryParams.set("end", String(positions.end));
+  }
+  const queryString = queryParams.toString();
+
   const documentLink = matterId
-    ? `/protected/matters/${matterId}/documents/${documentId}${chunkId ? `?highlight=${chunkId}` : ""}`
-    : `/protected/documents/${documentId}${chunkId ? `?highlight=${chunkId}` : ""}`;
+    ? `/protected/matters/${matterId}/documents/${documentId}${queryString ? `?${queryString}` : ""}`
+    : `/protected/documents/${documentId}${queryString ? `?${queryString}` : ""}`;
 
   // Fetch chunk content for preview on hover
   const fetchChunkPreview = async () => {
@@ -127,8 +154,10 @@ const InlineCitation: FC<InlineCitationProps> = ({
     <TooltipProvider>
       <Tooltip delayDuration={300}>
         <TooltipTrigger asChild>
-          <Link
+          <a
             href={documentLink}
+            target="_blank"
+            rel="noopener noreferrer"
             onMouseEnter={fetchChunkPreview}
             className={cn(
               "inline-flex items-center gap-1",
@@ -141,7 +170,7 @@ const InlineCitation: FC<InlineCitationProps> = ({
           >
             <FileText className="h-3 w-3 shrink-0" />
             <span>{citationText}</span>
-          </Link>
+          </a>
         </TooltipTrigger>
         <TooltipContent
           side="top"
@@ -350,10 +379,31 @@ const defaultComponents: any = {
   },
 };
 
+/**
+ * Custom URL transformer that allows the cite: protocol for citations.
+ * ReactMarkdown by default only allows http, https, mailto, and tel protocols.
+ */
+function allowCiteProtocol(url: string): string {
+  // Allow cite: protocol for document citations
+  if (url.startsWith("cite:")) {
+    return url;
+  }
+  // For all other URLs, return as-is (ReactMarkdown handles sanitization)
+  return url;
+}
+
 const MarkdownTextImpl: FC<{ children: string }> = ({ children }) => {
-  // Get matter ID from URL params if available
+  // Get matter ID from URL path params (e.g., /protected/matters/[matterId]/...)
   const params = useParams();
-  const matterId = params?.matterId as string | undefined;
+  const searchParams = useSearchParams();
+
+  // Check both path params and query params for matterId
+  // Path: /protected/matters/[matterId]/...
+  // Query: /protected/chat?matterId=xxx
+  const matterId =
+    (params?.matterId as string | undefined) ||
+    searchParams.get("matterId") ||
+    undefined;
 
   // Create components with citation link support
   const componentsWithCitations = {
@@ -404,6 +454,7 @@ const MarkdownTextImpl: FC<{ children: string }> = ({ children }) => {
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeKatex]}
         components={componentsWithCitations}
+        urlTransform={allowCiteProtocol}
       >
         {children}
       </ReactMarkdown>

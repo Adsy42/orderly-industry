@@ -4,7 +4,12 @@ import {
   validateIQLQuery,
   validateIQLQueryWithOperators,
 } from "@/lib/iql-validation";
-import { classifyIQL, ClassificationModel } from "@/lib/isaacus";
+import {
+  classifyIQL,
+  ClassificationModel,
+  extractClauseWithLLM,
+  findClausePosition,
+} from "@/lib/isaacus";
 
 /**
  * IQL Query API Route
@@ -54,7 +59,7 @@ export async function POST(request: NextRequest) {
     console.log("[IQL Query] Fetching document:", documentId);
     const { data: document, error: docError } = await supabase
       .from("documents")
-      .select("id, filename, extracted_text, processing_status")
+      .select("id, filename, extracted_text, processing_status, matter_id")
       .eq("id", documentId)
       .single();
 
@@ -111,19 +116,128 @@ export async function POST(request: NextRequest) {
       model as ClassificationModel,
     );
 
+    console.log(
+      `[IQL Query] IQL found ${queryResult.matches.length} passages, now extracting precise clauses with LLM...`,
+    );
+
+    // Extract the query type from IQL format for LLM extraction
+    // e.g., "{IS termination clause}" -> "termination clause"
+    const queryType =
+      query
+        .replace(/\{IS\s+/gi, "")
+        .replace(/\{CONTAINS\s+/gi, "")
+        .replace(/\}/g, "")
+        .trim() || query;
+
+    // Context window expansion: grab extra chars before/after chunk to handle cut-off sentences
+    const CONTEXT_WINDOW = 200; // characters to add on each side
+    const fullText = document.extracted_text;
+
+    // For each IQL match (passage), use LLM to extract the precise clause
+    const matchesWithExtractions = await Promise.all(
+      queryResult.matches.map(async (match) => {
+        const chunkStart = match.startIndex;
+        const chunkEnd = match.endIndex;
+        const chunkText = match.text;
+
+        // Expand the window to capture sentences that might be cut off
+        const expandedStart = Math.max(0, chunkStart - CONTEXT_WINDOW);
+        const expandedEnd = Math.min(
+          fullText.length,
+          chunkEnd + CONTEXT_WINDOW,
+        );
+        const expandedText = fullText.slice(expandedStart, expandedEnd);
+
+        try {
+          // Use LLM to extract the precise clause from the expanded context
+          console.log(
+            `[IQL Query] Extracting "${queryType}" from expanded chunk (${expandedText.length} chars, window: ${CONTEXT_WINDOW})`,
+          );
+          const extraction = await extractClauseWithLLM(
+            expandedText,
+            queryType,
+          );
+
+          if (extraction.clause && extraction.confidence > 0.3) {
+            // Find the position of the extracted clause in the expanded text
+            const positionInExpanded = findClausePosition(
+              expandedText,
+              extraction.clause,
+              0, // Start from 0, we'll add expandedStart later
+            );
+
+            if (positionInExpanded) {
+              // Map back to document-level positions
+              const docStart = expandedStart + positionInExpanded.start;
+              const docEnd = expandedStart + positionInExpanded.end;
+              const permalink = `cite:${document.id}@${docStart}-${docEnd}`;
+
+              console.log(
+                `[IQL Query] LLM extracted: "${extraction.clause.slice(0, 60)}..." at ${docStart}-${docEnd} (confidence: ${extraction.confidence})`,
+              );
+
+              return {
+                text: extraction.clause,
+                startIndex: docStart,
+                endIndex: docEnd,
+                score: match.score * extraction.confidence,
+                // Also include the full chunk for context
+                chunkText: chunkText,
+                chunkStart: chunkStart,
+                chunkEnd: chunkEnd,
+                citation: {
+                  formatted: document.filename,
+                  permalink,
+                  markdown: `[${document.filename}](${permalink})`,
+                  documentId: document.id,
+                  start: docStart,
+                  end: docEnd,
+                },
+              };
+            } else {
+              console.log(
+                `[IQL Query] LLM extracted clause but couldn't find position, using chunk bounds`,
+              );
+            }
+          } else {
+            console.log(
+              `[IQL Query] LLM extraction low confidence (${extraction.confidence}), using full chunk`,
+            );
+          }
+        } catch (err) {
+          console.error(`[IQL Query] LLM extraction failed for chunk: ${err}`);
+        }
+
+        // Fallback: use the full chunk if extraction fails
+        const permalink = `cite:${document.id}@${chunkStart}-${chunkEnd}`;
+        return {
+          ...match,
+          citation: {
+            formatted: document.filename,
+            permalink,
+            markdown: `[${document.filename}](${permalink})`,
+            documentId: document.id,
+            start: chunkStart,
+            end: chunkEnd,
+          },
+        };
+      }),
+    );
+
     // Return results
     const result = {
       query,
       documentId: document.id,
       documentName: document.filename,
+      matterId: document.matter_id,
       score: queryResult.score,
-      matches: queryResult.matches,
+      matches: matchesWithExtractions,
       executedAt: new Date().toISOString(),
       model,
     };
 
     console.log(
-      `[IQL Query] Query completed: ${queryResult.matches.length} matches found with score ${queryResult.score.toFixed(2)}`,
+      `[IQL Query] Query completed: ${matchesWithExtractions.length} matches with LLM-extracted clauses`,
     );
 
     return NextResponse.json(result);
@@ -140,6 +254,18 @@ export async function POST(request: NextRequest) {
         {
           error: "Failed to execute IQL query",
           message: "Isaacus API unavailable. Please try again later.",
+          details: errorMessage,
+        },
+        { status: 500 },
+      );
+    }
+
+    // Handle OpenAI-specific errors
+    if (errorMessage.includes("OPENAI") || errorMessage.includes("OpenAI")) {
+      return NextResponse.json(
+        {
+          error: "Failed to extract clause",
+          message: "OpenAI API unavailable. Results will show full chunks.",
           details: errorMessage,
         },
         { status: 500 },

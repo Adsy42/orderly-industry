@@ -22,18 +22,18 @@ The agent API will be available at [http://localhost:2024](http://localhost:2024
 
 Copy `.env.example` to `.env` and configure:
 
-| Variable                     | Description                                  | Required                   |
-| ---------------------------- | -------------------------------------------- | -------------------------- |
-| `OPENAI_API_KEY`             | OpenAI API key for GPT models                | Yes                        |
-| `TAVILY_API_KEY`             | Tavily API key for web search                | Yes                        |
-| `SUPABASE_URL`               | Supabase project URL                         | Yes                        |
-| `SUPABASE_ANON_KEY`          | Supabase anon key                            | Yes                        |
-| `SUPABASE_SERVICE_ROLE_KEY`  | Supabase service role key (bypasses RLS)     | Yes (for document tools)   |
-| `ISAACUS_API_KEY`            | Isaacus Legal AI API key                     | Yes (for document tools)   |
-| `ISAACUS_BASE_URL`           | Isaacus API base URL                         | No (defaults to production)|
-| `DEEPSEEK_API_KEY`           | DeepSeek API key for OCR                     | No (for scanned PDFs)      |
-| `LANGSMITH_API_KEY`          | LangSmith API key                            | Recommended                |
-| `LANGSMITH_TRACING`          | Enable tracing (`true`)                      | Recommended                |
+| Variable                    | Description                              | Required                    |
+| --------------------------- | ---------------------------------------- | --------------------------- |
+| `OPENAI_API_KEY`            | OpenAI API key for GPT models            | Yes                         |
+| `TAVILY_API_KEY`            | Tavily API key for web search            | Yes                         |
+| `SUPABASE_URL`              | Supabase project URL                     | Yes                         |
+| `SUPABASE_ANON_KEY`         | Supabase anon key                        | Yes                         |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase service role key (bypasses RLS) | Yes (for document tools)    |
+| `ISAACUS_API_KEY`           | Isaacus Legal AI API key                 | Yes (for document tools)    |
+| `ISAACUS_BASE_URL`          | Isaacus API base URL                     | No (defaults to production) |
+| `DEEPSEEK_API_KEY`          | DeepSeek API key for OCR                 | No (for scanned PDFs)       |
+| `LANGSMITH_API_KEY`         | LangSmith API key                        | Recommended                 |
+| `LANGSMITH_TRACING`         | Enable tracing (`true`)                  | Recommended                 |
 
 **Important:** The `SUPABASE_SERVICE_ROLE_KEY` is required for document analysis tools to work. Without it, the agent cannot access documents due to Row Level Security (RLS) policies.
 
@@ -89,13 +89,13 @@ The agent uses a hierarchical delegation model with specialized subagents:
 
 ### Document Agent Tools
 
-| Tool                     | Purpose                                      |
-| ------------------------ | -------------------------------------------- |
-| `isaacus_search`         | Semantic search + reranking across documents |
-| `isaacus_extract`        | Extractive QA with document citations        |
-| `isaacus_classify`       | Legal clause classification                  |
-| `get_document_text`      | Retrieve full document text from Supabase    |
-| `list_matter_documents`  | List all documents in a matter               |
+| Tool                    | Purpose                                      |
+| ----------------------- | -------------------------------------------- |
+| `isaacus_search`        | Semantic search + reranking across documents |
+| `isaacus_extract`       | Extractive QA with document citations        |
+| `isaacus_classify`      | Legal clause classification                  |
+| `get_document_text`     | Retrieve full document text from Supabase    |
+| `list_matter_documents` | List all documents in a matter               |
 
 ## Development
 

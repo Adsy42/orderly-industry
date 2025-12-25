@@ -275,8 +275,18 @@ async def _isaacus_extract_async(
             citations = []
             for chunk in top_chunks:
                 chunk_text = get_chunk_text(chunk)
-                # Check if this chunk contains the answer
-                contains_answer = answer_text.lower() in chunk_text.lower()
+
+                # Find exact position of the answer within this chunk
+                answer_start = -1
+                answer_end = -1
+                answer_lower = answer_text.lower()
+                chunk_lower = chunk_text.lower()
+
+                if answer_lower in chunk_lower:
+                    answer_start = chunk_lower.find(answer_lower)
+                    answer_end = answer_start + len(answer_text)
+
+                contains_answer = answer_start >= 0
 
                 # Get citation data (new schema)
                 citation_data = chunk.get("citation") or {}
@@ -291,12 +301,19 @@ async def _isaacus_extract_async(
                     section_path=citation_data.get("section_path") or [],
                 )
 
-                # Build permalink: cite:document_id#chunk_id
-                permalink = (
-                    f"cite:{document_id}#{chunk_id}"
-                    if chunk_id
-                    else f"cite:{document_id}"
-                )
+                # Build permalink with character positions for precise highlighting
+                # Format: cite:document_id#chunk_id@start-end
+                if contains_answer and answer_start >= 0:
+                    permalink = (
+                        f"cite:{document_id}#{chunk_id}@{answer_start}-{answer_end}"
+                    )
+                elif chunk_id:
+                    permalink = f"cite:{document_id}#{chunk_id}"
+                else:
+                    permalink = f"cite:{document_id}"
+
+                # Create ready-to-use markdown citation
+                markdown_citation = f"{formatted_citation}({permalink})"
 
                 citations.append(
                     {
@@ -310,6 +327,11 @@ async def _isaacus_extract_async(
                         "section_path": citation_data.get("section_path") or [],
                         "formatted": formatted_citation,
                         "permalink": permalink,
+                        "markdown": markdown_citation,  # Ready-to-use markdown link
+                        # Precise character positions for highlighting
+                        "answer_start": answer_start if contains_answer else None,
+                        "answer_end": answer_end if contains_answer else None,
+                        "answer_text": answer_text if contains_answer else None,
                     }
                 )
 
@@ -322,6 +344,13 @@ async def _isaacus_extract_async(
 
             # Include formatted citations in the answer for AI grounding
             primary_citation = citations[0]["formatted"] if citations else ""
+            primary_markdown = citations[0]["markdown"] if citations else ""
+
+            # Citation usage hint for the agent
+            citation_hint = (
+                "CITATION FORMAT: Include the 'markdown' field in your response. "
+                f"Example usage: 'The answer is {answer_text} {primary_markdown}'"
+            )
 
             return {
                 "answer": answer_text,
@@ -330,6 +359,8 @@ async def _isaacus_extract_async(
                 "question": question,
                 "found": True,
                 "primary_citation": primary_citation,
+                "primary_markdown": primary_markdown,
+                "_citation_hint": citation_hint,
             }
 
         return {

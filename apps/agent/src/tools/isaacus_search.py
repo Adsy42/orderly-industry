@@ -305,12 +305,19 @@ async def _isaacus_search_async(
             # Single result, no reranking needed
             results = [_format_search_result(candidates[0], None)]
 
+        # Add citation usage hint for the agent
+        citation_hint = (
+            "CITATION FORMAT: For each result, use the 'citation.permalink' in markdown links. "
+            "Example: 'According to [Contract.pdf, p.12, § 7.2](cite:doc-id#chunk-id), the clause states...'"
+        )
+
         return {
             "results": results,
             "total_found": len(results),
             "query": query,
             "matter_id": matter_id,
             "reranked": reranked,
+            "_citation_hint": citation_hint,
         }
 
     except Exception as e:
@@ -370,6 +377,9 @@ def _format_search_result(
     # Create permalink format: cite:document_id#chunk_id
     permalink = f"cite:{document_id}#{chunk_id}" if chunk_id else f"cite:{document_id}"
 
+    # Create ready-to-use markdown citation
+    markdown_citation = f"[{formatted_citation}]({permalink})"
+
     return {
         "document_id": document_id,
         "chunk_id": chunk_id,
@@ -384,6 +394,7 @@ def _format_search_result(
             "heading": citation_data.get("heading"),
             "formatted": formatted_citation,
             "permalink": permalink,
+            "markdown": markdown_citation,  # Ready-to-use markdown link
         },
         "parent_content": candidate.get("parent_content"),
     }

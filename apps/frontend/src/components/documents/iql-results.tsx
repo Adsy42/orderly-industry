@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useState } from "react";
+import Link from "next/link";
 import {
   CheckCircle,
   XCircle,
@@ -12,6 +13,7 @@ import {
   ChevronUp,
   Copy,
   Check,
+  ExternalLink,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -25,12 +27,14 @@ interface IQLResultsProps {
   results: IQLQueryResult | null;
   onMatchClick?: (match: IQLQueryResult["matches"][0]) => void;
   className?: string;
+  matterId?: string;
 }
 
 export function IQLResults({
   results,
   onMatchClick,
   className,
+  matterId,
 }: IQLResultsProps) {
   if (!results) {
     return null;
@@ -81,7 +85,7 @@ export function IQLResults({
       })),
       metadata: {
         exportedAt: new Date().toISOString(),
-        exportedBy: "IQL Analysis Tool",
+        exportedBy: "Clause Finder",
         version: "1.0",
       },
     };
@@ -92,7 +96,7 @@ export function IQLResults({
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `iql-results-${results.documentName.replace(/\.[^/.]+$/, "")}-${new Date().toISOString().split("T")[0]}.json`;
+    a.download = `clause-finder-results-${results.documentName.replace(/\.[^/.]+$/, "")}-${new Date().toISOString().split("T")[0]}.json`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
@@ -172,6 +176,9 @@ export function IQLResults({
               getScoreIcon={getScoreIcon}
               formatScore={formatScore}
               onMatchClick={onMatchClick}
+              matterId={matterId ?? results.matterId}
+              documentId={results.documentId}
+              documentName={results.documentName}
             />
           ))}
         </div>
@@ -188,6 +195,9 @@ function MatchCard({
   getScoreIcon,
   formatScore,
   onMatchClick,
+  matterId,
+  documentId,
+  documentName,
 }: {
   match: IQLQueryResult["matches"][0];
   index: number;
@@ -195,9 +205,13 @@ function MatchCard({
   getScoreIcon: (score: number) => React.ReactNode;
   formatScore: (score: number) => string;
   onMatchClick?: (match: IQLQueryResult["matches"][0]) => void;
+  matterId?: string;
+  documentId: string;
+  documentName: string;
 }) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [copied, setCopied] = useState(false);
+  const [copiedText, setCopiedText] = useState(false);
+  const [copiedCitation, setCopiedCitation] = useState(false);
 
   const needsTruncation = match.text.length > MAX_EXCERPT_LENGTH;
   const displayText =
@@ -205,14 +219,33 @@ function MatchCard({
       ? match.text
       : match.text.slice(0, MAX_EXCERPT_LENGTH) + "...";
 
-  const handleCopy = async (e: React.MouseEvent) => {
+  const documentHref = matterId
+    ? `/protected/matters/${matterId}/documents/${documentId}?start=${match.startIndex}&end=${match.endIndex}`
+    : `/protected/documents/${documentId}?start=${match.startIndex}&end=${match.endIndex}`;
+
+  const citationMarkdown =
+    match.citation?.markdown ??
+    `[${documentName}](cite:${documentId}@${match.startIndex}-${match.endIndex})`;
+
+  const handleCopyText = async (e: React.MouseEvent) => {
     e.stopPropagation();
     try {
       await navigator.clipboard.writeText(match.text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      setCopiedText(true);
+      setTimeout(() => setCopiedText(false), 2000);
     } catch (err) {
       console.error("Failed to copy:", err);
+    }
+  };
+
+  const handleCopyCitation = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await navigator.clipboard.writeText(citationMarkdown);
+      setCopiedCitation(true);
+      setTimeout(() => setCopiedCitation(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy citation:", err);
     }
   };
 
@@ -249,9 +282,9 @@ function MatchCard({
               variant="ghost"
               size="sm"
               className="h-6 px-2"
-              onClick={handleCopy}
+              onClick={handleCopyText}
             >
-              {copied ? (
+              {copiedText ? (
                 <Check className="h-3 w-3 text-green-500" />
               ) : (
                 <Copy className="h-3 w-3" />
@@ -268,26 +301,46 @@ function MatchCard({
               Position: {match.startIndex.toLocaleString()}-
               {match.endIndex.toLocaleString()}
             </p>
-            {needsTruncation && (
+            <div className="flex items-center gap-2">
+              <Link
+                href={documentHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-muted-foreground inline-flex items-center gap-1 text-xs hover:underline"
+              >
+                <ExternalLink className="h-3 w-3" />
+                Open in document
+              </Link>
               <Button
+                type="button"
                 variant="ghost"
                 size="sm"
                 className="h-6 px-2 text-xs"
-                onClick={handleToggleExpand}
+                onClick={handleCopyCitation}
               >
-                {isExpanded ? (
-                  <>
-                    <ChevronUp className="mr-1 h-3 w-3" />
-                    Show less
-                  </>
-                ) : (
-                  <>
-                    <ChevronDown className="mr-1 h-3 w-3" />
-                    Show more
-                  </>
-                )}
+                {copiedCitation ? "Copied citation" : "Copy citation"}
               </Button>
-            )}
+              {needsTruncation && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-6 px-2 text-xs"
+                  onClick={handleToggleExpand}
+                >
+                  {isExpanded ? (
+                    <>
+                      <ChevronUp className="mr-1 h-3 w-3" />
+                      Show less
+                    </>
+                  ) : (
+                    <>
+                      <ChevronDown className="mr-1 h-3 w-3" />
+                      Show more
+                    </>
+                  )}
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </div>

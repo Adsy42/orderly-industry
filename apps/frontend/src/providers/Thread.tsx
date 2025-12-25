@@ -15,12 +15,26 @@ import {
 import { createClient as createSupabaseClient } from "@/lib/supabase/client";
 import type { Session } from "@supabase/supabase-js";
 
+interface Conversation {
+  id: string;
+  user_id: string;
+  title: string | null;
+  thread_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
 interface ThreadContextType {
   getThreads: () => Promise<Thread[]>;
+  getConversations: () => Promise<Conversation[]>;
   threads: Thread[];
+  conversations: Conversation[];
   setThreads: Dispatch<SetStateAction<Thread[]>>;
+  setConversations: Dispatch<SetStateAction<Conversation[]>>;
   threadsLoading: boolean;
+  conversationsLoading: boolean;
   setThreadsLoading: Dispatch<SetStateAction<boolean>>;
+  setConversationsLoading: Dispatch<SetStateAction<boolean>>;
 }
 
 const ThreadContext = createContext<ThreadContextType | undefined>(undefined);
@@ -39,7 +53,9 @@ export function ThreadProvider({ children }: { children: ReactNode }) {
   const [apiUrl] = useQueryState("apiUrl");
   const [assistantId] = useQueryState("assistantId");
   const [threads, setThreads] = useState<Thread[]>([]);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [threadsLoading, setThreadsLoading] = useState(false);
+  const [conversationsLoading, setConversationsLoading] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
 
   // Get session from Supabase client for JWT auth
@@ -86,12 +102,41 @@ export function ThreadProvider({ children }: { children: ReactNode }) {
     return threads;
   }, [apiUrl, assistantId, session?.access_token]);
 
+  const getConversations = useCallback(async (): Promise<Conversation[]> => {
+    if (!session?.user?.id) return [];
+
+    try {
+      const supabase = createSupabaseClient();
+      const { data, error } = await supabase
+        .from("conversations")
+        .select("*")
+        .eq("user_id", session.user.id)
+        .order("updated_at", { ascending: false })
+        .limit(100);
+
+      if (error) {
+        console.error("Failed to fetch conversations:", error);
+        return [];
+      }
+
+      return (data || []) as Conversation[];
+    } catch (error) {
+      console.error("Error fetching conversations:", error);
+      return [];
+    }
+  }, [session?.user?.id]);
+
   const value = {
     getThreads,
+    getConversations,
     threads,
+    conversations,
     setThreads,
+    setConversations,
     threadsLoading,
+    conversationsLoading,
     setThreadsLoading,
+    setConversationsLoading,
   };
 
   return (

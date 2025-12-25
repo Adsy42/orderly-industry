@@ -13,6 +13,7 @@ All 89 tasks from the specification have been completed. The core infrastructure
 ## ✅ Fully Working
 
 ### Matter Management (US1) ✅ Complete
+
 - [x] Create matters with title and description
 - [x] Auto-generated matter numbers (M-YYYY-NNN format)
 - [x] View matters list with document counts
@@ -22,6 +23,7 @@ All 89 tasks from the specification have been completed. The core infrastructure
 - [x] RLS policies for matter access control
 
 ### Document Upload & Storage (US2) ✅ Complete
+
 - [x] Drag-and-drop document upload (Supabase Dropzone)
 - [x] PDF, DOCX, TXT file support
 - [x] 50MB file size limit
@@ -32,6 +34,7 @@ All 89 tasks from the specification have been completed. The core infrastructure
 - [x] Real-time document status updates
 
 ### Document Processing (US3) ✅ Complete
+
 - [x] Edge Function `process-document` deployed
 - [x] Text extraction from PDF (PyMuPDF/pypdf)
 - [x] Text extraction from DOCX (python-docx/mammoth)
@@ -43,6 +46,7 @@ All 89 tasks from the specification have been completed. The core infrastructure
 - [x] Processing status updates (pending → processing → ready/error)
 
 ### Semantic Search (US4) ✅ Complete
+
 - [x] Document search UI component
 - [x] Embed API route for query vectorization
 - [x] `match_document_embeddings()` RPC function
@@ -52,6 +56,7 @@ All 89 tasks from the specification have been completed. The core infrastructure
 - [x] Fallback to full-text search
 
 ### Matter Participants (US5) ✅ Complete
+
 - [x] Participants manager component
 - [x] Role-based access (counsel, client, observer)
 - [x] Invite participant by email
@@ -60,6 +65,7 @@ All 89 tasks from the specification have been completed. The core infrastructure
 - [x] Permission checks on upload/delete
 
 ### Database & Security ✅ Complete
+
 - [x] `matters` table with RLS
 - [x] `matter_participants` table with roles
 - [x] `documents` table with RLS
@@ -70,6 +76,7 @@ All 89 tasks from the specification have been completed. The core infrastructure
 - [x] All RLS policies with proper indexes
 
 ### Agent Integration ✅ Complete
+
 - [x] Document Agent subagent defined and configured
 - [x] Agent tools implemented:
   - `isaacus_search` - Semantic document search with reranking
@@ -91,18 +98,21 @@ All 89 tasks from the specification have been completed. The core infrastructure
 The Edge Function for document processing requires the **Isaacus API key** to generate embeddings.
 
 **To enable:**
+
 1. Go to Supabase Dashboard → Edge Functions → `process-document`
 2. Add secret: `ISAACUS_API_KEY=<your-key>`
 3. Optionally: `ISAACUS_BASE_URL=https://api.isaacus.com`
 
 **Without Isaacus API key:**
+
 - Documents upload successfully
 - Text is extracted and stored
-- Documents show as "ready" 
+- Documents show as "ready"
 - Semantic search returns no results (no embeddings)
 - Agent tools fallback to text search
 
 **With Isaacus API key:**
+
 - Documents are fully processed with embeddings
 - Semantic search works across documents
 - Agent can answer questions about document contents with citations
@@ -112,6 +122,7 @@ The Edge Function for document processing requires the **Isaacus API key** to ge
 For scanned PDF support, the DeepSeek API key is required.
 
 **To enable:**
+
 1. Add `DEEPSEEK_API_KEY=<your-key>` to agent environment
 2. OCR is automatically used when PyMuPDF detects low text content
 
@@ -133,6 +144,7 @@ These items are planned for future phases:
 ## Quick Start
 
 ### For Development
+
 ```bash
 # Start the frontend
 cd apps/frontend && pnpm dev
@@ -142,6 +154,7 @@ cd apps/agent && uv run langgraph dev
 ```
 
 ### For Production
+
 1. Apply database migrations to Supabase
 2. Deploy Edge Function: `supabase functions deploy process-document`
 3. Add Isaacus API key to Edge Function secrets
@@ -205,6 +218,7 @@ cd apps/agent && uv run langgraph dev
 ## Files Changed
 
 ### Frontend (`apps/frontend/`)
+
 - `src/app/protected/matters/page.tsx` - Matters list page
 - `src/app/protected/matters/[matterId]/page.tsx` - Matter detail page
 - `src/hooks/use-matters.ts` - Matter CRUD operations
@@ -216,6 +230,7 @@ cd apps/agent && uv run langgraph dev
 - `src/hooks/use-supabase-upload.ts` - Upload hook
 
 ### Agent (`apps/agent/`)
+
 - `src/agent/graph.py` - Added document subagent + tools
 - `src/agent/prompts.py` - Added document analysis instructions
 - `src/tools/isaacus_search.py` - Semantic search with reranking
@@ -229,6 +244,7 @@ cd apps/agent && uv run langgraph dev
 - `src/services/deepseek_ocr.py` - OCR for scanned documents
 
 ### Supabase (`supabase/`)
+
 - `migrations/20251223120000_create_matters.sql`
 - `migrations/20251223120100_create_matter_participants.sql`
 - `migrations/20251223120200_create_documents.sql`
@@ -238,5 +254,3 @@ cd apps/agent && uv run langgraph dev
 - `migrations/20251223150000_fix_embedding_dimension.sql`
 - `migrations/20251223160000_fix_docx_extraction.sql`
 - `functions/process-document/index.ts` - Document processing Edge Function
-
-

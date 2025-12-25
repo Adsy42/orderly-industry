@@ -34,6 +34,7 @@ This command automates pull request creation after `/speckit.commit`. It generat
 ### 1. Initialize Context
 
 Run `.specify/scripts/bash/check-prerequisites.sh --json --require-tasks --include-tasks` from repo root and parse JSON for:
+
 - `FEATURE_DIR` - Path to spec directory
 - `BRANCH_NAME` - Current feature branch
 - `FEATURE_NUMBER` - Feature number (e.g., "004")
@@ -71,12 +72,12 @@ Display branch status:
 ```markdown
 ## Branch Status
 
-| Check | Status | Details |
-|-------|--------|---------|
-| Feature Branch | ✅ | `004-matters-documents` |
-| Commits Ahead | ✅ | 12 commits ahead of main |
-| Pushed to Remote | ✅ | Up to date with origin |
-| Clean Working Tree | ✅ | No uncommitted changes |
+| Check              | Status | Details                  |
+| ------------------ | ------ | ------------------------ |
+| Feature Branch     | ✅     | `004-matters-documents`  |
+| Commits Ahead      | ✅     | 12 commits ahead of main |
+| Pushed to Remote   | ✅     | Up to date with origin   |
+| Clean Working Tree | ✅     | No uncommitted changes   |
 ```
 
 ### 3. Check for Existing PR
@@ -91,14 +92,15 @@ gh pr list --head "$CURRENT_BRANCH" --state open --json number,url,title
 ```markdown
 ## Existing Pull Request Found
 
-| Field | Value |
-|-------|-------|
-| PR Number | #42 |
-| Title | feat: Add matters and document management |
-| URL | https://github.com/owner/repo/pull/42 |
-| State | Open |
+| Field     | Value                                     |
+| --------- | ----------------------------------------- |
+| PR Number | #42                                       |
+| Title     | feat: Add matters and document management |
+| URL       | https://github.com/owner/repo/pull/42     |
+| State     | Open                                      |
 
 Would you like to:
+
 - **A**: Update the existing PR description
 - **B**: View the existing PR
 - **C**: Continue to check preview deployments
@@ -109,18 +111,21 @@ Wait for user choice before proceeding.
 ### 4. Load Spec Context
 
 Read the following files from FEATURE_DIR:
+
 - `spec.md` - Feature specification (REQUIRED)
 - `tasks.md` - Task breakdown (REQUIRED)
 - `plan.md` - Technical plan (if exists)
 - `checklists/requirements.md` - Quality checklist (if exists)
 
 Extract from spec.md:
+
 - Feature title and description
 - User stories with priorities
 - Success criteria
 - Key entities
 
 Extract from tasks.md:
+
 - Total tasks and completion status
 - User story breakdown
 
@@ -182,16 +187,19 @@ Use Supabase MCP tools:
 ```markdown
 ## Preview Deployments
 
-| Service | Status | URL |
-|---------|--------|-----|
-| Vercel (Frontend) | ✅ Ready | [Preview](https://project-abc123.vercel.app) |
-| LangSmith (Agent) | 🔄 Building | Waiting... |
-| Supabase (Database) | ⚠️ N/A | No database changes |
+| Service             | Status      | URL                                          |
+| ------------------- | ----------- | -------------------------------------------- |
+| Vercel (Frontend)   | ✅ Ready    | [Preview](https://project-abc123.vercel.app) |
+| LangSmith (Agent)   | 🔄 Building | Waiting...                                   |
+| Supabase (Database) | ⚠️ N/A      | No database changes                          |
 
 **Full-Stack Testing URL:**
 ```
+
 https://project-abc123.vercel.app?apiUrl=https://langsmith-preview-pr-42.api.langsmith.com&assistantId=deep_research
+
 ```
+
 ```
 
 **If any preview is still building:**
@@ -200,6 +208,7 @@ https://project-abc123.vercel.app?apiUrl=https://langsmith-preview-pr-42.api.lan
 ⏳ **Preview deployments still in progress**
 
 Would you like to:
+
 - **A**: Wait for deployments to complete (polls every 30 seconds)
 - **B**: Create PR now and add preview URLs later
 - **C**: Skip preview verification
@@ -215,9 +224,10 @@ Create a comprehensive PR description from spec files:
 ### Title Suggestion
 
 Based on the spec, suggest a PR title:
-
 ```
+
 feat(frontend,agent,db): add matters and document management foundation
+
 ```
 
 ### Generated Description
@@ -309,6 +319,7 @@ Present the generated description and ask for confirmation:
 **Head Branch:** `004-matters-documents`
 
 **Labels:** (select applicable)
+
 - [ ] `enhancement`
 - [ ] `documentation`
 - [ ] `database`
@@ -316,10 +327,12 @@ Present the generated description and ask for confirmation:
 - [ ] `agent`
 
 **Reviewers:** (optional)
+
 - [ ] @teammate1
 - [ ] @teammate2
 
 Would you like to:
+
 - **A**: Create PR with this description
 - **B**: Edit the description first
 - **C**: Create as draft PR
@@ -350,15 +363,15 @@ gh pr create \
 
 After PR is created:
 
-```markdown
+````markdown
 ## ✅ Pull Request Created
 
-| Field | Value |
-|-------|-------|
-| PR Number | #42 |
-| URL | https://github.com/owner/repo/pull/42 |
-| Status | Open |
-| CI Status | 🔄 Running |
+| Field     | Value                                 |
+| --------- | ------------------------------------- |
+| PR Number | #42                                   |
+| URL       | https://github.com/owner/repo/pull/42 |
+| Status    | Open                                  |
+| CI Status | 🔄 Running                            |
 
 ### Next Steps
 
@@ -366,13 +379,16 @@ After PR is created:
    ```bash
    gh pr checks 42 --watch
    ```
+````
 
 2. **Add Preview URLs**: Once deployments complete, comment with preview URLs
+
    ```bash
    gh pr comment 42 --body "Preview deployments ready: ..."
    ```
 
 3. **Request Review**: Tag reviewers when ready
+
    ```bash
    gh pr edit 42 --add-reviewer teammate1
    ```
@@ -381,22 +397,23 @@ After PR is created:
 
 ### Monitor PR Status
 
-| Check | Status | Details |
-|-------|--------|---------|
-| CI - Lint | 🔄 Running | ESLint, Ruff |
-| CI - Build | 🔄 Running | Next.js build |
-| CI - Tests | 🔄 Running | Frontend + Agent |
-| Preview - Vercel | 🔄 Building | ~2 min remaining |
+| Check               | Status      | Details          |
+| ------------------- | ----------- | ---------------- |
+| CI - Lint           | 🔄 Running  | ESLint, Ruff     |
+| CI - Build          | 🔄 Running  | Next.js build    |
+| CI - Tests          | 🔄 Running  | Frontend + Agent |
+| Preview - Vercel    | 🔄 Building | ~2 min remaining |
 | Preview - LangSmith | 🔄 Building | ~5 min remaining |
 
 Would you like me to watch for CI completion? (yes/no)
-```
+
+````
 
 If user says yes, poll for status:
 
 ```bash
 gh pr checks --watch
-```
+````
 
 ## Arguments
 
@@ -420,10 +437,11 @@ Examples:
 
 ### No GitHub CLI
 
-```markdown
+````markdown
 ❌ **GitHub CLI not installed**
 
 Install GitHub CLI to use this command:
+
 ```bash
 # macOS
 brew install gh
@@ -434,12 +452,15 @@ sudo apt install gh
 # Then authenticate
 gh auth login
 ```
+````
 
 Alternatively, create the PR manually:
+
 1. Go to: https://github.com/owner/repo/compare/main...004-matters-documents
 2. Copy the generated description above
 3. Create the pull request
-```
+
+````
 
 ### Not Authenticated
 
@@ -447,23 +468,25 @@ Alternatively, create the PR manually:
 gh auth status
 # If not authenticated:
 gh auth login
-```
+````
 
 ### PR Creation Failed
 
 Capture the error and provide guidance:
 
-```markdown
+````markdown
 ❌ **PR Creation Failed**
 
 **Error:** `GraphQL: No commits between main and 004-matters-documents`
 
 **Possible causes:**
+
 1. Branch is not ahead of main
 2. Branch not pushed to remote
 3. Incorrect base branch
 
 **Resolution:**
+
 ```bash
 # Ensure branch is pushed
 git push -u origin 004-matters-documents
@@ -471,7 +494,9 @@ git push -u origin 004-matters-documents
 # Verify commits exist
 git log main..HEAD --oneline
 ```
-```
+````
+
+````
 
 ## PR Description Template
 
@@ -495,7 +520,7 @@ The generated description follows this structure:
 
 ## Review Checklist
 [Items for reviewers based on constitution]
-```
+````
 
 ## Integration with Spec-Driven Development
 
@@ -506,5 +531,4 @@ This command bridges the gap between implementation and review by:
 3. **Testability**: Provides preview URLs for verification
 4. **Quality**: Includes review checklist from constitution
 5. **Context**: Gives reviewers all information needed for effective review
-
 

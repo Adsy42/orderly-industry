@@ -6,10 +6,23 @@ export interface IQLQueryResult {
   query: string;
   documentId: string;
   documentName: string;
+  matterId: string;
   score: number;
   matches: IQLMatch[];
   executedAt: string;
   model: string;
+}
+
+export interface IQLMatchCitation {
+  /** Display name (usually filename) */
+  formatted: string;
+  /** cite:documentId@start-end */
+  permalink: string;
+  /** Markdown link: [filename](cite:documentId@start-end) */
+  markdown: string;
+  documentId: string;
+  start: number;
+  end: number;
 }
 
 export interface IQLMatch {
@@ -18,6 +31,13 @@ export interface IQLMatch {
   endIndex: number;
   score: number;
   chunkIndex?: number;
+  /** Full chunk text for context (when QA extraction is used) */
+  chunkText?: string;
+  /** Start position of the chunk in the document */
+  chunkStart?: number;
+  /** End position of the chunk in the document */
+  chunkEnd?: number;
+  citation?: IQLMatchCitation;
 }
 
 export interface SavedIQLQuery {

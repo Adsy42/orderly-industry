@@ -15,7 +15,7 @@ const navigation = [
     icon: Briefcase,
   },
   {
-    name: "IQL Analyzer",
+    name: "Clause Finder",
     href: "/protected/iql-analyzer",
     icon: FileSearch,
   },
@@ -47,17 +47,26 @@ export function AppHeader() {
             const isActive =
               pathname === item.href || pathname.startsWith(item.href + "/");
             const Icon = item.icon;
+            const isChat = item.href === "/protected/chat";
+            const isDisabled = isChat; // Chat is under maintenance
 
             return (
               <Link
                 key={item.name}
-                href={item.href}
+                href={isDisabled ? "#" : item.href}
+                onClick={(e) => {
+                  if (isDisabled) {
+                    e.preventDefault();
+                  }
+                }}
                 className={cn(
                   "inline-flex items-center gap-2 rounded-md px-3 py-2 text-sm font-medium transition-colors",
                   isActive
                     ? "bg-primary/10 text-primary"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                  isDisabled && "cursor-not-allowed opacity-50",
                 )}
+                aria-disabled={isDisabled}
               >
                 <Icon className="h-4 w-4" />
                 <span className="hidden sm:inline">{item.name}</span>
