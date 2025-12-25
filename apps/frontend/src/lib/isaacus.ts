@@ -621,7 +621,6 @@ Return JSON: { "indices": [0], "confidence": 0.0-1.0, "reasoning": "brief explan
 
     const parsed = JSON.parse(content);
     const indices: number[] = parsed.indices || [];
-<<<<<<< HEAD
     const confidence: number = parsed.confidence || 0.5; // Default to 0.5, not 0
 
     // If LLM returned empty indices despite our instructions, use fallback
@@ -634,12 +633,6 @@ Return JSON: { "indices": [0], "confidence": 0.0-1.0, "reasoning": "brief explan
         chunkStartOffset,
         parsed.reasoning || "LLM found no match, using first sentences",
       );
-=======
-    const confidence: number = parsed.confidence || 0;
-
-    if (indices.length === 0) {
-      return { clause: "", confidence: 0, reasoning: parsed.reasoning };
->>>>>>> 817b6bf (refactor(api): improve LLM clause extraction with sentence-based selection)
     }
 
     // Filter valid indices and sort them
@@ -648,15 +641,11 @@ Return JSON: { "indices": [0], "confidence": 0.0-1.0, "reasoning": "brief explan
       .sort((a: number, b: number) => a - b);
 
     if (validIndices.length === 0) {
-<<<<<<< HEAD
       return createFallbackResult(
         sentences,
         chunkStartOffset,
         "All indices were invalid",
       );
-=======
-      return { clause: "", confidence: 0, reasoning: parsed.reasoning };
->>>>>>> 817b6bf (refactor(api): improve LLM clause extraction with sentence-based selection)
     }
 
     // Combine selected sentences
@@ -669,11 +658,7 @@ Return JSON: { "indices": [0], "confidence": 0.0-1.0, "reasoning": "brief explan
 
     return {
       clause: combinedText,
-<<<<<<< HEAD
       confidence: Math.max(confidence, 0.4), // Ensure minimum confidence since chunk is known-relevant
-=======
-      confidence,
->>>>>>> 817b6bf (refactor(api): improve LLM clause extraction with sentence-based selection)
       reasoning: parsed.reasoning,
       startIndex: chunkStartOffset + firstSentence.start,
       endIndex: chunkStartOffset + lastSentence.end,

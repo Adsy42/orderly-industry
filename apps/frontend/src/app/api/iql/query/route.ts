@@ -151,7 +151,7 @@ export async function POST(request: NextRequest) {
           // Use sentence-based LLM extraction - segments text into sentences,
           // presents them as numbered options, and picks the best one(s)
           console.log(
-            `[IQL Query] Extracting "${queryType}" using sentence-based selection (${expandedText.length} chars, window: ${CONTEXT_WINDOW})`,
+            `[IQL Query] Extracting "${queryType}" (${expandedText.length} chars, window: ${CONTEXT_WINDOW})`,
           );
 
           // Pass the expandedStart offset so positions are relative to the full document
@@ -174,7 +174,7 @@ export async function POST(request: NextRequest) {
             const permalink = `cite:${document.id}@${docStart}-${docEnd}`;
 
             console.log(
-              `[IQL Query] LLM selected sentence(s): "${extraction.clause.slice(0, 60)}..." at ${docStart}-${docEnd} (confidence: ${extraction.confidence}${extraction.reasoning ? `, reason: ${extraction.reasoning}` : ""})`,
+              `[IQL Query] Extracted: "${extraction.clause.slice(0, 50)}..." at ${docStart}-${docEnd} (conf: ${extraction.confidence.toFixed(2)}${extraction.reasoning ? `, ${extraction.reasoning.slice(0, 60)}` : ""})`,
             );
 
             return {
@@ -198,7 +198,7 @@ export async function POST(request: NextRequest) {
           } else {
             // This should rarely happen now with improved fallback logic
             console.log(
-              `[IQL Query] LLM extraction low confidence (${extraction.confidence}) or no positions, using full chunk`,
+              `[IQL Query] Extraction unusable (conf: ${extraction.confidence}, hasClause: ${!!extraction.clause}), using chunk fallback`,
             );
           }
         } catch (err) {
