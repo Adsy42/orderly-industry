@@ -6,12 +6,10 @@ for conducting web research with strategic thinking and context management.
 Version: 1.1.0 - Added document analysis capabilities with Isaacus Legal AI
 """
 
-import os
 from datetime import datetime
 
 from deepagents import create_deep_agent
 from langchain.chat_models import init_chat_model
-from langchain_openai import ChatOpenAI
 
 from src.agent.prompts import (
     RESEARCH_WORKFLOW_INSTRUCTIONS,
