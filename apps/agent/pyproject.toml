@@ -25,6 +25,10 @@ dependencies = [
     "pymupdf>=1.24.0",  # Better PDF extraction + image rendering for OCR
     "mammoth>=1.8.0",   # DOCX to HTML with structure preservation
     "striprtf>=0.0.26", # RTF text extraction
+    # Structure extraction (for hierarchical document parsing)
+    "unstructured>=0.16.0",  # Structure-preserving document parsing
+    "python-magic>=0.4.27; sys_platform == 'linux'",  # File type detection (Linux)
+    "python-magic-bin>=0.4.14; sys_platform != 'linux'",  # File type detection (Windows/macOS)
     # Supabase client
     "supabase>=2.0.0",
 ]

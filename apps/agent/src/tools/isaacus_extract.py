@@ -1,6 +1,10 @@
-"""Isaacus extractive QA tool with reranking for precise answer extraction."""
+"""Isaacus extractive QA tool with reranking for precise answer extraction.
+
+Enhanced with structural citations in legal format for AI grounding.
+"""
 
 import os
+import re
 from typing import List, Optional
 
 import httpx
@@ -11,9 +15,10 @@ from ..services.isaacus_client import IsaacusClient
 
 
 class Citation(BaseModel):
-    """A citation for an extracted answer."""
+    """A citation for an extracted answer with legal formatting."""
 
     document_id: str = Field(description="UUID of the source document")
+    chunk_id: str = Field(description="UUID of the specific chunk for permalink")
     filename: str = Field(description="Name of the source file")
     text_excerpt: str = Field(description="The exact text containing the answer")
     position: Optional[str] = Field(
@@ -23,6 +28,23 @@ class Citation(BaseModel):
     relevance_score: Optional[float] = Field(
         default=None,
         description="Reranking relevance score (0-1)",
+    )
+    # New structural citation fields
+    page: Optional[int] = Field(
+        default=None,
+        description="Page number in source document",
+    )
+    section_path: List[str] = Field(
+        default_factory=list,
+        description="Path through section hierarchy",
+    )
+    formatted: str = Field(
+        default="",
+        description="Formatted citation string, e.g., '[Contract.pdf, p.12, § 7.2]'",
+    )
+    permalink: str = Field(
+        default="",
+        description="Permalink in cite:document_id#chunk_id format",
     )
 
 
@@ -137,11 +159,12 @@ async def _isaacus_extract_async(
         # Format embedding as string for pgvector
         embedding_str = "[" + ",".join(str(x) for x in query_embedding) + "]"
 
-        # Step 2: Vector search - get more candidates for reranking
-        print("[Isaacus Extract] Performing vector search for candidates")
+        # Step 2: Hybrid search - try new function first, fallback to legacy
+        print("[Isaacus Extract] Performing hybrid search for candidates")
         async with httpx.AsyncClient() as http_client:
+            # Try hybrid search function first (new schema with citations)
             response = await http_client.post(
-                f"{supabase_url}/rest/v1/rpc/match_document_embeddings",
+                f"{supabase_url}/rest/v1/rpc/hybrid_search_chunks",
                 headers={
                     "apikey": supabase_key,
                     "Authorization": f"Bearer {supabase_key}",
@@ -149,11 +172,32 @@ async def _isaacus_extract_async(
                 },
                 json={
                     "query_embedding": embedding_str,
+                    "query_text": question,
                     "matter_uuid": matter_id,
-                    "match_threshold": 0.3,  # Lower threshold to get more candidates
+                    "semantic_weight": 0.7,
+                    "match_threshold": 0.3,
                     "match_count": 10,
+                    "include_context": True,
                 },
             )
+
+            # Fallback to legacy function if hybrid not available
+            if response.status_code != 200:
+                print("[Isaacus Extract] Hybrid search not available, using legacy")
+                response = await http_client.post(
+                    f"{supabase_url}/rest/v1/rpc/match_document_chunks",
+                    headers={
+                        "apikey": supabase_key,
+                        "Authorization": f"Bearer {supabase_key}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "query_embedding": embedding_str,
+                        "matter_uuid": matter_id,
+                        "match_threshold": 0.3,
+                        "match_count": 10,
+                    },
+                )
 
             if response.status_code != 200:
                 error_detail = response.text
@@ -181,6 +225,10 @@ async def _isaacus_extract_async(
 
         print(f"[Isaacus Extract] Found {len(chunks)} candidate chunks")
 
+        # Helper to get chunk text (supports both old and new schema)
+        def get_chunk_text(c: dict) -> str:
+            return c.get("content") or c.get("chunk_text") or ""
+
         # Step 3: Rerank chunks by question relevance
         reranked_chunks = chunks
         if len(chunks) > 1:
@@ -188,7 +236,7 @@ async def _isaacus_extract_async(
                 print(f"[Isaacus Extract] Reranking {len(chunks)} chunks")
                 rerank_results = await client.rerank(
                     query=question,
-                    documents=[c["chunk_text"] for c in chunks],
+                    documents=[get_chunk_text(c) for c in chunks],
                     model="kanon-universal-classifier",
                     top_k=5,  # Get top 5 most relevant
                 )
@@ -211,7 +259,7 @@ async def _isaacus_extract_async(
         top_chunks = reranked_chunks[:3]  # Use top 3 for extraction
         context = "\n\n---\n\n".join(
             [
-                f"[From: {chunk['filename']}]\n{chunk['chunk_text']}"
+                f"[From: {chunk.get('filename', 'Document')}]\n{get_chunk_text(chunk)}"
                 for chunk in top_chunks
             ]
         )
@@ -223,19 +271,45 @@ async def _isaacus_extract_async(
         if result and result.get("answer"):
             answer_text = result["answer"]
 
-            # Build citations from the chunks used
+            # Build citations from the chunks used with legal formatting
             citations = []
             for chunk in top_chunks:
+                chunk_text = get_chunk_text(chunk)
                 # Check if this chunk contains the answer
-                contains_answer = answer_text.lower() in chunk["chunk_text"].lower()
+                contains_answer = answer_text.lower() in chunk_text.lower()
+
+                # Get citation data (new schema)
+                citation_data = chunk.get("citation") or {}
+                filename = chunk.get("filename", "Document")
+                document_id = chunk.get("document_id", "")
+                chunk_id = chunk.get("chunk_id") or chunk.get("id") or ""
+
+                # Format legal-style citation
+                formatted_citation = _format_legal_citation(
+                    filename=filename,
+                    page=citation_data.get("page"),
+                    section_path=citation_data.get("section_path") or [],
+                )
+
+                # Build permalink: cite:document_id#chunk_id
+                permalink = (
+                    f"cite:{document_id}#{chunk_id}"
+                    if chunk_id
+                    else f"cite:{document_id}"
+                )
 
                 citations.append(
                     {
-                        "document_id": chunk["document_id"],
-                        "filename": chunk["filename"],
-                        "text_excerpt": chunk["chunk_text"][:500],
+                        "document_id": document_id,
+                        "chunk_id": chunk_id,
+                        "filename": filename,
+                        "text_excerpt": chunk_text[:500],
                         "position": f"Chunk {chunk.get('chunk_index', 'N/A')}",
                         "relevance_score": chunk.get("rerank_score"),
+                        "page": citation_data.get("page"),
+                        "section_path": citation_data.get("section_path") or [],
+                        "formatted": formatted_citation,
+                        "permalink": permalink,
                     }
                 )
 
@@ -246,12 +320,16 @@ async def _isaacus_extract_async(
 
             print(f"[Isaacus Extract] Found answer with {len(citations)} citation(s)")
 
+            # Include formatted citations in the answer for AI grounding
+            primary_citation = citations[0]["formatted"] if citations else ""
+
             return {
                 "answer": answer_text,
                 "confidence": result.get("confidence", 0.8),
                 "citations": citations,
                 "question": question,
                 "found": True,
+                "primary_citation": primary_citation,
             }
 
         return {
@@ -273,6 +351,31 @@ async def _isaacus_extract_async(
         }
     finally:
         await client.close()
+
+
+def _format_legal_citation(
+    filename: str,
+    page: int | None,
+    section_path: list[str],
+) -> str:
+    """Format a citation in legal style: [Document.pdf, p.12, § 7.2]"""
+    parts = [filename]
+
+    if page:
+        parts.append(f"p.{page}")
+
+    if section_path:
+        last_section = section_path[-1] if section_path else ""
+        # Extract section number if present
+        section_match = re.match(r"^(\d+\.?)+", last_section)
+        if section_match:
+            parts.append(f"§ {section_match.group(0)}")
+        elif last_section:
+            # Use first few words of heading
+            short_heading = " ".join(last_section.split()[:3])
+            parts.append(short_heading)
+
+    return f"[{', '.join(parts)}]"
 
 
 # Export the tool function directly
