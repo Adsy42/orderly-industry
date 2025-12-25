@@ -6,10 +6,12 @@ for conducting web research with strategic thinking and context management.
 Version: 1.1.0 - Added document analysis capabilities with Isaacus Legal AI
 """
 
+import os
 from datetime import datetime
 
 from deepagents import create_deep_agent
 from langchain.chat_models import init_chat_model
+from langchain_openai import ChatOpenAI
 
 from src.agent.prompts import (
     RESEARCH_WORKFLOW_INSTRUCTIONS,
@@ -69,14 +71,27 @@ If no [CONTEXT] message exists, ask the user which matter they want to search.""
 
 # Model options - uncomment the one you want to use:
 
-# OpenAI GPT-4o
-model = init_chat_model(model="openai:gpt-4o", temperature=0.0)
+# OpenAI GPT-4o (uses OPENAI_API_KEY)
+# model = init_chat_model(model="openai:gpt-4o", temperature=0.0)
 
-# Anthropic Claude Sonnet
+# Anthropic Claude Sonnet (uses ANTHROPIC_API_KEY)
 # model = init_chat_model(model="anthropic:claude-sonnet-4-5-20250929", temperature=0.0)
 
-# Google Gemini
+# Google Gemini (uses GOOGLE_API_KEY)
 # model = ChatGoogleGenerativeAI(model="gemini-3-pro-preview", temperature=0.0)
+
+# OpenRouter - supports any model via OpenRouter API (uses OPENROUTER_API_KEY)
+# Set OPENROUTER_API_KEY env var and uncomment one of these:
+# model = ChatOpenAI(
+#     model="anthropic/claude-3.5-sonnet",
+#     base_url="https://openrouter.ai/api/v1",
+#     api_key=os.getenv("OPENROUTER_API_KEY"),
+#     temperature=0.0,
+# )
+# Or use any other OpenRouter model like "openai/gpt-4o", "google/gemini-pro", etc.
+
+# Default: OpenAI GPT-4o (fallback if nothing is configured)
+model = init_chat_model(model="openai:gpt-4o", temperature=0.0)
 
 # Create the agent with both research and document analysis capabilities
 agent = create_deep_agent(

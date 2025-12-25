@@ -3,7 +3,15 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Briefcase, MessageSquare, FileSearch } from "lucide-react";
+import {
+  Briefcase,
+  MessageSquare,
+  FileSearch,
+  FolderOpen,
+  Scale,
+  BookOpen,
+  Zap,
+} from "lucide-react";
 import { OrderlyIcon } from "@/components/icons/orderly";
 import { LogoutButton } from "@/components/logout-button";
 import { cn } from "@/lib/utils";
@@ -15,14 +23,29 @@ const navigation = [
     icon: Briefcase,
   },
   {
-    name: "IQL Analyzer",
-    href: "/protected/iql-analyzer",
-    icon: FileSearch,
-  },
-  {
     name: "Chat",
     href: "/protected/chat",
     icon: MessageSquare,
+  },
+  {
+    name: "Research",
+    href: "/protected/legal-research",
+    icon: BookOpen,
+  },
+  {
+    name: "Discovery",
+    href: "/protected/discovery",
+    icon: FolderOpen,
+  },
+  {
+    name: "Orders",
+    href: "/protected/court-orders",
+    icon: Scale,
+  },
+  {
+    name: "Workflows",
+    href: "/protected/workflows",
+    icon: Zap,
   },
 ];
 
