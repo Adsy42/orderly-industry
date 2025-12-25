@@ -7,11 +7,19 @@ import remarkGfm from "remark-gfm";
 import rehypeKatex from "rehype-katex";
 import remarkMath from "remark-math";
 import { FC, memo, useState } from "react";
-import { CheckIcon, CopyIcon } from "lucide-react";
+import { CheckIcon, CopyIcon, FileText, ExternalLink } from "lucide-react";
 import { SyntaxHighlighter } from "@/components/thread/syntax-highlighter";
 
 import { TooltipIconButton } from "@/components/thread/tooltip-icon-button";
 import { cn } from "@/lib/utils";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import Link from "next/link";
+import { useParams } from "next/navigation";
 
 import "katex/dist/katex.min.css";
 
@@ -57,6 +65,113 @@ const CodeHeader: FC<CodeHeaderProps> = ({ language, code }) => {
         {isCopied && <CheckIcon />}
       </TooltipIconButton>
     </div>
+  );
+};
+
+/**
+ * Citation link component for rendering cite: protocol links.
+ * Extracts the citation text, document ID, and chunk ID to create clickable links
+ * with preview tooltips showing the exact cited passage.
+ */
+interface InlineCitationProps {
+  href: string;
+  children: React.ReactNode;
+  matterId?: string;
+}
+
+const InlineCitation: FC<InlineCitationProps> = ({
+  href,
+  children,
+  matterId,
+}) => {
+  // Extract document ID and chunk ID from cite:document-id#chunk-id format
+  const citePart = href.replace("cite:", "");
+  const [documentId, chunkId] = citePart.split("#");
+  const citationText = String(children);
+
+  // State for chunk content preview
+  const [chunkContent, setChunkContent] = useState<string | null>(null);
+  const [isLoadingPreview, setIsLoadingPreview] = useState(false);
+
+  // Build the document link with chunk highlight parameter
+  const documentLink = matterId
+    ? `/protected/matters/${matterId}/documents/${documentId}${chunkId ? `?highlight=${chunkId}` : ""}`
+    : `/protected/documents/${documentId}${chunkId ? `?highlight=${chunkId}` : ""}`;
+
+  // Fetch chunk content for preview on hover
+  const fetchChunkPreview = async () => {
+    if (!chunkId || chunkContent !== null) return;
+
+    setIsLoadingPreview(true);
+    try {
+      const response = await fetch(
+        `/api/citations/${documentId}?chunkId=${chunkId}`,
+      );
+      if (response.ok) {
+        const data = await response.json();
+        // API returns 'preview' field with truncated chunk content
+        setChunkContent(data.preview || null);
+      }
+    } catch (err) {
+      console.error("Failed to fetch chunk preview:", err);
+      setChunkContent(null);
+    } finally {
+      setIsLoadingPreview(false);
+    }
+  };
+
+  // Preview text is already truncated by API
+  const previewText = chunkContent;
+
+  return (
+    <TooltipProvider>
+      <Tooltip delayDuration={300}>
+        <TooltipTrigger asChild>
+          <Link
+            href={documentLink}
+            onMouseEnter={fetchChunkPreview}
+            className={cn(
+              "inline-flex items-center gap-1",
+              "text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300",
+              "text-sm font-medium",
+              "underline decoration-dotted underline-offset-2 hover:decoration-solid",
+              "-mx-0.5 rounded px-0.5 transition-colors",
+              "hover:bg-blue-50 dark:hover:bg-blue-950/30",
+            )}
+          >
+            <FileText className="h-3 w-3 shrink-0" />
+            <span>{citationText}</span>
+          </Link>
+        </TooltipTrigger>
+        <TooltipContent
+          side="top"
+          align="start"
+          className="max-w-sm border bg-white p-3 shadow-lg dark:bg-gray-900"
+        >
+          {isLoadingPreview ? (
+            <div className="text-muted-foreground flex items-center gap-2 text-xs">
+              <div className="h-3 w-3 animate-spin rounded-full border-2 border-current border-t-transparent" />
+              <span>Loading preview...</span>
+            </div>
+          ) : previewText ? (
+            <div className="space-y-2">
+              <p className="text-xs leading-relaxed text-gray-700 italic dark:text-gray-300">
+                &ldquo;{previewText}&rdquo;
+              </p>
+              <div className="text-muted-foreground flex items-center gap-1 border-t pt-2 text-xs">
+                <ExternalLink className="h-3 w-3" />
+                <span>Click to view in document</span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 text-xs">
+              <ExternalLink className="h-3 w-3" />
+              <span>Click to view source document</span>
+            </div>
+          )}
+        </TooltipContent>
+      </Tooltip>
+    </TooltipProvider>
   );
 };
 
@@ -118,15 +233,7 @@ const defaultComponents: any = {
       {...props}
     />
   ),
-  a: ({ className, ...props }: { className?: string }) => (
-    <a
-      className={cn(
-        "text-primary font-medium underline underline-offset-4",
-        className,
-      )}
-      {...props}
-    />
-  ),
+  // Note: 'a' links are handled specially in MarkdownTextImpl to support cite: protocol
   blockquote: ({ className, ...props }: { className?: string }) => (
     <blockquote
       className={cn("border-l-2 pl-6 italic", className)}
@@ -244,12 +351,59 @@ const defaultComponents: any = {
 };
 
 const MarkdownTextImpl: FC<{ children: string }> = ({ children }) => {
+  // Get matter ID from URL params if available
+  const params = useParams();
+  const matterId = params?.matterId as string | undefined;
+
+  // Create components with citation link support
+  const componentsWithCitations = {
+    ...defaultComponents,
+    a: ({
+      href,
+      children: linkChildren,
+      className,
+      ...props
+    }: {
+      href?: string;
+      children?: React.ReactNode;
+      className?: string;
+    }) => {
+      // Check if this is a citation link (cite: protocol)
+      if (href?.startsWith("cite:")) {
+        return (
+          <InlineCitation
+            href={href}
+            matterId={matterId}
+          >
+            {linkChildren}
+          </InlineCitation>
+        );
+      }
+
+      // Regular link
+      return (
+        <a
+          href={href}
+          className={cn(
+            "text-primary font-medium underline underline-offset-4",
+            className,
+          )}
+          target={href?.startsWith("http") ? "_blank" : undefined}
+          rel={href?.startsWith("http") ? "noopener noreferrer" : undefined}
+          {...props}
+        >
+          {linkChildren}
+        </a>
+      );
+    },
+  };
+
   return (
     <div className="markdown-content">
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeKatex]}
-        components={defaultComponents}
+        components={componentsWithCitations}
       >
         {children}
       </ReactMarkdown>

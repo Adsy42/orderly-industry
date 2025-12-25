@@ -1,6 +1,6 @@
 import { validate } from "uuid";
 import { getApiKey } from "@/lib/api-key";
-import { Thread } from "@langchain/langgraph-sdk";
+import { Thread, Client } from "@langchain/langgraph-sdk";
 import { useQueryState } from "nuqs";
 import {
   createContext,
@@ -8,10 +8,12 @@ import {
   ReactNode,
   useCallback,
   useState,
+  useEffect,
   Dispatch,
   SetStateAction,
 } from "react";
-import { createClient } from "./client";
+import { createClient as createSupabaseClient } from "@/lib/supabase/client";
+import type { Session } from "@supabase/supabase-js";
 
 interface ThreadContextType {
   getThreads: () => Promise<Thread[]>;
@@ -38,10 +40,41 @@ export function ThreadProvider({ children }: { children: ReactNode }) {
   const [assistantId] = useQueryState("assistantId");
   const [threads, setThreads] = useState<Thread[]>([]);
   const [threadsLoading, setThreadsLoading] = useState(false);
+  const [session, setSession] = useState<Session | null>(null);
+
+  // Get session from Supabase client for JWT auth
+  useEffect(() => {
+    const supabase = createSupabaseClient();
+
+    // Get initial session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+
+    // Listen for auth changes
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   const getThreads = useCallback(async (): Promise<Thread[]> => {
     if (!apiUrl || !assistantId) return [];
-    const client = createClient(apiUrl, getApiKey() || undefined);
+
+    // Create client with auth - use Supabase JWT for local dev, or LangSmith API key for production
+    const headers: Record<string, string> = {};
+    if (session?.access_token) {
+      headers["Authorization"] = `Bearer ${session.access_token}`;
+    }
+
+    const client = new Client({
+      apiUrl,
+      apiKey: getApiKey() || undefined,
+      defaultHeaders: Object.keys(headers).length > 0 ? headers : undefined,
+    });
 
     const threads = await client.threads.search({
       metadata: {
@@ -51,7 +84,7 @@ export function ThreadProvider({ children }: { children: ReactNode }) {
     });
 
     return threads;
-  }, [apiUrl, assistantId]);
+  }, [apiUrl, assistantId, session?.access_token]);
 
   const value = {
     getThreads,

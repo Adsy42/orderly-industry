@@ -16,12 +16,6 @@ import {
   type RemoveUIMessage,
 } from "@langchain/langgraph-sdk/react-ui";
 import { useQueryState } from "nuqs";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { OrderlyIcon } from "@/components/icons/orderly";
-import { Label } from "@/components/ui/label";
-import { ArrowRight } from "lucide-react";
-import { PasswordInput } from "@/components/ui/password-input";
 import { getApiKey } from "@/lib/api-key";
 import { useThreads } from "./Thread";
 import { toast } from "sonner";
@@ -52,14 +46,19 @@ async function sleep(ms = 4000) {
 async function checkGraphStatus(
   apiUrl: string,
   apiKey: string | null,
+  authToken: string | null,
 ): Promise<boolean> {
   try {
+    const headers: Record<string, string> = {};
+    if (apiKey) {
+      headers["X-Api-Key"] = apiKey;
+    }
+    if (authToken) {
+      headers["Authorization"] = `Bearer ${authToken}`;
+    }
+
     const res = await fetch(`${apiUrl}/info`, {
-      ...(apiKey && {
-        headers: {
-          "X-Api-Key": apiKey,
-        },
-      }),
+      headers: Object.keys(headers).length > 0 ? headers : undefined,
     });
 
     return res.ok;
@@ -80,6 +79,20 @@ const StreamSession = ({
   apiUrl: string;
   assistantId: string;
 }) => {
+  // #region agent log
+  fetch("http://127.0.0.1:7243/ingest/b05c2d04-a0a4-474b-97d6-e4c51366f6f1", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      location: "Stream.tsx:StreamSession",
+      message: "H4: Props received by StreamSession",
+      data: { apiKey: apiKey ? "[REDACTED]" : null, apiUrl, assistantId },
+      timestamp: Date.now(),
+      sessionId: "debug-session",
+      hypothesisId: "H4",
+    }),
+  }).catch(() => {});
+  // #endregion
   const [threadId, setThreadId] = useQueryState("threadId");
   const { getThreads, setThreads } = useThreads();
   const [session, setSession] = useState<Session | null>(null);
@@ -112,6 +125,25 @@ const StreamSession = ({
     return Object.keys(h).length > 0 ? h : undefined;
   }, [session?.access_token]);
 
+  // #region agent log
+  fetch("http://127.0.0.1:7243/ingest/b05c2d04-a0a4-474b-97d6-e4c51366f6f1", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      location: "Stream.tsx:useTypedStream",
+      message: "H5: Params passed to useTypedStream hook",
+      data: {
+        apiUrl,
+        assistantId,
+        threadId,
+        hasDefaultHeaders: !!defaultHeaders,
+      },
+      timestamp: Date.now(),
+      sessionId: "debug-session",
+      hypothesisId: "H5",
+    }),
+  }).catch(() => {});
+  // #endregion
   const streamValue = useTypedStream({
     apiUrl,
     apiKey: apiKey || undefined, // Use || to treat empty string as undefined
@@ -136,7 +168,10 @@ const StreamSession = ({
   });
 
   useEffect(() => {
-    checkGraphStatus(apiUrl, apiKey).then((ok) => {
+    // Only check status once we have a session (or after a delay if no auth required)
+    if (!session?.access_token) return;
+
+    checkGraphStatus(apiUrl, apiKey, session.access_token).then((ok) => {
       if (!ok) {
         toast.error("Failed to connect to Orderly server", {
           description: () => (
@@ -151,7 +186,7 @@ const StreamSession = ({
         });
       }
     });
-  }, [apiKey, apiUrl]);
+  }, [apiKey, apiUrl, session?.access_token]);
 
   return (
     <StreamContext.Provider value={streamValue}>
@@ -160,145 +195,101 @@ const StreamSession = ({
   );
 };
 
-// Default values for the form
-const DEFAULT_API_URL = "http://localhost:2024";
-const DEFAULT_ASSISTANT_ID = "agent";
+// Default assistant ID when not configured - must match registered graph name in langgraph.json
+const DEFAULT_ASSISTANT_ID = "deep_research";
+
+/**
+ * Get the API URL for LangGraph requests.
+ * The LangGraph SDK requires a full URL (not relative path) for the URL constructor.
+ * In production, requests go through /api/* passthrough route.
+ */
+function getDefaultApiUrl(): string {
+  // If running in browser, construct full URL using origin
+  if (typeof window !== "undefined") {
+    return `${window.location.origin}/api`;
+  }
+  // SSR fallback - this shouldn't be used for actual requests
+  return "http://localhost:3000/api";
+}
 
 export const StreamProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
-  // Get environment variables
-  const envApiUrl: string | undefined = process.env.NEXT_PUBLIC_API_URL;
-  const envAssistantId: string | undefined =
-    process.env.NEXT_PUBLIC_ASSISTANT_ID;
+  // Get environment variables with direct access (Next.js inlines NEXT_PUBLIC_* at build time)
+  // Fall back to sensible defaults so users never see a config form
+  const envApiUrl: string =
+    process.env.NEXT_PUBLIC_API_URL || getDefaultApiUrl();
+  const envAssistantId: string =
+    process.env.NEXT_PUBLIC_ASSISTANT_ID || DEFAULT_ASSISTANT_ID;
+  // #region agent log
+  fetch("http://127.0.0.1:7243/ingest/b05c2d04-a0a4-474b-97d6-e4c51366f6f1", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      location: "Stream.tsx:StreamProvider",
+      message: "H1/H2: Checking env vars and defaults",
+      data: {
+        NEXT_PUBLIC_ASSISTANT_ID: process.env.NEXT_PUBLIC_ASSISTANT_ID,
+        DEFAULT_ASSISTANT_ID,
+        envAssistantId,
+        envApiUrl,
+      },
+      timestamp: Date.now(),
+      sessionId: "debug-session",
+      hypothesisId: "H1-H2",
+    }),
+  }).catch(() => {});
+  // #endregion
 
-  // Use URL params with env var fallbacks
-  const [apiUrl, setApiUrl] = useQueryState("apiUrl", {
-    defaultValue: envApiUrl || "",
+  // Use URL params with env var fallbacks (allows override via query string if needed)
+  const [apiUrl] = useQueryState("apiUrl", {
+    defaultValue: envApiUrl,
   });
-  const [assistantId, setAssistantId] = useQueryState("assistantId", {
-    defaultValue: envAssistantId || "",
+  const [assistantId] = useQueryState("assistantId", {
+    defaultValue: envAssistantId,
   });
 
-  // For API key, use localStorage with env var fallback
-  const [apiKey, _setApiKey] = useState(() => {
+  // For API key, use localStorage (only needed for direct LangSmith connections, not passthrough)
+  const [apiKey] = useState(() => {
     const storedKey = getApiKey();
     return storedKey || "";
   });
 
-  const setApiKey = (key: string) => {
-    window.localStorage.setItem("lg:chat:apiKey", key);
-    _setApiKey(key);
-  };
+  // Resolve API URL - ensure it's a full URL for the LangGraph SDK
+  const resolvedApiUrl = useMemo(() => {
+    const url = apiUrl || envApiUrl;
+    // If it's already a full URL, use it as-is
+    if (url.startsWith("http://") || url.startsWith("https://")) {
+      return url;
+    }
+    // Otherwise, make it a full URL using the current origin
+    if (typeof window !== "undefined") {
+      return `${window.location.origin}${url.startsWith("/") ? "" : "/"}${url}`;
+    }
+    return url;
+  }, [apiUrl, envApiUrl]);
 
-  // Determine final values to use, prioritizing URL params then env vars
-  const finalApiUrl = apiUrl || envApiUrl;
   const finalAssistantId = assistantId || envAssistantId;
-
-  // Show the form if we: don't have an API URL, or don't have an assistant ID
-  if (!finalApiUrl || !finalAssistantId) {
-    return (
-      <div className="flex min-h-screen w-full items-center justify-center p-4">
-        <div className="animate-in fade-in-0 zoom-in-95 bg-background flex max-w-3xl flex-col rounded-lg border shadow-lg">
-          <div className="mt-14 flex flex-col gap-2 border-b p-6">
-            <div className="flex flex-col items-start gap-2">
-              <OrderlyIcon className="text-primary h-7" />
-              <h1 className="text-xl font-semibold tracking-tight">Orderly</h1>
-            </div>
-            <p className="text-muted-foreground">
-              Welcome to Orderly! Before you get started, you need to enter the
-              URL of the deployment and the assistant / graph ID.
-            </p>
-          </div>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-
-              const form = e.target as HTMLFormElement;
-              const formData = new FormData(form);
-              const apiUrl = formData.get("apiUrl") as string;
-              const assistantId = formData.get("assistantId") as string;
-              const apiKey = formData.get("apiKey") as string;
-
-              setApiUrl(apiUrl);
-              setApiKey(apiKey);
-              setAssistantId(assistantId);
-
-              form.reset();
-            }}
-            className="bg-muted/50 flex flex-col gap-6 p-6"
-          >
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="apiUrl">
-                Deployment URL<span className="text-rose-500">*</span>
-              </Label>
-              <p className="text-muted-foreground text-sm">
-                This is the URL of your Orderly deployment. Can be a local or
-                production deployment.
-              </p>
-              <Input
-                id="apiUrl"
-                name="apiUrl"
-                className="bg-background"
-                defaultValue={apiUrl || DEFAULT_API_URL}
-                required
-              />
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="assistantId">
-                Assistant / Graph ID<span className="text-rose-500">*</span>
-              </Label>
-              <p className="text-muted-foreground text-sm">
-                This is the ID of the graph (can be the graph name), or
-                assistant to fetch threads from, and invoke when actions are
-                taken.
-              </p>
-              <Input
-                id="assistantId"
-                name="assistantId"
-                className="bg-background"
-                defaultValue={assistantId || DEFAULT_ASSISTANT_ID}
-                required
-              />
-            </div>
-
-            <div className="flex flex-col gap-2">
-              <Label htmlFor="apiKey">API Key</Label>
-              <p className="text-muted-foreground text-sm">
-                This is <strong>NOT</strong> required if using a local server.
-                This value is stored in your browser's local storage and is only
-                used to authenticate requests sent to your Orderly server.
-              </p>
-              <PasswordInput
-                id="apiKey"
-                name="apiKey"
-                defaultValue={apiKey ?? ""}
-                className="bg-background"
-                placeholder="Enter your API key..."
-              />
-            </div>
-
-            <div className="mt-2 flex justify-end">
-              <Button
-                type="submit"
-                size="lg"
-              >
-                Continue
-                <ArrowRight className="size-5" />
-              </Button>
-            </div>
-          </form>
-        </div>
-      </div>
-    );
-  }
+  // #region agent log
+  fetch("http://127.0.0.1:7243/ingest/b05c2d04-a0a4-474b-97d6-e4c51366f6f1", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      location: "Stream.tsx:StreamProvider:render",
+      message: "H3: Final values passed to StreamSession",
+      data: { assistantId, envAssistantId, finalAssistantId, resolvedApiUrl },
+      timestamp: Date.now(),
+      sessionId: "debug-session",
+      hypothesisId: "H3",
+    }),
+  }).catch(() => {});
+  // #endregion
 
   return (
     <StreamSession
       apiKey={apiKey || null}
-      apiUrl={apiUrl}
-      assistantId={assistantId}
+      apiUrl={resolvedApiUrl}
+      assistantId={finalAssistantId}
     >
       {children}
     </StreamSession>

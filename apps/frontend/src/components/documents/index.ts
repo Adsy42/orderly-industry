@@ -1,3 +1,4 @@
+// Existing document components
 export { DocumentCard } from "./document-card";
 export { DocumentList } from "./document-list";
 export { DocumentUpload } from "./document-upload";
@@ -7,6 +8,11 @@ export { IQLResults } from "./iql-results";
 export { IQLTemplateSelector } from "./iql-template-selector";
 export { SavedQueries } from "./saved-queries";
 
+// New components for legal grounding and citations
+export { CitationLink, CitationRenderer } from "./citation-link";
+export { SectionTree, SectionTreeSkeleton } from "./section-tree";
+
+// Type exports
 export type { DocumentCardProps } from "./document-card";
 export type { DocumentListProps } from "./document-list";
 export type { DocumentUploadProps } from "./document-upload";
