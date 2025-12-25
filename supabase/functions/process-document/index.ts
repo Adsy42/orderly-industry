@@ -47,7 +47,7 @@ async function updateDocumentStatus(
 
 /**
  * Extract text from DOCX using JSZip.
- * 
+ *
  * DOCX files are ZIP archives containing:
  * - word/document.xml: Main document content
  * - word/header*.xml: Headers
@@ -97,7 +97,7 @@ async function extractTextFromDocx(content: Uint8Array): Promise<string> {
     }
 
     const result = parts.join("\n\n");
-    
+
     if (!result.trim()) {
       throw new Error("No text content found in DOCX");
     }
@@ -123,11 +123,12 @@ function extractTextFromXml(xml: string): string {
 
   while ((paragraphMatch = paragraphRegex.exec(xml)) !== null) {
     const paragraphContent = paragraphMatch[1];
-    
+
     // Check if this is a table cell (don't add extra line breaks)
-    const isTableCell = xml.indexOf("<w:tc>") !== -1 && 
-                        paragraphMatch.index > xml.lastIndexOf("<w:tc>", paragraphMatch.index);
-    
+    const isTableCell =
+      xml.indexOf("<w:tc>") !== -1 &&
+      paragraphMatch.index > xml.lastIndexOf("<w:tc>", paragraphMatch.index);
+
     // Extract all text runs within the paragraph
     const textRegex = /<w:t[^>]*>([^<]*)<\/w:t>/g;
     let textMatch;
@@ -154,12 +155,14 @@ function extractTextFromXml(xml: string): string {
     .replace(/&quot;/g, '"')
     .replace(/&apos;/g, "'")
     .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)))
-    .replace(/&#x([0-9a-fA-F]+);/g, (_, code) => String.fromCharCode(parseInt(code, 16)));
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, code) =>
+      String.fromCharCode(parseInt(code, 16)),
+    );
 
   // Clean up excessive whitespace while preserving paragraph structure
   result = result
     .split("\n")
-    .map(line => line.trim())
+    .map((line) => line.trim())
     .join("\n")
     .replace(/\n{3,}/g, "\n\n");
 
@@ -168,7 +171,7 @@ function extractTextFromXml(xml: string): string {
 
 /**
  * Extract text from PDF.
- * 
+ *
  * For native text extraction in Deno Edge Functions, we use a simple
  * stream-based approach. For scanned PDFs, the text will be minimal
  * and OCR should be used (via DeepSeek Vision in the Python agent).
@@ -198,7 +201,7 @@ function extractTextFromPdf(content: Uint8Array): string {
   // ... additional PDF parsing can be added
 
   const result = extractedParts.join("\n\n").trim();
-  
+
   if (!result || result.length < 50) {
     // Return indicator that OCR may be needed
     return "[PDF requires OCR for text extraction - limited native text found]";
@@ -220,7 +223,10 @@ function extractTextFromTxt(content: Uint8Array): string {
 }
 
 // Extract text based on file type
-async function extractText(content: Uint8Array, fileType: string): Promise<string> {
+async function extractText(
+  content: Uint8Array,
+  fileType: string,
+): Promise<string> {
   switch (fileType.toLowerCase()) {
     case "pdf":
       return extractTextFromPdf(content);
@@ -310,22 +316,26 @@ async function generateEmbeddings(
   isaacusBaseUrl: string,
 ): Promise<number[][]> {
   const allEmbeddings: number[][] = [];
-  
+
   // Isaacus API base URL includes /v1, so endpoint is just /embeddings
   // Base URL should be https://api.isaacus.com/v1
-  const baseUrl = isaacusBaseUrl.endsWith('/v1') 
-    ? isaacusBaseUrl 
+  const baseUrl = isaacusBaseUrl.endsWith("/v1")
+    ? isaacusBaseUrl
     : `${isaacusBaseUrl}/v1`;
   const endpoint = `${baseUrl}/embeddings`;
   console.log(`Calling Isaacus API: ${endpoint} for ${texts.length} chunks`);
 
   // Process in smaller batches to avoid token limits
   const BATCH_SIZE = 5;
-  
-  for (let batchStart = 0; batchStart < texts.length; batchStart += BATCH_SIZE) {
+
+  for (
+    let batchStart = 0;
+    batchStart < texts.length;
+    batchStart += BATCH_SIZE
+  ) {
     const batch = texts.slice(batchStart, batchStart + BATCH_SIZE);
     let lastError: Error | null = null;
-    
+
     for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
       try {
         const response = await fetch(endpoint, {
@@ -350,22 +360,32 @@ async function generateEmbeddings(
         }
 
         const data = await response.json();
-        console.log(`Isaacus response keys: ${Object.keys(data).join(', ')}`);
+        console.log(`Isaacus response keys: ${Object.keys(data).join(", ")}`);
         // Isaacus returns { embeddings: [{ index: 0, embedding: [...] }, ...] }
         let batchEmbeddings: number[][];
         if (data.embeddings && Array.isArray(data.embeddings)) {
           // Check if embeddings are objects with 'embedding' field or direct arrays
-          if (data.embeddings[0] && typeof data.embeddings[0] === 'object' && 'embedding' in data.embeddings[0]) {
+          if (
+            data.embeddings[0] &&
+            typeof data.embeddings[0] === "object" &&
+            "embedding" in data.embeddings[0]
+          ) {
             // Format: { embeddings: [{ index: 0, embedding: [...] }, ...] }
-            batchEmbeddings = data.embeddings.map((item: { embedding: number[] }) => item.embedding);
+            batchEmbeddings = data.embeddings.map(
+              (item: { embedding: number[] }) => item.embedding,
+            );
           } else {
             // Format: { embeddings: [[...], [...], ...] }
             batchEmbeddings = data.embeddings;
           }
         } else if (data.data && Array.isArray(data.data)) {
-          batchEmbeddings = data.data.map((item: { embedding: number[] }) => item.embedding);
+          batchEmbeddings = data.data.map(
+            (item: { embedding: number[] }) => item.embedding,
+          );
         } else {
-          throw new Error(`Unexpected Isaacus response format: ${JSON.stringify(data).slice(0, 200)}`);
+          throw new Error(
+            `Unexpected Isaacus response format: ${JSON.stringify(data).slice(0, 200)}`,
+          );
         }
         allEmbeddings.push(...batchEmbeddings);
         break; // Success, move to next batch
@@ -425,7 +445,8 @@ async function storeEmbeddings(
 // CORS headers
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
@@ -489,7 +510,9 @@ Deno.serve(async (req) => {
         throw new Error("No text could be extracted from document");
       }
 
-      console.log(`Extracted ${extractedText.length} characters from ${document.filename}`);
+      console.log(
+        `Extracted ${extractedText.length} characters from ${document.filename}`,
+      );
 
       // Step 4: Update status to embedding and save extracted text
       await updateDocumentStatus(supabase, document.id, "embedding", {
@@ -544,7 +567,10 @@ Deno.serve(async (req) => {
 
       return new Response(
         JSON.stringify({ success: false, error: errorMessage }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
       );
     }
   } catch (error) {

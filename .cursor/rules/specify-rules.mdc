@@ -3,6 +3,8 @@
 Auto-generated from all feature plans. Last updated: 2025-12-23
 
 ## Active Technologies
+- TypeScript 5.x (Next.js), Python 3.11+ (Agent) + Next.js 15, LangGraph, Supabase JS, unstructured (Python), Isaacus SDK (005-document-ingestion-grounding)
+- Supabase PostgreSQL with pgvector extension (005-document-ingestion-grounding)
 
 - YAML (GitHub Actions), Bash (scripts) + LangGraph CLI, LangSmith Control Plane API, GitHub Actions (001-langsmith-preview-deploys)
 
@@ -22,6 +24,7 @@ tests/
 YAML (GitHub Actions), Bash (scripts): Follow standard conventions
 
 ## Recent Changes
+- 005-document-ingestion-grounding: Added TypeScript 5.x (Next.js), Python 3.11+ (Agent) + Next.js 15, LangGraph, Supabase JS, unstructured (Python), Isaacus SDK
 
 - 001-langsmith-preview-deploys: Added YAML (GitHub Actions), Bash (scripts) + LangGraph CLI, LangSmith Control Plane API, GitHub Actions
 

@@ -152,21 +152,21 @@ uv sync  # All dependencies are in pyproject.toml
 
 The following tools are implemented in `src/tools/`:
 
-| Tool                       | File                        | Description                         |
-| -------------------------- | --------------------------- | ----------------------------------- |
-| `isaacus_search`           | `isaacus_search.py`         | Semantic search + reranking         |
-| `isaacus_extract`          | `isaacus_extract.py`        | Extractive QA with citations        |
-| `isaacus_classify`         | `isaacus_classify.py`       | Legal clause classification         |
-| `get_document_text`        | `get_document_text.py`      | Retrieve document text from storage |
-| `list_matter_documents`    | `list_matter_documents.py`  | List documents in a matter          |
+| Tool                    | File                       | Description                         |
+| ----------------------- | -------------------------- | ----------------------------------- |
+| `isaacus_search`        | `isaacus_search.py`        | Semantic search + reranking         |
+| `isaacus_extract`       | `isaacus_extract.py`       | Extractive QA with citations        |
+| `isaacus_classify`      | `isaacus_classify.py`      | Legal clause classification         |
+| `get_document_text`     | `get_document_text.py`     | Retrieve document text from storage |
+| `list_matter_documents` | `list_matter_documents.py` | List documents in a matter          |
 
 ### Agent Services (Implemented)
 
-| Service              | File                     | Description                           |
-| -------------------- | ------------------------ | ------------------------------------- |
-| `IsaacusClient`      | `isaacus_client.py`      | Isaacus API wrapper                   |
-| `DocumentProcessor`  | `document_processor.py`  | PDF/DOCX/TXT text extraction with OCR |
-| `DeepSeekOCR`        | `deepseek_ocr.py`        | OCR for scanned documents             |
+| Service             | File                    | Description                           |
+| ------------------- | ----------------------- | ------------------------------------- |
+| `IsaacusClient`     | `isaacus_client.py`     | Isaacus API wrapper                   |
+| `DocumentProcessor` | `document_processor.py` | PDF/DOCX/TXT text extraction with OCR |
+| `DeepSeekOCR`       | `deepseek_ocr.py`       | OCR for scanned documents             |
 
 ### OCR Support (Optional)
 
@@ -354,4 +354,3 @@ cd apps/agent && uv run langgraph dev
 
 # Visit http://localhost:3000/protected/matters
 ```
-

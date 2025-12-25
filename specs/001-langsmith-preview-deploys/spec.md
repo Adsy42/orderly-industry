@@ -5,7 +5,7 @@
 **Status**: Draft  
 **Input**: User description: "Enhance CI/CD with staging environment for LangSmith similar to Vercel and Supabase preview deployments"
 
-## User Scenarios & Testing *(mandatory)*
+## User Scenarios & Testing _(mandatory)_
 
 ### User Story 1 - Preview Agent Deployment on Pull Request (Priority: P1)
 
@@ -80,7 +80,7 @@ As a developer testing a preview deployment, I want to easily connect my Vercel 
 - What happens when deployment times out? The workflow should retry once, then fail with a clear error message.
 - What happens when LangSmith API rate limits are hit? The workflow should implement exponential backoff and notify the developer.
 
-## Requirements *(mandatory)*
+## Requirements _(mandatory)_
 
 ### Functional Requirements
 
@@ -101,7 +101,7 @@ As a developer testing a preview deployment, I want to easily connect my Vercel 
 - **Production Deployment**: The main LangSmith deployment that serves production traffic, updated on merges to main.
 - **Deployment Revision**: An update to an existing deployment with new code, used for production updates.
 
-## Success Criteria *(mandatory)*
+## Success Criteria _(mandatory)_
 
 ### Measurable Outcomes
 

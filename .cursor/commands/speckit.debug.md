@@ -21,6 +21,7 @@ You **MUST** consider the user input before proceeding (if not empty).
 ## Purpose
 
 This command diagnoses and fixes issues discovered during pull request review or CI failures. It leverages MCP tools for:
+
 - **LangSmith**: Debug agent traces, runs, and experiment failures
 - **Supabase**: Check migrations, RLS policies, database logs, and security advisors
 - **Vercel**: Analyze build logs and deployment failures
@@ -40,13 +41,13 @@ This command diagnoses and fixes issues discovered during pull request review or
 
 ## Issue Types
 
-| Type | Description | MCP Tools Used |
-|------|-------------|----------------|
-| **CI Failure** | Build, lint, or test failures | Vercel, GitHub Actions logs |
-| **Agent Error** | LangGraph agent runtime issues | LangSmith runs, traces, logs |
-| **Database Issue** | Migration failures, RLS problems | Supabase logs, advisors, SQL |
-| **Review Feedback** | Requested changes from reviewers | Parse PR comments |
-| **Runtime Error** | Production/preview runtime issues | LangSmith traces, Supabase logs |
+| Type                | Description                       | MCP Tools Used                  |
+| ------------------- | --------------------------------- | ------------------------------- |
+| **CI Failure**      | Build, lint, or test failures     | Vercel, GitHub Actions logs     |
+| **Agent Error**     | LangGraph agent runtime issues    | LangSmith runs, traces, logs    |
+| **Database Issue**  | Migration failures, RLS problems  | Supabase logs, advisors, SQL    |
+| **Review Feedback** | Requested changes from reviewers  | Parse PR comments               |
+| **Runtime Error**   | Production/preview runtime issues | LangSmith traces, Supabase logs |
 
 ## Execution Steps
 
@@ -75,12 +76,12 @@ Parse PR data to detect:
 ```markdown
 ## PR Analysis
 
-| Check | Status | Details |
-|-------|--------|---------|
-| PR Number | #42 | Open |
-| CI Status | ❌ FAILED | 2 checks failed |
-| Review Status | 🔄 Changes Requested | 3 comments |
-| Merge Conflicts | ✅ None | Clean |
+| Check           | Status               | Details         |
+| --------------- | -------------------- | --------------- |
+| PR Number       | #42                  | Open            |
+| CI Status       | ❌ FAILED            | 2 checks failed |
+| Review Status   | 🔄 Changes Requested | 3 comments      |
+| Merge Conflicts | ✅ None              | Clean           |
 ```
 
 #### 2.3 Categorize Issues
@@ -90,12 +91,12 @@ Based on analysis, determine the primary issue type:
 ```markdown
 ## Issues Detected
 
-| Priority | Type | Source | Description |
-|----------|------|--------|-------------|
-| 1 | CI Failure | GitHub Actions | `ci-agent` workflow failed |
-| 2 | CI Failure | Vercel | Build failed with type errors |
-| 3 | Review Feedback | @reviewer | "Add error handling to upload" |
-| 4 | Review Feedback | @reviewer | "Missing RLS policy for delete" |
+| Priority | Type            | Source         | Description                     |
+| -------- | --------------- | -------------- | ------------------------------- |
+| 1        | CI Failure      | GitHub Actions | `ci-agent` workflow failed      |
+| 2        | CI Failure      | Vercel         | Build failed with type errors   |
+| 3        | Review Feedback | @reviewer      | "Add error handling to upload"  |
+| 4        | Review Feedback | @reviewer      | "Missing RLS policy for delete" |
 ```
 
 Present to user:
@@ -125,6 +126,7 @@ gh run view <run-id> --log-failed
 ```
 
 Parse the logs and identify:
+
 - Which job failed
 - Error message and stack trace
 - File and line number if available
@@ -145,10 +147,10 @@ apps/agent/src/tools/isaacus_extract.py:23:5: F401 'typing.Dict' imported but un
 
 ### Suggested Fixes
 
-| File | Line | Issue | Fix |
-|------|------|-------|-----|
-| `isaacus_search.py` | 45 | Line too long | Break line at logical point |
-| `isaacus_extract.py` | 23 | Unused import | Remove `Dict` from imports |
+| File                 | Line | Issue         | Fix                         |
+| -------------------- | ---- | ------------- | --------------------------- |
+| `isaacus_search.py`  | 45   | Line too long | Break line at logical point |
+| `isaacus_extract.py` | 23   | Unused import | Remove `Dict` from imports  |
 
 Would you like me to apply these fixes? (yes/no)
 ```
@@ -160,12 +162,14 @@ Use Vercel MCP tools to get deployment logs:
 **Step 1: Find the failed deployment**
 
 Use `mcp_vercel_list_deployments` with the project ID and team ID:
+
 - Filter by branch name
 - Look for `state: "ERROR"` or `state: "FAILED"`
 
 **Step 2: Get build logs**
 
 Use `mcp_vercel_get_deployment_build_logs` with the deployment ID:
+
 - Parse for TypeScript errors
 - Look for Next.js build errors
 - Identify missing dependencies
@@ -182,10 +186,11 @@ Use `mcp_vercel_get_deployment_build_logs` with the deployment ID:
 \`\`\`
 Type error: Property 'matterId' does not exist on type 'Params'.
 
-  > 12 | export default async function MatterPage({ params }: { params: { matterId: string } }) {
+> 12 | export default async function MatterPage({ params }: { params: { matterId: string } }) {
+
        |                                                                   ^
-  
-  Build failed because of Next.js type errors.
+
+Build failed because of Next.js type errors.
 \`\`\`
 
 ### Root Cause
@@ -199,11 +204,11 @@ Next.js 15 changed dynamic route params to be async. The `params` prop needs to 
 \`\`\`typescript
 // Before
 export default async function MatterPage({ params }: { params: { matterId: string } }) {
-  const matterId = params.matterId;
+const matterId = params.matterId;
 
 // After  
 export default async function MatterPage({ params }: { params: Promise<{ matterId: string }> }) {
-  const { matterId } = await params;
+const { matterId } = await params;
 \`\`\`
 
 Would you like me to apply this fix? (yes/no)
@@ -218,12 +223,14 @@ For agent-related failures, use LangSmith MCP tools extensively.
 **Find the project:**
 
 Use `mcp_langsmith_list_projects` to find the relevant project:
+
 - Filter by project name containing the feature name
 - Get the project ID for further queries
 
 **Fetch recent runs:**
 
 Use `mcp_langsmith_fetch_runs` with:
+
 - `project_name`: The identified project
 - `error`: `"true"` to filter for errored runs
 - `limit`: 10 to get recent failures
@@ -236,11 +243,11 @@ Use `mcp_langsmith_fetch_runs` with:
 
 ### Recent Failed Runs
 
-| Run ID | Name | Error | Latency |
-|--------|------|-------|---------|
-| `abc123` | `deep_research` | Tool execution failed | 12.5s |
-| `def456` | `deep_research` | Rate limit exceeded | 45.2s |
-| `ghi789` | `isaacus_search` | Connection timeout | 30.0s |
+| Run ID   | Name             | Error                 | Latency |
+| -------- | ---------------- | --------------------- | ------- |
+| `abc123` | `deep_research`  | Tool execution failed | 12.5s   |
+| `def456` | `deep_research`  | Rate limit exceeded   | 45.2s   |
+| `ghi789` | `isaacus_search` | Connection timeout    | 30.0s   |
 ```
 
 #### 4.2 Analyze Specific Run
@@ -258,11 +265,11 @@ For the most recent failure, use `mcp_langsmith_fetch_runs` with `trace_id` to g
 
 \`\`\`
 orchestrator (success, 2.1s)
-  └─ planning (success, 1.5s)
-  └─ document_agent (error, 8.9s)
-       └─ isaacus_search (success, 3.2s)
-       └─ isaacus_extract (error, 5.7s)  ← FAILED HERE
-            Error: KeyError: 'document_id'
+└─ planning (success, 1.5s)
+└─ document_agent (error, 8.9s)
+└─ isaacus_search (success, 3.2s)
+└─ isaacus_extract (error, 5.7s) ← FAILED HERE
+Error: KeyError: 'document_id'
 \`\`\`
 
 #### Error Details
@@ -275,8 +282,8 @@ orchestrator (success, 2.1s)
 
 \`\`\`json
 {
-  "question": "What is the limitation period?",
-  "matter_id": "uuid-123"
+"question": "What is the limitation period?",
+"matter_id": "uuid-123"
 }
 \`\`\`
 
@@ -291,26 +298,28 @@ The agent called `isaacus_extract` with `matter_id` instead of `document_id`. Th
 1. **Update tool docstring** to clarify required parameters:
 
 \`\`\`python
+
 # apps/agent/src/tools/isaacus_extract.py
 
 @tool(parse_docstring=True)
 def isaacus_extract(document_id: str, question: str) -> dict:
-    """Extract precise answers from a document with citations.
-    
+"""Extract precise answers from a document with citations.
+
     Args:
         document_id: The UUID of the document to search (required, from documents table)
         question: The question to answer from the document content
-    
+
     Returns:
         Answer with document citation including page and section
     """
+
 \`\`\`
 
 2. **Add validation** to provide better error messages:
 
 \`\`\`python
 if not document_id:
-    return {"error": "document_id is required. Get document IDs from isaacus_search first."}
+return {"error": "document_id is required. Get document IDs from isaacus_search first."}
 \`\`\`
 
 Would you like me to apply these fixes? (yes/no)
@@ -331,12 +340,12 @@ Use `mcp_supabase_list_migrations` to verify migrations are applied:
 ```markdown
 ## Migration Status
 
-| Version | Name | Status |
-|---------|------|--------|
-| 20251223110000 | create_profiles | ✅ Applied |
-| 20251223120000 | create_matters | ✅ Applied |
-| 20251223120100 | create_documents | ❌ **FAILED** |
-| 20251223120200 | create_matter_participants | ⏳ Pending |
+| Version        | Name                       | Status        |
+| -------------- | -------------------------- | ------------- |
+| 20251223110000 | create_profiles            | ✅ Applied    |
+| 20251223120000 | create_matters             | ✅ Applied    |
+| 20251223120100 | create_documents           | ❌ **FAILED** |
+| 20251223120200 | create_matter_participants | ⏳ Pending    |
 ```
 
 #### 5.2 Check Database Logs
@@ -357,6 +366,7 @@ CONTEXT: SQL statement "CREATE TABLE matters (...)"
 ### Root Cause
 
 Migration `20251223120100_create_documents` failed because it references a table that either:
+
 1. Already exists from a previous run
 2. Has a naming conflict
 
@@ -366,7 +376,7 @@ Update migration to use `IF NOT EXISTS`:
 
 \`\`\`sql
 create table if not exists public.documents (
-  ...
+...
 );
 \`\`\`
 
@@ -385,17 +395,18 @@ Use `mcp_supabase_get_advisors` with `type: "security"`:
 ```markdown
 ## Security Advisors
 
-| Severity | Issue | Table | Remediation |
-|----------|-------|-------|-------------|
-| 🔴 High | No RLS policy | `documents` | [Add RLS](https://supabase.com/docs/...) |
-| 🟡 Medium | Missing index | `matters.created_by` | Add index for RLS performance |
-| 🟢 Low | No table comment | `matter_participants` | Add descriptive comment |
+| Severity  | Issue            | Table                 | Remediation                              |
+| --------- | ---------------- | --------------------- | ---------------------------------------- |
+| 🔴 High   | No RLS policy    | `documents`           | [Add RLS](https://supabase.com/docs/...) |
+| 🟡 Medium | Missing index    | `matters.created_by`  | Add index for RLS performance            |
+| 🟢 Low    | No table comment | `matter_participants` | Add descriptive comment                  |
 
 ### Critical: Missing RLS on `documents`
 
 The `documents` table has RLS enabled but no policies defined. This means **no one can access the table**.
 
 **Required policies:**
+
 1. `documents_select_policy` - Users can view documents in their matters
 2. `documents_insert_policy` - Users can upload to matters they participate in
 3. `documents_delete_policy` - Only matter owners/counsel can delete
@@ -407,16 +418,16 @@ The `documents` table has RLS enabled but no policies defined. This means **no o
 create policy "Users can view documents in their matters"
 on public.documents for select
 using (
-  exists (
-    select 1 from public.matter_participants mp
-    where mp.matter_id = documents.matter_id
-    and mp.user_id = (select auth.uid())
-  )
-  or exists (
-    select 1 from public.matters m
-    where m.id = documents.matter_id
-    and m.created_by = (select auth.uid())
-  )
+exists (
+select 1 from public.matter_participants mp
+where mp.matter_id = documents.matter_id
+and mp.user_id = (select auth.uid())
+)
+or exists (
+select 1 from public.matters m
+where m.id = documents.matter_id
+and m.created_by = (select auth.uid())
+)
 );
 \`\`\`
 
@@ -452,11 +463,11 @@ gh pr view --json reviews,comments --jq '.reviews[].body, .comments[].body'
 
 ### Changes Requested
 
-| Reviewer | Comment | Category | Priority |
-|----------|---------|----------|----------|
-| @alice | "Add error handling for failed uploads" | Code Quality | High |
-| @bob | "Missing test for matter deletion" | Testing | Medium |
-| @alice | "Typo in component prop name" | Bug Fix | Low |
+| Reviewer | Comment                                 | Category     | Priority |
+| -------- | --------------------------------------- | ------------ | -------- |
+| @alice   | "Add error handling for failed uploads" | Code Quality | High     |
+| @bob     | "Missing test for matter deletion"      | Testing      | Medium   |
+| @alice   | "Typo in component prop name"           | Bug Fix      | Low      |
 
 ### Actionable Items
 
@@ -481,23 +492,23 @@ For each feedback item, create a fix task:
 **Current code:**
 \`\`\`typescript
 const { upload } = useSupabaseUpload({
-  onComplete: (files) => {
-    refetchDocuments();
-  },
+onComplete: (files) => {
+refetchDocuments();
+},
 });
 \`\`\`
 
 **Fixed code:**
 \`\`\`typescript
 const { upload } = useSupabaseUpload({
-  onComplete: (files) => {
-    refetchDocuments();
-    toast.success(`${files.length} file(s) uploaded successfully`);
-  },
-  onError: (error) => {
-    console.error('Upload failed:', error);
-    toast.error(`Upload failed: ${error.message}`);
-  },
+onComplete: (files) => {
+refetchDocuments();
+toast.success(`${files.length} file(s) uploaded successfully`);
+},
+onError: (error) => {
+console.error('Upload failed:', error);
+toast.error(`Upload failed: ${error.message}`);
+},
 });
 \`\`\`
 
@@ -511,6 +522,7 @@ After user confirms fixes:
 #### 7.1 Execute Code Changes
 
 Apply all confirmed fixes using the edit tools:
+
 - Update Python files for agent fixes
 - Update TypeScript files for frontend fixes
 - Create new migrations for database fixes
@@ -554,6 +566,7 @@ After fixes are verified:
 ## Ready to Commit Fixes
 
 **Files Changed:**
+
 - M `apps/frontend/src/components/documents/document-upload.tsx`
 - M `apps/agent/src/tools/isaacus_extract.py`
 - A `supabase/migrations/20251224_add_documents_rls.sql`
@@ -594,20 +607,20 @@ After fixes are pushed:
 ```markdown
 ## ✅ Fixes Applied and Pushed
 
-| Item | Status |
-|------|--------|
-| Fixes Applied | 4 of 4 |
-| Lint Check | ✅ Pass |
-| Build Check | ✅ Pass |
-| Commit Created | `a1b2c3d` |
-| Pushed to Remote | ✅ |
+| Item             | Status    |
+| ---------------- | --------- |
+| Fixes Applied    | 4 of 4    |
+| Lint Check       | ✅ Pass   |
+| Build Check      | ✅ Pass   |
+| Commit Created   | `a1b2c3d` |
+| Pushed to Remote | ✅        |
 
 ### CI Status
 
-| Workflow | Status |
-|----------|--------|
-| ci-frontend | 🔄 Running |
-| ci-agent | 🔄 Running |
+| Workflow      | Status     |
+| ------------- | ---------- |
+| ci-frontend   | 🔄 Running |
+| ci-agent      | 🔄 Running |
 | preview-agent | 🔄 Running |
 
 ### Next Steps
@@ -643,34 +656,35 @@ Examples:
 
 ### LangSmith Tools
 
-| Tool | Use Case |
-|------|----------|
-| `mcp_langsmith_list_projects` | Find agent projects |
-| `mcp_langsmith_fetch_runs` | Get run traces and errors |
-| `mcp_langsmith_get_logs` | Access runtime logs |
-| `mcp_langsmith_list_experiments` | Check experiment results |
+| Tool                             | Use Case                  |
+| -------------------------------- | ------------------------- |
+| `mcp_langsmith_list_projects`    | Find agent projects       |
+| `mcp_langsmith_fetch_runs`       | Get run traces and errors |
+| `mcp_langsmith_get_logs`         | Access runtime logs       |
+| `mcp_langsmith_list_experiments` | Check experiment results  |
 
 ### Supabase Tools
 
-| Tool | Use Case |
-|------|----------|
-| `mcp_supabase_list_migrations` | Check migration status |
-| `mcp_supabase_get_logs` | Get postgres/auth/edge-function logs |
-| `mcp_supabase_get_advisors` | Security and performance checks |
-| `mcp_supabase_execute_sql` | Test queries and RLS |
-| `mcp_supabase_list_tables` | Verify schema |
+| Tool                           | Use Case                             |
+| ------------------------------ | ------------------------------------ |
+| `mcp_supabase_list_migrations` | Check migration status               |
+| `mcp_supabase_get_logs`        | Get postgres/auth/edge-function logs |
+| `mcp_supabase_get_advisors`    | Security and performance checks      |
+| `mcp_supabase_execute_sql`     | Test queries and RLS                 |
+| `mcp_supabase_list_tables`     | Verify schema                        |
 
 ### Vercel Tools
 
-| Tool | Use Case |
-|------|----------|
-| `mcp_vercel_list_deployments` | Find deployments |
-| `mcp_vercel_get_deployment` | Get deployment details |
+| Tool                                   | Use Case               |
+| -------------------------------------- | ---------------------- |
+| `mcp_vercel_list_deployments`          | Find deployments       |
+| `mcp_vercel_get_deployment`            | Get deployment details |
 | `mcp_vercel_get_deployment_build_logs` | Analyze build failures |
 
 ## Error Recovery
 
 If debugging is interrupted:
+
 1. Partial fixes are not committed
 2. User can re-run `/speckit.debug` to continue
 3. All analysis results are displayed again
@@ -685,5 +699,4 @@ Spec → Plan → Tasks → Implement → Commit → PR → Debug → Commit →
                                             └──────────┘
                                             (iterate until pass)
 ```
-
 

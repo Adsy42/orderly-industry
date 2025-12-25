@@ -126,19 +126,19 @@ Or manually work through `tasks.md`, marking each complete.
 
 ### Available Commands
 
-| Command                  | Purpose                                      |
-| ------------------------ | -------------------------------------------- |
-| `/speckit.specify`       | Create feature specification                 |
-| `/speckit.clarify`       | Clarify ambiguous requirements               |
-| `/speckit.plan`          | Create technical plan                        |
-| `/speckit.tasks`         | Break plan into tasks                        |
-| `/speckit.implement`     | Execute implementation                       |
-| `/speckit.commit`        | Verify quality gates & create commits        |
-| `/speckit.pr`            | Create pull request with spec references     |
-| `/speckit.debug`         | Debug CI failures & review feedback          |
-| `/speckit.analyze`       | Check consistency                            |
-| `/speckit.checklist`     | Generate quality checklist                   |
-| `/speckit.taskstoissues` | Export tasks to GitHub Issues                |
+| Command                  | Purpose                                  |
+| ------------------------ | ---------------------------------------- |
+| `/speckit.specify`       | Create feature specification             |
+| `/speckit.clarify`       | Clarify ambiguous requirements           |
+| `/speckit.plan`          | Create technical plan                    |
+| `/speckit.tasks`         | Break plan into tasks                    |
+| `/speckit.implement`     | Execute implementation                   |
+| `/speckit.commit`        | Verify quality gates & create commits    |
+| `/speckit.pr`            | Create pull request with spec references |
+| `/speckit.debug`         | Debug CI failures & review feedback      |
+| `/speckit.analyze`       | Check consistency                        |
+| `/speckit.checklist`     | Generate quality checklist               |
+| `/speckit.taskstoissues` | Export tasks to GitHub Issues            |
 
 ## Git Workflow
 
@@ -250,6 +250,7 @@ After committing your changes with `/speckit.commit`, use `/speckit.pr` to creat
 ```
 
 The command will:
+
 1. Verify your branch is pushed to remote
 2. Check for preview deployments (Vercel, LangSmith, Supabase)
 3. Generate a PR description from your spec files
@@ -278,6 +279,7 @@ If CI fails or reviewers request changes, use `/speckit.debug`:
 ```
 
 The command uses MCP tools to diagnose issues:
+
 - **LangSmith**: Analyze agent traces, run errors, and experiments
 - **Supabase**: Check migrations, RLS policies, logs, and security advisors
 - **Vercel**: Parse build logs and deployment failures

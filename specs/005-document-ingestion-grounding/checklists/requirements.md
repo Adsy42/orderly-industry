@@ -1,7 +1,7 @@
-# Specification Quality Checklist: LangSmith Preview Deployments
+# Specification Quality Checklist: Document Ingestion & Legal Grounding
 
-**Purpose**: Validate specification completeness and quality before proceeding to planning  
-**Created**: 2025-12-23  
+**Purpose**: Validate specification completeness and quality before proceeding to planning
+**Created**: 2024-12-25
 **Feature**: [spec.md](../spec.md)
 
 ## Content Quality
@@ -31,7 +31,10 @@
 
 ## Notes
 
-- All checklist items pass validation
-- Spec references LangSmith Control Plane API as a service boundary, which is acceptable
-- Ready to proceed to `/speckit.plan`
+- Specification is ready for `/speckit.plan`
+- Key technical decisions to resolve in planning:
+  1. How to call Python `unstructured` library from Next.js (subprocess vs microservice vs Edge Function calling Python agent)
+  2. Database migration strategy for adding new tables and updating embedding dimension
+  3. How to handle in-flight documents during migration
+- Consider creating a separate research document for Isaacus API dimension verification
 

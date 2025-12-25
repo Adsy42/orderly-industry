@@ -106,7 +106,7 @@ As a frequent user, I want to save custom IQL queries for reuse, so that I can e
 
 - **FR-001**: System MUST accept legal documents in common formats for analysis (PDF, DOCX, TXT)
 - **FR-002**: System MUST parse and validate IQL query syntax before execution
-- **FR-003**: System MUST execute IQL queries against uploaded documents via Isaacus API
+- **FR-003**: System MUST execute IQL queries against uploaded documents via Isaacus API using existing `extracted_text` field (on-demand, no preprocessing)
 - **FR-004**: System MUST display query results with confidence scores ranging from 0 to 1
 - **FR-005**: System MUST support all IQL logical operators: AND, OR, NOT, >, <, +
 - **FR-006**: System MUST provide access to pre-built IQL templates as defined by Isaacus
@@ -137,11 +137,18 @@ As a frequent user, I want to save custom IQL queries for reuse, so that I can e
 - **SC-006**: System gracefully handles API errors, displaying meaningful messages within 5 seconds of failure detection
 - **SC-007**: Users can export analysis results in at least one structured format within 3 clicks from results view
 
+## Clarifications
+
+### Session 2024-12-24
+
+- Q: Should IQL queries use existing extracted text on-demand, or require additional preprocessing at upload time? → A: On-demand query execution using existing `extracted_text` field. No changes to upload flow. IQL queries execute at query time via Isaacus API, separate from embedding generation.
+
 ## Assumptions
 
 - Isaacus API access and credentials will be available for integration
 - The Isaacus models (kanon-universal-classifier or kanon-universal-classifier-mini) will be used for query execution
-- Document text extraction from PDF/DOCX will be handled prior to Isaacus analysis
+- Document text extraction from PDF/DOCX will be handled prior to Isaacus analysis (existing process)
+- IQL queries execute on-demand using existing `extracted_text` field (no preprocessing required)
 - Users have basic understanding of legal document structure (clauses, provisions, etc.)
 - The system will integrate with the existing authentication mechanism (Supabase Auth)
 - Query history and saved queries will be scoped to authenticated users
