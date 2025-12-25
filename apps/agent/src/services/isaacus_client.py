@@ -137,37 +137,73 @@ class IsaacusClient:
 
     async def extract(
         self,
-        question: str,
-        context: str,
-        model: str = "legal-extract-v1",
+        query: str,
+        texts: list[str],
+        model: str = "kanon-answer-extractor",
+        top_k: int | None = 1,
+        ignore_inextractability: bool = True,
     ) -> dict[str, Any]:
-        """Extract answer from context using extractive QA.
+        """Extract answer from texts using Isaacus extractive QA.
 
         Finds the exact text span that answers the question,
-        with citation information for legal documents.
+        with start/end character positions for precise highlighting.
+
+        API docs: https://docs.isaacus.com/capabilities/extractive-question-answering
 
         Args:
-            question: Question to answer
-            context: Text context to search for answer
-            model: Extraction model to use
+            query: Question to answer
+            texts: List of text passages to search for answers
+            model: "kanon-answer-extractor" or "kanon-answer-extractor-mini"
+            top_k: Number of top answers to return per text (default: 1)
+            ignore_inextractability: If True, return answers even if model
+                thinks text doesn't contain answer (useful after reranking)
 
         Returns:
-            Dict with 'answer', 'confidence', 'start', 'end' keys
+            Dict with 'answer', 'score', 'start', 'end', 'text_index' keys,
+            or empty dict if no answer found
         """
+        # Build kwargs for SDK call
+        kwargs: dict[str, Any] = {
+            "model": model,
+            "query": query,
+            "texts": texts,
+            "ignore_inextractability": ignore_inextractability,
+        }
+        if top_k is not None:
+            kwargs["top_k"] = top_k
+
         # Run sync SDK call in thread to avoid blocking event loop
         response = await asyncio.to_thread(
-            self._client.extractions.qa.create,
-            question=question,
-            context=context,
-            model=model,
+            lambda: self._client.extractions.qa.create(**kwargs)
         )
 
-        # Convert SDK response to dict
+        # Parse response structure
+        # Response has: extractions[{index, inextractability_score, answers[{text, start, end, score}]}]
+        if not response.extractions:
+            return {}
+
+        # Find best answer across all texts
+        best_answer = None
+        best_score = -1.0
+        best_text_index = 0
+
+        for extraction in response.extractions:
+            if extraction.answers:
+                for answer in extraction.answers:
+                    if answer.score > best_score:
+                        best_score = answer.score
+                        best_answer = answer
+                        best_text_index = extraction.index
+
+        if not best_answer:
+            return {}
+
         return {
-            "answer": response.answer,
-            "confidence": getattr(response, "confidence", 1.0),
-            "start": getattr(response, "start", 0),
-            "end": getattr(response, "end", len(context)),
+            "answer": best_answer.text,
+            "score": best_answer.score,
+            "start": best_answer.start,
+            "end": best_answer.end,
+            "text_index": best_text_index,
         }
 
     async def classify(

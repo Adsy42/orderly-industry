@@ -404,4 +404,3 @@ function hashContent(content: string): string {
   }
   return hash.toString(16);
 }
-

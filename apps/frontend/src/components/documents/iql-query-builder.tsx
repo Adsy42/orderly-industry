@@ -18,6 +18,7 @@ import {
 } from "@/lib/iql-validation";
 import { cn } from "@/lib/utils";
 import type { IQLQueryResult, IQLValidationResult } from "@/types/iql";
+import { IQLHelp } from "./iql-help";
 
 interface IQLQueryBuilderProps {
   documentId: string;
@@ -30,6 +31,7 @@ interface IQLQueryBuilderProps {
     description?: string,
   ) => Promise<void>;
   className?: string;
+  hideInlineHelp?: boolean; // If true, don't show inline help (help shown at page level)
 }
 
 export function IQLQueryBuilder({
@@ -39,6 +41,7 @@ export function IQLQueryBuilder({
   onQueryChange,
   onSaveQuery,
   className,
+  hideInlineHelp = false,
 }: IQLQueryBuilderProps) {
   const [query, setQuery] = React.useState(initialQuery);
 
@@ -59,7 +62,6 @@ export function IQLQueryBuilder({
   const [validationWarnings, setValidationWarnings] = React.useState<string[]>(
     [],
   );
-  const [showHelp, setShowHelp] = React.useState(false);
   const [isSaving, setIsSaving] = React.useState(false);
   const [saveName, setSaveName] = React.useState("");
   const [saveDescription, setSaveDescription] = React.useState("");
@@ -90,14 +92,14 @@ export function IQLQueryBuilder({
 
   const handleExecute = async () => {
     if (!query.trim()) {
-      setError("Please enter an IQL query");
+      setError("Please enter a search query");
       return;
     }
 
     // Check validation
     const validation = validateIQLQuery(query);
     if (!validation.valid) {
-      setError(validation.error || "Invalid IQL query syntax");
+      setError(validation.error || "Invalid query syntax");
       return;
     }
 
@@ -184,10 +186,8 @@ export function IQLQueryBuilder({
       const results: IQLQueryResult = await response.json();
       onResults?.(results);
     } catch (err) {
-      console.error("IQL query error:", err);
-      setError(
-        err instanceof Error ? err.message : "Failed to execute IQL query",
-      );
+      console.error("Clause Finder error:", err);
+      setError(err instanceof Error ? err.message : "Failed to execute search");
     } finally {
       setIsExecuting(false);
     }
@@ -202,19 +202,51 @@ export function IQLQueryBuilder({
 
   return (
     <div className={cn("space-y-4", className)}>
+      {/* Instructions Info Box - Always visible */}
+      <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+        <div className="flex gap-3">
+          <Info className="mt-0.5 h-5 w-5 shrink-0 text-blue-600" />
+          <div className="flex-1 space-y-1">
+            <h4 className="text-sm font-medium text-blue-900">
+              How to find clauses
+            </h4>
+            <p className="text-sm text-blue-800">
+              Use built-in clause types like{" "}
+              <code className="rounded bg-blue-100 px-1.5 py-0.5 font-mono text-xs">
+                {"{IS confidentiality clause}"}
+              </code>{" "}
+              or combine searches with{" "}
+              <code className="rounded bg-blue-100 px-1.5 py-0.5 font-mono text-xs">
+                AND
+              </code>
+              ,{" "}
+              <code className="rounded bg-blue-100 px-1.5 py-0.5 font-mono text-xs">
+                OR
+              </code>
+              , and{" "}
+              <code className="rounded bg-blue-100 px-1.5 py-0.5 font-mono text-xs">
+                NOT
+              </code>
+              . Use the buttons above for example queries, operator guide, and
+              understanding results.
+            </p>
+          </div>
+        </div>
+      </div>
+
       <div className="space-y-2">
         <label
-          htmlFor="iql-query"
+          htmlFor="clause-finder-query"
           className="text-sm font-medium"
         >
-          IQL Query
+          Clause Finder
         </label>
         <Textarea
-          id="iql-query"
+          id="clause-finder-query"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Enter IQL query, e.g., {IS confidentiality clause}"
+          placeholder="Find clauses, e.g., {IS confidentiality clause}"
           className={cn(
             "font-mono text-sm",
             validationError && "border-destructive",
@@ -224,7 +256,7 @@ export function IQLQueryBuilder({
         />
         {validationError && (
           <p
-            id="iql-query-error"
+            id="clause-finder-error"
             className="text-destructive flex items-center gap-1 text-xs"
             role="alert"
             aria-live="polite"
@@ -254,122 +286,17 @@ export function IQLQueryBuilder({
         )}
         <div className="flex items-center justify-between">
           <p
-            id="iql-query-help"
+            id="clause-finder-hint"
             className="text-muted-foreground text-xs"
           >
-            Press Cmd/Ctrl + Enter to execute
+            Press Cmd/Ctrl + Enter to search
           </p>
-          <button
-            type="button"
-            onClick={() => setShowHelp(!showHelp)}
-            className="text-muted-foreground hover:text-foreground flex items-center gap-1 text-xs"
-          >
-            <HelpCircle className="h-3 w-3" />
-            {showHelp ? "Hide" : "Show"} IQL help
-          </button>
         </div>
-        {showHelp && (
-          <div className="bg-muted space-y-3 rounded-md border p-3 text-xs">
-            {/* Templates vs Custom Statements */}
-            <div className="border-primary/20 bg-primary/5 rounded border p-2">
-              <p className="mb-1 flex items-center gap-1 font-medium">
-                <Info className="h-3 w-3" />
-                Templates vs Custom Statements
-              </p>
-              <p className="text-muted-foreground">
-                <strong>Templates</strong> (recommended) are hand-optimized for
-                accuracy:
-                <code className="bg-background mx-1 rounded px-1">
-                  {"{IS confidentiality clause}"}
-                </code>
-              </p>
-              <p className="text-muted-foreground mt-1">
-                <strong>Custom descriptions</strong> work best with the
-                &quot;clause that&quot; template:
-                <code className="bg-background mx-1 rounded px-1">
-                  {'{IS clause that "your description"}'}
-                </code>
-              </p>
-              <p className="text-muted-foreground mt-1">
-                <strong>Standalone queries</strong> without brackets work for
-                simple cases:
-                <code className="bg-background mx-1 rounded px-1">
-                  confidentiality clause
-                </code>
-              </p>
-            </div>
-
-            <div>
-              <p className="mb-1 font-medium">Logical Operators:</p>
-              <ul className="text-muted-foreground list-inside list-disc space-y-0.5">
-                <li>
-                  <code>AND</code> - Both conditions must match (returns minimum
-                  score)
-                </li>
-                <li>
-                  <code>OR</code> - Either condition matches (returns maximum
-                  score)
-                </li>
-                <li>
-                  <code>NOT</code> - Inverts the score (1 - original score)
-                </li>
-              </ul>
-            </div>
-            <div>
-              <p className="mb-1 font-medium">Comparison Operators:</p>
-              <ul className="text-muted-foreground list-inside list-disc space-y-0.5">
-                <li>
-                  <code>&gt;</code> - Returns first score if greater, else 0
-                </li>
-                <li>
-                  <code>&lt;</code> - Returns second score if greater, else 0
-                </li>
-                <li>
-                  <code>+</code> - Averages all statement scores
-                </li>
-              </ul>
-            </div>
-            <div>
-              <p className="mb-1 font-medium">Examples:</p>
-              <ul className="text-muted-foreground list-inside list-disc space-y-0.5">
-                <li>
-                  <code>
-                    {"{IS confidentiality clause} AND {IS unilateral clause}"}
-                  </code>
-                </li>
-                <li>
-                  <code>
-                    {
-                      '{IS clause obligating "Customer"} > {IS clause obligating "Supplier"}'
-                    }
-                  </code>
-                </li>
-                <li>
-                  <code>
-                    {"{IS termination clause} OR {IS remedial clause}"}
-                  </code>
-                </li>
-                <li>
-                  <code>{"NOT {IS liability limitation clause}"}</code>
-                </li>
-              </ul>
-            </div>
-            <div>
-              <p className="mb-1 font-medium">Operator Precedence:</p>
-              <p className="text-muted-foreground">
-                <code>()</code> → <code>+</code> → <code>&gt;</code>,{" "}
-                <code>&lt;</code> → <code>NOT</code> → <code>AND</code> →{" "}
-                <code>OR</code>
-              </p>
-            </div>
-            <div>
-              <p className="mb-1 font-medium">Chained Comparisons:</p>
-              <p className="text-muted-foreground">
-                <code>A &gt; B &gt; C</code> is interpreted as{" "}
-                <code>(A &gt; B) AND (B &gt; C)</code>
-              </p>
-            </div>
-          </div>
+        {!hideInlineHelp && (
+          <IQLHelp
+            onInsertQuery={(insertedQuery) => setQuery(insertedQuery)}
+            className="mt-2"
+          />
         )}
       </div>
 
@@ -388,17 +315,17 @@ export function IQLQueryBuilder({
           onClick={handleExecute}
           disabled={isExecuting || !query.trim() || !!validationError}
           className="flex-1"
-          aria-label="Execute IQL query"
+          aria-label="Find matching clauses"
         >
           {isExecuting ? (
             <>
               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Executing...
+              Searching...
             </>
           ) : (
             <>
               <Search className="mr-2 h-4 w-4" />
-              Execute Query
+              Find Clauses
             </>
           )}
         </Button>
@@ -413,11 +340,11 @@ export function IQLQueryBuilder({
         )}
       </div>
 
-      {/* Save Query Dialog */}
+      {/* Save Search Dialog */}
       {showSaveDialog && onSaveQuery && (
         <div className="bg-muted space-y-3 rounded-md border p-4">
           <div className="flex items-center justify-between">
-            <h4 className="text-sm font-medium">Save Query</h4>
+            <h4 className="text-sm font-medium">Save Search</h4>
             <button
               type="button"
               onClick={() => {
@@ -435,7 +362,7 @@ export function IQLQueryBuilder({
               type="text"
               value={saveName}
               onChange={(e) => setSaveName(e.target.value)}
-              placeholder="Query name"
+              placeholder="Search name"
               className="border-input w-full rounded-md border bg-transparent px-3 py-2 text-sm"
             />
             <textarea

@@ -6,11 +6,13 @@
  * - Reranking (search result quality improvement)
  * - Extractive QA (precise answer extraction)
  * - Universal Classification (IQL queries)
+ * - LLM-based clause extraction (via OpenAI)
  *
  * @see https://docs.isaacus.com
  */
 
 import { Isaacus, APIError } from "isaacus";
+import OpenAI from "openai";
 
 // Get configuration from environment
 const ISAACUS_API_KEY = process.env.ISAACUS_API_KEY;
@@ -325,22 +327,26 @@ export async function classifyIQL(
 /**
  * Extract answer from context using Extractive QA.
  *
- * @param question - Question to answer
- * @param context - Text context to search for answer
+ * @param query - Question/query to answer
+ * @param texts - Array of text passages to search for answers (or single string)
  * @param model - Extraction model to use
- * @returns Extracted answer with confidence score
+ * @returns Extracted answer with confidence score and positions
  */
 export async function extract(
-  question: string,
-  context: string,
+  query: string,
+  texts: string | string[],
   model: ExtractModel = "kanon-answer-extractor",
 ): Promise<ExtractionResult> {
   if (!ISAACUS_API_KEY) {
     throw new Error("ISAACUS_API_KEY environment variable is not configured");
   }
 
+  // Normalize to array
+  const textsArray = Array.isArray(texts) ? texts : [texts];
+
   try {
     // Direct HTTP call since TypeScript SDK v0.1.3 doesn't support extractions yet
+    // Use correct field names: "query" and "texts" (array)
     const response = await fetch("https://api.isaacus.com/v1/extractions/qa", {
       method: "POST",
       headers: {
@@ -349,8 +355,10 @@ export async function extract(
       },
       body: JSON.stringify({
         model,
-        question,
-        context,
+        query,
+        texts: textsArray,
+        ignore_inextractability: true,
+        top_k: 1,
       }),
     });
 
@@ -363,11 +371,41 @@ export async function extract(
 
     const data = await response.json();
 
+    // Parse response structure:
+    // { extractions: [{ index, inextractability_score, answers: [{ text, start, end, score }] }] }
+    if (!data.extractions || data.extractions.length === 0) {
+      return { answer: "", confidence: 0 };
+    }
+
+    // Find best answer across all texts
+    let bestAnswer: {
+      text: string;
+      start: number;
+      end: number;
+      score: number;
+    } | null = null;
+    let bestScore = -1;
+
+    for (const extraction of data.extractions) {
+      if (extraction.answers && extraction.answers.length > 0) {
+        for (const answer of extraction.answers) {
+          if (answer.score > bestScore) {
+            bestScore = answer.score;
+            bestAnswer = answer;
+          }
+        }
+      }
+    }
+
+    if (!bestAnswer) {
+      return { answer: "", confidence: 0 };
+    }
+
     return {
-      answer: data.answer || "",
-      confidence: data.confidence || 1.0,
-      start: data.start,
-      end: data.end,
+      answer: bestAnswer.text,
+      confidence: bestAnswer.score,
+      start: bestAnswer.start,
+      end: bestAnswer.end,
     };
   } catch (error) {
     if (error instanceof Error) {
@@ -375,6 +413,147 @@ export async function extract(
     }
     throw new Error(`Isaacus extraction error: ${error}`);
   }
+}
+
+/**
+ * Result from LLM-based clause extraction.
+ */
+export interface LLMExtractionResult {
+  clause: string;
+  confidence: number;
+  reasoning?: string;
+}
+
+/**
+ * Get or create an OpenAI client instance.
+ * Throws if API key is not configured.
+ */
+function getOpenAIClient(): OpenAI {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) {
+    throw new Error("OPENAI_API_KEY environment variable is not configured");
+  }
+  return new OpenAI({ apiKey });
+}
+
+/**
+ * Extract the precise clause/sentence from a chunk using LLM.
+ *
+ * Uses GPT-4o-mini to identify and extract the most relevant sentence
+ * that matches the IQL query from a larger text chunk.
+ *
+ * @param chunkText - The text chunk from IQL classification
+ * @param queryType - What we're looking for (e.g., "termination clause", "confidentiality provision")
+ * @returns Extracted clause with confidence and optional reasoning
+ */
+export async function extractClauseWithLLM(
+  chunkText: string,
+  queryType: string,
+): Promise<LLMExtractionResult> {
+  const openai = getOpenAIClient();
+
+  const systemPrompt = `You are a legal document analyst. Your task is to extract the single most relevant sentence or clause from the provided text that best represents the requested legal provision.
+
+Rules:
+1. Return ONLY the exact text from the document - do not paraphrase or summarize
+2. Extract the complete sentence or clause, not a fragment
+3. If multiple sentences are relevant, choose the most specific one
+4. If no relevant clause is found, return an empty string
+5. Respond in JSON format with "clause" and "confidence" (0-1) fields`;
+
+  const userPrompt = `Extract the ${queryType} from this text:
+
+"""
+${chunkText}
+"""
+
+Return JSON: { "clause": "exact extracted text", "confidence": 0.0-1.0 }`;
+
+  try {
+    const response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0,
+      max_tokens: 1000,
+    });
+
+    const content = response.choices[0]?.message?.content;
+    if (!content) {
+      return { clause: "", confidence: 0 };
+    }
+
+    const parsed = JSON.parse(content);
+    return {
+      clause: parsed.clause || "",
+      confidence: parsed.confidence || 0,
+      reasoning: parsed.reasoning,
+    };
+  } catch (error) {
+    console.error("[LLM Extraction] Error:", error);
+    return { clause: "", confidence: 0 };
+  }
+}
+
+/**
+ * Find the position of extracted clause within the original chunk.
+ *
+ * @param chunk - Original text chunk
+ * @param clause - Extracted clause text
+ * @param chunkStart - Start position of chunk in the full document
+ * @returns Start and end positions relative to the full document
+ */
+export function findClausePosition(
+  chunk: string,
+  clause: string,
+  chunkStart: number,
+): { start: number; end: number } | null {
+  if (!clause) return null;
+
+  // Direct match
+  const index = chunk.indexOf(clause);
+  if (index !== -1) {
+    return {
+      start: chunkStart + index,
+      end: chunkStart + index + clause.length,
+    };
+  }
+
+  // Fuzzy match - try to find the clause with minor variations
+  // (handles cases where LLM might have slight whitespace differences)
+  const normalizedClause = clause.trim().replace(/\s+/g, " ");
+  const normalizedChunk = chunk.replace(/\s+/g, " ");
+  const normalizedIndex = normalizedChunk.indexOf(normalizedClause);
+
+  if (normalizedIndex !== -1) {
+    // Find the actual position in the original chunk
+    // by counting characters up to the normalized position
+    let originalPos = 0;
+    let normalizedPos = 0;
+    while (normalizedPos < normalizedIndex && originalPos < chunk.length) {
+      if (/\s/.test(chunk[originalPos])) {
+        // Skip multiple whitespace in original
+        while (
+          originalPos < chunk.length - 1 &&
+          /\s/.test(chunk[originalPos + 1])
+        ) {
+          originalPos++;
+        }
+      }
+      originalPos++;
+      normalizedPos++;
+    }
+
+    return {
+      start: chunkStart + originalPos,
+      end: chunkStart + originalPos + clause.length,
+    };
+  }
+
+  return null;
 }
 
 /**
