@@ -28,11 +28,25 @@ export function LoginForm({
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const supabase = createClient();
     setIsLoading(true);
     setError(null);
 
     try {
+      // Create client with error handling
+      let supabase;
+      try {
+        supabase = createClient();
+      } catch (clientError) {
+        const errorMessage =
+          clientError instanceof Error
+            ? clientError.message
+            : "Failed to initialize Supabase client. Please check your environment configuration.";
+        console.error("[Login] Supabase client creation failed:", clientError);
+        setError(errorMessage);
+        setIsLoading(false);
+        return;
+      }
+
       const { error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -41,7 +55,12 @@ export function LoginForm({
       // Redirect to matters after successful login
       router.push("/protected/matters");
     } catch (error: unknown) {
-      setError(error instanceof Error ? error.message : "An error occurred");
+      const errorMessage =
+        error instanceof Error
+          ? error.message
+          : "An error occurred during login";
+      console.error("[Login] Authentication error:", error);
+      setError(errorMessage);
     } finally {
       setIsLoading(false);
     }

@@ -135,24 +135,16 @@ export function useDocuments({
 
         if (createError) throw new Error(createError.message);
 
-        // Trigger Edge Function for processing (text extraction + embeddings)
+        // Trigger document processing via new API route
         try {
-          const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-          const {
-            data: { session },
-          } = await supabase.auth.getSession();
-
-          if (supabaseUrl && data && session?.access_token) {
-            fetch(`${supabaseUrl}/functions/v1/process-document`, {
+          if (data) {
+            fetch("/api/documents/process", {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
-                Authorization: `Bearer ${session.access_token}`,
               },
               body: JSON.stringify({
-                type: "INSERT",
-                table: "documents",
-                record: { ...data, processing_status: "pending" },
+                document_id: data.id,
               }),
             }).catch((err) => {
               console.warn("Document processing request failed:", err);

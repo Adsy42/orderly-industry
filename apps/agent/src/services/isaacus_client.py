@@ -89,7 +89,7 @@ class IsaacusClient:
         self,
         query: str,
         documents: list[str],
-        model: str = "legal-rerank-v1",
+        model: str = "kanon-universal-classifier",
         top_k: int | None = None,
     ) -> list[dict[str, Any]]:
         """Rerank documents by relevance to query.
@@ -100,20 +100,19 @@ class IsaacusClient:
         Args:
             query: Search query
             documents: List of document texts to rerank
-            model: Reranking model to use
-            top_k: Optional limit on returned results
+            model: Reranking model to use (kanon-universal-classifier or kanon-reranker)
+            top_k: Optional limit on returned results (applied after API call)
 
         Returns:
             List of dicts with 'index', 'score', and 'text' keys,
             sorted by relevance score descending
         """
+        # SDK only supports query, texts, and model - no top_k
         kwargs: dict[str, Any] = {
             "query": query,
-            "documents": documents,
+            "texts": documents,
             "model": model,
         }
-        if top_k is not None:
-            kwargs["top_k"] = top_k
 
         # Run sync SDK call in thread to avoid blocking event loop
         response = await asyncio.to_thread(
@@ -121,7 +120,7 @@ class IsaacusClient:
         )
 
         # Convert SDK response objects to dicts
-        return [
+        results = [
             {
                 "index": item.index,
                 "score": item.score,
@@ -129,6 +128,12 @@ class IsaacusClient:
             }
             for item in response.results
         ]
+
+        # Apply top_k filtering client-side if specified
+        if top_k is not None and len(results) > top_k:
+            results = results[:top_k]
+
+        return results
 
     async def extract(
         self,

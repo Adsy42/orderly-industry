@@ -1,5 +1,6 @@
 """Agent tools for document analysis using Isaacus Legal AI."""
 
+from .extract_structure import extract_document_structure
 from .get_document_text import (
     GetDocumentTextInput,
     GetDocumentTextOutput,
@@ -53,6 +54,8 @@ __all__ = [
     "IsaacusIQLInput",
     "IsaacusIQLOutput",
     "IQLMatch",
+    # Structure extraction tool
+    "extract_document_structure",
 ]
 
 # List of all document tools for registration with the agent
@@ -64,4 +67,5 @@ ISAACUS_TOOLS = [
     isaacus_search,  # Semantic search (requires embeddings)
     isaacus_extract,  # Extractive QA
     isaacus_iql,  # IQL - clause finding/classification (uses kanon-universal-classifier)
+    extract_document_structure,  # Hierarchical structure extraction with citations
 ]

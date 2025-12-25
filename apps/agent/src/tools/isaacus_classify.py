@@ -170,14 +170,14 @@ async def _isaacus_classify_async(
 
             # Get chunks for these documents
             chunks_response = await http_client.get(
-                f"{supabase_url}/rest/v1/document_embeddings",
+                f"{supabase_url}/rest/v1/document_chunks",
                 headers={
                     "apikey": supabase_key,
                     "Authorization": f"Bearer {supabase_key}",
                 },
                 params={
                     "document_id": f"in.({','.join(doc_ids)})",
-                    "select": "id,document_id,chunk_index,chunk_text",
+                    "select": "id,document_id,chunk_index,content",
                     "limit": "100",
                 },
             )
@@ -203,7 +203,9 @@ async def _isaacus_classify_async(
 
         # Process chunks to classify
         for chunk in chunks:
-            chunk_text = chunk["chunk_text"]
+            chunk_text = chunk.get("content") or chunk.get(
+                "chunk_text", ""
+            )  # Support both old and new schema
             document_id = chunk["document_id"]
             filename = doc_map.get(document_id, "Unknown")
 

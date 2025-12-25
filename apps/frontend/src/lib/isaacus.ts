@@ -108,29 +108,45 @@ export async function embed(
   task: EmbeddingTask = "retrieval/document",
   model: EmbeddingModel = "kanon-2-embedder",
 ): Promise<number[][]> {
-  const client = getIsaacusClient();
+  if (!ISAACUS_API_KEY) {
+    throw new Error("ISAACUS_API_KEY environment variable is not configured");
+  }
 
   try {
-    // TypeScript SDK may not have proper types for embeddings
-    // Using type assertion as the runtime API should work
-    const response = await (client as any).embeddings.create({
-      model,
-      texts,
-      task,
+    // Direct HTTP call since TypeScript SDK v0.1.3 doesn't support embeddings yet
+    // SDK only has classifications.universal.create
+    const response = await fetch("https://api.isaacus.com/v1/embeddings", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${ISAACUS_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model,
+        texts,
+        task,
+      }),
     });
 
-    if (!response.embeddings || response.embeddings.length === 0) {
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(
+        `Isaacus API error (${response.status}): ${errorData.message || response.statusText}`,
+      );
+    }
+
+    const data = await response.json();
+
+    if (!data.embeddings || data.embeddings.length === 0) {
       throw new Error("No embeddings returned from Isaacus API");
     }
 
-    return response.embeddings.map((e: any) => e.embedding);
+    return data.embeddings.map((e: any) => e.embedding);
   } catch (error) {
-    if (error instanceof APIError) {
-      throw new Error(
-        `Isaacus embedding error (${error.status}): ${error.message}`,
-      );
+    if (error instanceof Error) {
+      throw error;
     }
-    throw error;
+    throw new Error(`Isaacus embedding error: ${error}`);
   }
 }
 
@@ -149,17 +165,34 @@ export async function rerank(
   topK?: number,
   model: ClassificationModel = "kanon-universal-classifier",
 ): Promise<RerankResult[]> {
-  const client = getIsaacusClient();
+  if (!ISAACUS_API_KEY) {
+    throw new Error("ISAACUS_API_KEY environment variable is not configured");
+  }
 
   try {
-    // TypeScript SDK may not have proper types for rerankings
-    const response = await (client as any).rerankings.create({
-      model,
-      query,
-      texts,
+    // Direct HTTP call since TypeScript SDK v0.1.3 doesn't support reranking yet
+    const response = await fetch("https://api.isaacus.com/v1/rerankings", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${ISAACUS_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model,
+        query,
+        texts,
+      }),
     });
 
-    const results = response.results.map((r: any) => ({
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(
+        `Isaacus API error (${response.status}): ${errorData.message || response.statusText}`,
+      );
+    }
+
+    const data = await response.json();
+    const results = data.results.map((r: any) => ({
       index: r.index,
       score: r.score,
       text: texts[r.index],
@@ -167,12 +200,10 @@ export async function rerank(
 
     return topK ? results.slice(0, topK) : results;
   } catch (error) {
-    if (error instanceof APIError) {
-      throw new Error(
-        `Isaacus reranking error (${error.status}): ${error.message}`,
-      );
+    if (error instanceof Error) {
+      throw error;
     }
-    throw error;
+    throw new Error(`Isaacus reranking error: ${error}`);
   }
 }
 
@@ -304,29 +335,45 @@ export async function extract(
   context: string,
   model: ExtractModel = "kanon-answer-extractor",
 ): Promise<ExtractionResult> {
-  const client = getIsaacusClient();
+  if (!ISAACUS_API_KEY) {
+    throw new Error("ISAACUS_API_KEY environment variable is not configured");
+  }
 
   try {
-    // TypeScript SDK may not have proper types for extractions
-    const response = await (client as any).extractions.qa.create({
-      model,
-      question,
-      context,
+    // Direct HTTP call since TypeScript SDK v0.1.3 doesn't support extractions yet
+    const response = await fetch("https://api.isaacus.com/v1/extractions/qa", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${ISAACUS_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model,
+        question,
+        context,
+      }),
     });
 
-    return {
-      answer: response.answer || "",
-      confidence: (response as any).confidence || 1.0,
-      start: (response as any).start,
-      end: (response as any).end,
-    };
-  } catch (error) {
-    if (error instanceof APIError) {
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
       throw new Error(
-        `Isaacus extraction error (${error.status}): ${error.message}`,
+        `Isaacus API error (${response.status}): ${errorData.message || response.statusText}`,
       );
     }
-    throw error;
+
+    const data = await response.json();
+
+    return {
+      answer: data.answer || "",
+      confidence: data.confidence || 1.0,
+      start: data.start,
+      end: data.end,
+    };
+  } catch (error) {
+    if (error instanceof Error) {
+      throw error;
+    }
+    throw new Error(`Isaacus extraction error: ${error}`);
   }
 }
 
