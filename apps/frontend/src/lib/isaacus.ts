@@ -525,10 +525,11 @@ function getOpenAIClient(): OpenAI {
  * Extract the precise clause/sentence from a chunk using LLM with sentence-based selection.
  *
  * Uses GPT-4o-mini to identify which sentence(s) from a pre-segmented list
- * best match the IQL query. This avoids the "returns everything" problem
- * by forcing the LLM to choose from discrete sentence options.
+ * are MOST RELEVANT to the IQL query. The key insight is that IQL has already
+ * determined this chunk is semantically relevant - the LLM's job is to find
+ * the BEST sentences, not to re-validate relevance.
  *
- * @param chunkText - The text chunk from IQL classification
+ * @param chunkText - The text chunk from IQL classification (already semantically matched)
  * @param queryType - What we're looking for (e.g., "termination clause", "confidentiality provision")
  * @param chunkStartOffset - Start position of the chunk in the original document (for position mapping)
  * @returns Extracted clause with confidence, reasoning, and positions
@@ -547,7 +548,7 @@ export async function extractClauseWithLLM(
     return { clause: "", confidence: 0 };
   }
 
-  // If only one sentence, return it directly
+  // If only one sentence, return it directly with high confidence
   if (sentences.length === 1) {
     return {
       clause: sentences[0].text,
@@ -557,28 +558,46 @@ export async function extractClauseWithLLM(
     };
   }
 
+  // For 2-3 sentences, just return all of them - they're likely all relevant
+  if (sentences.length <= 3) {
+    const combinedText = sentences.map((s) => s.text).join(" ");
+    return {
+      clause: combinedText,
+      confidence: 0.7,
+      reasoning: "Short chunk - all sentences included",
+      startIndex: chunkStartOffset + sentences[0].start,
+      endIndex: chunkStartOffset + sentences[sentences.length - 1].end,
+    };
+  }
+
   // Present numbered sentences to the LLM
   const numberedSentences = sentences
     .map((s, i) => `[${i}] ${s.text}`)
     .join("\n\n");
 
-  const systemPrompt = `You are a legal document analyst. You will be given numbered sentences from a legal document. Your task is to identify which sentence(s) best represent the requested legal provision.
+  // Key change: The prompt now emphasizes that this chunk was ALREADY identified
+  // as semantically relevant by IQL - the LLM should find the CORE sentences,
+  // not re-validate relevance
+  const systemPrompt = `You are a legal document analyst specializing in clause extraction.
+
+IMPORTANT CONTEXT: The text you're analyzing has ALREADY been identified by a semantic search system as containing or relating to the requested provision. Your job is NOT to determine if it's relevant - it already is. Your job is to find the 1-3 sentences that form the CORE of this provision.
 
 Rules:
-1. Return the index number(s) of the most relevant sentence(s)
-2. If one sentence clearly contains the provision, return just that index
-3. If the provision spans multiple consecutive sentences, return all their indices
-4. If no sentence is relevant, return an empty array
+1. ALWAYS return at least one sentence index - the chunk is already known to be relevant
+2. Pick the 1-3 most central sentences that capture the key legal meaning
+3. If the provision clearly spans multiple consecutive sentences, include them all
+4. Prefer fewer, more focused sentences over many sentences
 5. Respond in JSON format`;
 
-  const userPrompt = `Which sentence(s) contain the ${queryType}?
+  const userPrompt = `This text chunk has been semantically matched to "${queryType}". 
+Find the 1-3 sentences that are MOST CENTRAL to this concept.
 
 Sentences:
 ${numberedSentences}
 
 Return JSON: { "indices": [0], "confidence": 0.0-1.0, "reasoning": "brief explanation" }
-- indices: array of sentence indices (0-based) that contain the clause
-- confidence: how confident you are (0.0-1.0)
+- indices: array of sentence indices (0-based) - MUST include at least one
+- confidence: how well these sentences capture the ${queryType} (0.0-1.0)
 - reasoning: brief explanation of your choice`;
 
   try {
@@ -595,15 +614,24 @@ Return JSON: { "indices": [0], "confidence": 0.0-1.0, "reasoning": "brief explan
 
     const content = response.choices[0]?.message?.content;
     if (!content) {
-      return { clause: "", confidence: 0 };
+      // Fallback: return first 2 sentences as reasonable default
+      return createFallbackResult(sentences, chunkStartOffset, "LLM returned no content");
     }
 
     const parsed = JSON.parse(content);
     const indices: number[] = parsed.indices || [];
-    const confidence: number = parsed.confidence || 0;
+    const confidence: number = parsed.confidence || 0.5; // Default to 0.5, not 0
 
+    // If LLM returned empty indices despite our instructions, use fallback
     if (indices.length === 0) {
-      return { clause: "", confidence: 0, reasoning: parsed.reasoning };
+      console.log(
+        `[LLM Extraction] LLM returned empty indices despite instructions, using fallback. Reasoning: ${parsed.reasoning}`,
+      );
+      return createFallbackResult(
+        sentences,
+        chunkStartOffset,
+        parsed.reasoning || "LLM found no match, using first sentences",
+      );
     }
 
     // Filter valid indices and sort them
@@ -612,7 +640,11 @@ Return JSON: { "indices": [0], "confidence": 0.0-1.0, "reasoning": "brief explan
       .sort((a: number, b: number) => a - b);
 
     if (validIndices.length === 0) {
-      return { clause: "", confidence: 0, reasoning: parsed.reasoning };
+      return createFallbackResult(
+        sentences,
+        chunkStartOffset,
+        "All indices were invalid",
+      );
     }
 
     // Combine selected sentences
@@ -625,15 +657,40 @@ Return JSON: { "indices": [0], "confidence": 0.0-1.0, "reasoning": "brief explan
 
     return {
       clause: combinedText,
-      confidence,
+      confidence: Math.max(confidence, 0.4), // Ensure minimum confidence since chunk is known-relevant
       reasoning: parsed.reasoning,
       startIndex: chunkStartOffset + firstSentence.start,
       endIndex: chunkStartOffset + lastSentence.end,
     };
   } catch (error) {
     console.error("[LLM Extraction] Error:", error);
-    return { clause: "", confidence: 0 };
+    return createFallbackResult(sentences, chunkStartOffset, `Error: ${error}`);
   }
+}
+
+/**
+ * Create a fallback extraction result when LLM fails or returns empty.
+ * Uses a heuristic to pick the first 1-2 sentences which are often
+ * the most relevant in legal text.
+ */
+function createFallbackResult(
+  sentences: SentenceWithPosition[],
+  chunkStartOffset: number,
+  reasoning: string,
+): LLMExtractionResult {
+  // Take up to first 2 sentences as a reasonable fallback
+  const count = Math.min(2, sentences.length);
+  const selectedSentences = sentences.slice(0, count);
+  const combinedText = selectedSentences.map((s) => s.text).join(" ");
+
+  return {
+    clause: combinedText,
+    confidence: 0.4, // Lower confidence for fallback, but still above threshold
+    reasoning: `Fallback: ${reasoning}`,
+    startIndex: chunkStartOffset + selectedSentences[0].start,
+    endIndex:
+      chunkStartOffset + selectedSentences[selectedSentences.length - 1].end,
+  };
 }
 
 /**
