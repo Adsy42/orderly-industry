@@ -52,12 +52,10 @@ function HighlightedText({
   text,
   start,
   end,
-  markRef,
 }: {
   text: string;
   start: number;
   end: number;
-  markRef?: React.RefObject<HTMLElement | null>;
 }) {
   // Validate positions
   const safeStart = Math.max(0, Math.min(start, text.length));
@@ -74,73 +72,11 @@ function HighlightedText({
   return (
     <>
       {before}
-      <mark 
-        ref={markRef as React.RefObject<HTMLElement>}
-        className="rounded bg-yellow-200 px-0.5 text-gray-900 ring-2 ring-yellow-300"
-      >
+      <mark className="rounded bg-yellow-200 px-0.5 text-gray-900 ring-2 ring-yellow-300">
         {highlighted}
       </mark>
       {after}
     </>
-  );
-}
-
-/**
- * Shows a focused excerpt around the highlighted text with context.
- * Used for IQL results to avoid rendering the entire document.
- */
-function FocusedHighlight({
-  text,
-  start,
-  end,
-  contextChars = 500,
-  markRef,
-}: {
-  text: string;
-  start: number;
-  end: number;
-  contextChars?: number;
-  markRef?: React.RefObject<HTMLDivElement | null>;
-}) {
-  // Validate positions
-  const safeStart = Math.max(0, Math.min(start, text.length));
-  const safeEnd = Math.max(safeStart, Math.min(end, text.length));
-
-  if (safeStart >= safeEnd) {
-    return <p className="text-muted-foreground text-sm">No highlight found</p>;
-  }
-
-  // Calculate context window
-  const excerptStart = Math.max(0, safeStart - contextChars);
-  const excerptEnd = Math.min(text.length, safeEnd + contextChars);
-  
-  // Adjust positions relative to excerpt
-  const relativeStart = safeStart - excerptStart;
-  const relativeEnd = safeEnd - excerptStart;
-  
-  const excerpt = text.slice(excerptStart, excerptEnd);
-  const showStartEllipsis = excerptStart > 0;
-  const showEndEllipsis = excerptEnd < text.length;
-
-  const before = excerpt.slice(0, relativeStart);
-  const highlighted = excerpt.slice(relativeStart, relativeEnd);
-  const after = excerpt.slice(relativeEnd);
-
-  return (
-    <div ref={markRef}>
-      <p className="text-sm leading-relaxed whitespace-pre-wrap text-gray-700">
-        {showStartEllipsis && <span className="text-gray-400">... </span>}
-        {before}
-        <mark className="rounded bg-yellow-200 px-0.5 text-gray-900 ring-2 ring-yellow-300">
-          {highlighted}
-        </mark>
-        {after}
-        {showEndEllipsis && <span className="text-gray-400"> ...</span>}
-      </p>
-      <p className="text-muted-foreground mt-2 text-xs">
-        Position: {start.toLocaleString()}-{end.toLocaleString()} of {text.length.toLocaleString()} chars
-      </p>
-    </div>
   );
 }
 
@@ -222,46 +158,18 @@ export default function DocumentViewerPage() {
     }
   }, [documentId]);
 
-  // Scroll to highlighted area after load - simplified and more reliable
+  // Scroll to highlighted chunk after load
   React.useEffect(() => {
-    const hasHighlighting =
-      highlightChunkId || (highlightStart !== null && highlightEnd !== null);
-
-    if (!hasHighlighting || isLoading) {
-      return;
-    }
-
-    // Use a simple, reliable scroll approach
-    const scrollToHighlight = () => {
-      const element = highlightRef.current;
-      if (!element) return false;
-
-      // Check if element has dimensions (is rendered)
-      const rect = element.getBoundingClientRect();
-      if (rect.width === 0 || rect.height === 0) return false;
-
-      element.scrollIntoView({
-        behavior: "smooth",
-        block: "center",
-        inline: "nearest",
-      });
-      return true;
-    };
-
-    // Try immediately after a short delay for initial render
-    const initialTimeout = setTimeout(() => {
-      if (!scrollToHighlight()) {
-        // If failed, try again with RAF + delay
-        requestAnimationFrame(() => {
-          setTimeout(() => {
-            scrollToHighlight();
-          }, 100);
+    if (highlightRef.current && highlightChunkId) {
+      // Small delay to ensure DOM is ready
+      setTimeout(() => {
+        highlightRef.current?.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
         });
-      }
-    }, 200);
-
-    return () => clearTimeout(initialTimeout);
-  }, [highlightChunkId, highlightStart, highlightEnd, isLoading]);
+      }, 100);
+    }
+  }, [chunks, highlightChunkId]);
 
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`;
@@ -382,7 +290,7 @@ export default function DocumentViewerPage() {
 
         {/* 
           IQL case: Document-level positions but no chunk ID 
-          Show focused excerpt around the highlighted text
+          Show full text with precise highlighting
         */}
         {!highlightChunkId &&
         highlightStart !== null &&
@@ -393,14 +301,15 @@ export default function DocumentViewerPage() {
             className="rounded-lg border bg-white p-6 ring-2 ring-yellow-300"
           >
             <div className="mb-2 text-xs text-gray-500">
-              Highlighted match in document
+              Showing highlighted match in full document text
             </div>
-            <FocusedHighlight
-              text={document.extracted_text}
-              start={highlightStart}
-              end={highlightEnd}
-              contextChars={500}
-            />
+            <p className="text-sm leading-relaxed whitespace-pre-wrap text-gray-700">
+              <HighlightedText
+                text={document.extracted_text}
+                start={highlightStart}
+                end={highlightEnd}
+              />
+            </p>
           </div>
         ) : chunks.length > 0 ? (
           <div className="space-y-3">
