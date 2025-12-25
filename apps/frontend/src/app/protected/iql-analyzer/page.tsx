@@ -10,6 +10,9 @@ import {
 import { IQLResults } from "@/components/documents/iql-results";
 import { IQLTemplateSelector } from "@/components/documents/iql-template-selector";
 import { SavedQueries } from "@/components/documents/saved-queries";
+import { IQLExampleQueries } from "@/components/documents/iql-example-queries";
+import { IQLOperatorsGuide } from "@/components/documents/iql-operators-guide";
+import { IQLUnderstandingResults } from "@/components/documents/iql-understanding-results";
 import { useSavedIQLQueries } from "@/hooks/use-saved-iql-queries";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -54,6 +57,9 @@ export default function IQLAnalyzerPage() {
   const [currentQuery, setCurrentQuery] = React.useState("");
   const [showTemplates, setShowTemplates] = React.useState(false);
   const [showSavedQueries, setShowSavedQueries] = React.useState(false);
+  const [showExamples, setShowExamples] = React.useState(false);
+  const [showOperators, setShowOperators] = React.useState(false);
+  const [showUnderstanding, setShowUnderstanding] = React.useState(false);
 
   // Saved queries hook
   const { createQuery } = useSavedIQLQueries({
@@ -141,13 +147,11 @@ export default function IQLAnalyzerPage() {
       <div className="mb-8">
         <div className="mb-2 flex items-center gap-3">
           <FileSearch className="text-primary h-8 w-8" />
-          <h1 className="text-3xl font-bold tracking-tight">
-            IQL Query Analyzer
-          </h1>
+          <h1 className="text-3xl font-bold tracking-tight">Clause Finder</h1>
         </div>
         <p className="text-muted-foreground">
-          Analyze legal documents using Isaacus Query Language. Select a matter
-          and document to begin.
+          Find and analyze clauses in your legal documents. Select a matter and
+          document to begin.
         </p>
       </div>
 
@@ -277,35 +281,87 @@ export default function IQLAnalyzerPage() {
               <p className="text-sm text-amber-700 dark:text-amber-300">
                 This document is still being processed (
                 {selectedDocument.processing_status}). Please wait for text
-                extraction to complete before running IQL queries.
+                extraction to complete before searching for clauses.
               </p>
             </div>
           </div>
         </Card>
       )}
 
-      {/* IQL Query Interface - Only show when document is selected and ready */}
+      {/* Clause Finder Interface - Only show when document is selected and ready */}
       {selectedDocumentId && isDocumentReady && (
         <>
-          {/* Template and Saved Queries Toggles */}
-          <div className="mb-4 flex gap-2">
+          {/* Help Section Toggles */}
+          <div className="mb-4 flex flex-wrap gap-2">
             <Button
               variant="outline"
               onClick={() => {
                 setShowTemplates(!showTemplates);
-                if (!showTemplates) setShowSavedQueries(false);
+                if (!showTemplates) {
+                  setShowSavedQueries(false);
+                  setShowExamples(false);
+                  setShowOperators(false);
+                  setShowUnderstanding(false);
+                }
               }}
             >
-              {showTemplates ? "Hide" : "Show"} Templates
+              {showTemplates ? "Hide" : "Show"} Clause Types
             </Button>
             <Button
               variant="outline"
               onClick={() => {
                 setShowSavedQueries(!showSavedQueries);
-                if (!showSavedQueries) setShowTemplates(false);
+                if (!showSavedQueries) {
+                  setShowTemplates(false);
+                  setShowExamples(false);
+                  setShowOperators(false);
+                  setShowUnderstanding(false);
+                }
               }}
             >
-              {showSavedQueries ? "Hide" : "Show"} Saved Queries
+              {showSavedQueries ? "Hide" : "Show"} Saved Searches
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowExamples(!showExamples);
+                if (!showExamples) {
+                  setShowTemplates(false);
+                  setShowSavedQueries(false);
+                  setShowOperators(false);
+                  setShowUnderstanding(false);
+                }
+              }}
+            >
+              {showExamples ? "Hide" : "Show"} Example Queries
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowOperators(!showOperators);
+                if (!showOperators) {
+                  setShowTemplates(false);
+                  setShowSavedQueries(false);
+                  setShowExamples(false);
+                  setShowUnderstanding(false);
+                }
+              }}
+            >
+              {showOperators ? "Hide" : "Show"} Operators Guide
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowUnderstanding(!showUnderstanding);
+                if (!showUnderstanding) {
+                  setShowTemplates(false);
+                  setShowSavedQueries(false);
+                  setShowExamples(false);
+                  setShowOperators(false);
+                }
+              }}
+            >
+              {showUnderstanding ? "Hide" : "Show"} Understanding Results
             </Button>
           </div>
 
@@ -321,10 +377,10 @@ export default function IQLAnalyzerPage() {
             </div>
           )}
 
-          {/* Saved Queries */}
+          {/* Saved Searches */}
           {showSavedQueries && (
             <div className="mb-8">
-              <h2 className="mb-4 text-lg font-semibold">Saved Queries</h2>
+              <h2 className="mb-4 text-lg font-semibold">Saved Searches</h2>
               <SavedQueries
                 onSelectQuery={(query) => {
                   setCurrentQuery(query);
@@ -335,13 +391,38 @@ export default function IQLAnalyzerPage() {
             </div>
           )}
 
-          {/* Query Builder */}
+          {/* Example Queries */}
+          {showExamples && (
+            <div className="mb-8">
+              <IQLExampleQueries
+                onInsertQuery={(insertedQuery) =>
+                  setCurrentQuery(insertedQuery)
+                }
+              />
+            </div>
+          )}
+
+          {/* Operators Guide */}
+          {showOperators && (
+            <div className="mb-8">
+              <IQLOperatorsGuide />
+            </div>
+          )}
+
+          {/* Understanding Results */}
+          {showUnderstanding && (
+            <div className="mb-8">
+              <IQLUnderstandingResults />
+            </div>
+          )}
+
+          {/* Clause Finder */}
           <div className="mb-8">
             <Card className="p-6">
               <div className="mb-4">
-                <h2 className="text-lg font-semibold">Query Builder</h2>
+                <h2 className="text-lg font-semibold">Find Clauses</h2>
                 <p className="text-muted-foreground text-sm">
-                  Analyzing: <strong>{selectedDocument?.filename}</strong>
+                  Searching in: <strong>{selectedDocument?.filename}</strong>
                 </p>
               </div>
               <IQLQueryBuilder
@@ -352,6 +433,7 @@ export default function IQLAnalyzerPage() {
                 onSaveQuery={async (name, query, description) => {
                   await createQuery(name, query, description, selectedMatterId);
                 }}
+                hideInlineHelp={true}
               />
             </Card>
           </div>
@@ -374,8 +456,7 @@ export default function IQLAnalyzerPage() {
           <FileText className="text-muted-foreground mx-auto mb-4 h-12 w-12" />
           <h2 className="mb-2 text-xl font-semibold">Select a Document</h2>
           <p className="text-muted-foreground">
-            Choose a document from the dropdown above to start analyzing with
-            IQL queries.
+            Choose a document from the dropdown above to start finding clauses.
           </p>
         </Card>
       )}
@@ -417,7 +498,7 @@ export default function IQLAnalyzerPage() {
           <Briefcase className="text-muted-foreground mx-auto mb-4 h-12 w-12" />
           <h2 className="mb-2 text-xl font-semibold">No Matters Found</h2>
           <p className="text-muted-foreground mb-4">
-            Create a matter and upload documents to start using IQL analysis.
+            Create a matter and upload documents to start finding clauses.
           </p>
           <Button
             variant="outline"

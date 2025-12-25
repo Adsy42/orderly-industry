@@ -7,7 +7,6 @@ import React, {
   useMemo,
 } from "react";
 import { useStream } from "@langchain/langgraph-sdk/react";
-import { type Message } from "@langchain/langgraph-sdk";
 import {
   uiMessageReducer,
   isUIMessage,
@@ -21,6 +20,8 @@ import { useThreads } from "./Thread";
 import { toast } from "sonner";
 import { createClient } from "@/lib/supabase/client";
 import type { Session } from "@supabase/supabase-js";
+import { getContentString } from "@/components/thread/utils";
+import type { Message } from "@langchain/langgraph-sdk";
 
 export type StateType = { messages: Message[]; ui?: UIMessage[] };
 
@@ -94,7 +95,8 @@ const StreamSession = ({
   }).catch(() => {});
   // #endregion
   const [threadId, setThreadId] = useQueryState("threadId");
-  const { getThreads, setThreads } = useThreads();
+  const { getThreads, setThreads, getConversations, setConversations } =
+    useThreads();
   const [session, setSession] = useState<Session | null>(null);
 
   // Get session from Supabase client
@@ -159,13 +161,82 @@ const StreamSession = ({
         });
       }
     },
-    onThreadId: (id) => {
+    onThreadId: async (id) => {
       setThreadId(id);
-      // Refetch threads list when thread ID changes.
+
+      // Save conversation to Supabase when a new thread is created
+      if (id && session?.user?.id) {
+        try {
+          const supabase = createClient();
+
+          // Check if conversation already exists
+          const { data: existing } = await supabase
+            .from("conversations")
+            .select("id")
+            .eq("thread_id", id)
+            .eq("user_id", session.user.id)
+            .single();
+
+          if (!existing) {
+            // Create new conversation with default title (will be updated when first message arrives)
+            await supabase.from("conversations").insert({
+              user_id: session.user.id,
+              thread_id: id,
+              title: "New conversation",
+            });
+          }
+        } catch (error) {
+          console.error("Failed to save conversation:", error);
+          // Don't show error to user - this is a background operation
+        }
+      }
+
+      // Refetch threads list and conversations when thread ID changes.
       // Wait for some seconds before fetching so we're able to get the new thread that was created.
-      sleep().then(() => getThreads().then(setThreads).catch(console.error));
+      sleep().then(() => {
+        getThreads().then(setThreads).catch(console.error);
+        getConversations().then(setConversations).catch(console.error);
+      });
     },
   });
+
+  // Update conversation title when first human message arrives
+  useEffect(() => {
+    if (!threadId || !session?.user?.id || !streamValue.values?.messages)
+      return;
+
+    const messages = streamValue.values.messages;
+    const firstHumanMessage = messages.find((m: Message) => m.type === "human");
+
+    if (firstHumanMessage) {
+      const contentString = getContentString(firstHumanMessage.content);
+      const title = contentString.trim().slice(0, 100) || "New conversation";
+
+      // Update conversation title if we have a meaningful title
+      if (title && title !== "New conversation") {
+        const supabase = createClient();
+        supabase
+          .from("conversations")
+          .update({ title, updated_at: new Date().toISOString() })
+          .eq("thread_id", threadId)
+          .eq("user_id", session.user.id)
+          .then(({ error }) => {
+            if (error) {
+              console.error("Failed to update conversation title:", error);
+            } else {
+              // Refresh conversations list after updating title
+              getConversations().then(setConversations).catch(console.error);
+            }
+          });
+      }
+    }
+  }, [
+    threadId,
+    session?.user?.id,
+    streamValue.values?.messages,
+    getConversations,
+    setConversations,
+  ]);
 
   useEffect(() => {
     // Only check status once we have a session (or after a delay if no auth required)

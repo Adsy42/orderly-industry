@@ -82,17 +82,22 @@ export default function ThreadHistory() {
     parseAsBoolean.withDefault(false),
   );
 
-  const { getThreads, threads, setThreads, threadsLoading, setThreadsLoading } =
-    useThreads();
+  const {
+    getConversations,
+    conversations,
+    setConversations,
+    conversationsLoading,
+    setConversationsLoading,
+  } = useThreads();
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    setThreadsLoading(true);
-    getThreads()
-      .then(setThreads)
+    setConversationsLoading(true);
+    getConversations()
+      .then(setConversations)
       .catch(console.error)
-      .finally(() => setThreadsLoading(false));
-  }, []);
+      .finally(() => setConversationsLoading(false));
+  }, [getConversations, setConversations, setConversationsLoading]);
 
   return (
     <>
@@ -113,10 +118,20 @@ export default function ThreadHistory() {
             Thread History
           </h1>
         </div>
-        {threadsLoading ? (
+        {conversationsLoading ? (
           <ThreadHistoryLoading />
         ) : (
-          <ThreadList threads={threads} />
+          <ThreadList
+            threads={conversations.map((conv) => ({
+              thread_id: conv.thread_id,
+              values: {},
+              created_at: conv.created_at,
+              updated_at: conv.updated_at,
+              metadata: {},
+              status: "idle" as const,
+              interrupts: {},
+            }))}
+          />
         )}
       </div>
       <div className="lg:hidden">
@@ -135,7 +150,15 @@ export default function ThreadHistory() {
               <SheetTitle>Thread History</SheetTitle>
             </SheetHeader>
             <ThreadList
-              threads={threads}
+              threads={conversations.map((conv) => ({
+                thread_id: conv.thread_id,
+                values: {},
+                created_at: conv.created_at,
+                updated_at: conv.updated_at,
+                metadata: {},
+                status: "idle" as const,
+                interrupts: {},
+              }))}
               onThreadClick={() => setChatHistoryOpen((o) => !o)}
             />
           </SheetContent>
