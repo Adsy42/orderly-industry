@@ -158,18 +158,36 @@ export default function DocumentViewerPage() {
     }
   }, [documentId]);
 
-  // Scroll to highlighted chunk after load
+  // Scroll to highlighted area after load
   React.useEffect(() => {
-    if (highlightRef.current && highlightChunkId) {
-      // Small delay to ensure DOM is ready
-      setTimeout(() => {
+    // Only scroll if we have highlighting parameters and data is loaded
+    const hasHighlighting =
+      highlightChunkId || (highlightStart !== null && highlightEnd !== null);
+
+    if (
+      highlightRef.current &&
+      hasHighlighting &&
+      !isLoading &&
+      (document || chunks.length > 0)
+    ) {
+      // Delay to ensure DOM is fully rendered, especially for large documents
+      const timeoutId = setTimeout(() => {
         highlightRef.current?.scrollIntoView({
           behavior: "smooth",
           block: "center",
         });
-      }, 100);
+      }, 300);
+
+      return () => clearTimeout(timeoutId);
     }
-  }, [chunks, highlightChunkId]);
+  }, [
+    chunks,
+    highlightChunkId,
+    highlightStart,
+    highlightEnd,
+    isLoading,
+    document,
+  ]);
 
   const formatFileSize = (bytes: number) => {
     if (bytes < 1024) return `${bytes} B`;
