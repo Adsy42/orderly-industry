@@ -170,13 +170,44 @@ export default function DocumentViewerPage() {
       !isLoading &&
       (document || chunks.length > 0)
     ) {
-      // Delay to ensure DOM is fully rendered, especially for large documents
-      const timeoutId = setTimeout(() => {
-        highlightRef.current?.scrollIntoView({
+      // Use a more robust scrolling approach for citations opened from links
+      // This ensures DOM is fully rendered and browser has painted before scrolling
+      let scrollAttempts = 0;
+      const maxAttempts = 10; // Maximum number of scroll attempts
+
+      const scrollToHighlight = () => {
+        const element = highlightRef.current;
+        if (!element) return;
+
+        scrollAttempts++;
+        if (scrollAttempts > maxAttempts) return;
+
+        // Check if element is in the DOM and has dimensions
+        const rect = element.getBoundingClientRect();
+        const isVisible = rect.width > 0 && rect.height > 0;
+
+        if (!isVisible) {
+          // Element not yet rendered, try again after a short delay
+          setTimeout(scrollToHighlight, 150);
+          return;
+        }
+
+        // Scroll with better positioning
+        element.scrollIntoView({
           behavior: "smooth",
           block: "center",
+          inline: "nearest",
         });
-      }, 300);
+      };
+
+      // Initial delay for page load, then use requestAnimationFrame for painting
+      // Longer delay when opening from citation links to ensure page is ready
+      const timeoutId = setTimeout(() => {
+        requestAnimationFrame(() => {
+          // Additional small delay to ensure content is painted
+          setTimeout(scrollToHighlight, 150);
+        });
+      }, 600);
 
       return () => clearTimeout(timeoutId);
     }
