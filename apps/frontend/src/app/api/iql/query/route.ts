@@ -8,7 +8,6 @@ import {
   classifyIQL,
   ClassificationModel,
   extractClauseWithLLM,
-  findClausePosition,
 } from "@/lib/isaacus";
 
 /**
@@ -140,7 +139,7 @@ export async function POST(request: NextRequest) {
         const chunkEnd = match.endIndex;
         const chunkText = match.text;
 
-        // Expand the window to capture sentences that might be cut off
+        // Expand the window to capture sentences that might be cut off at chunk boundaries
         const expandedStart = Math.max(0, chunkStart - CONTEXT_WINDOW);
         const expandedEnd = Math.min(
           fullText.length,
@@ -149,63 +148,61 @@ export async function POST(request: NextRequest) {
         const expandedText = fullText.slice(expandedStart, expandedEnd);
 
         try {
-          // Use LLM to extract the precise clause from the expanded context
+          // Use sentence-based LLM extraction - segments text into sentences,
+          // presents them as numbered options, and picks the best one(s)
           console.log(
-            `[IQL Query] Extracting "${queryType}" from expanded chunk (${expandedText.length} chars, window: ${CONTEXT_WINDOW})`,
+            `[IQL Query] Extracting "${queryType}" (${expandedText.length} chars, window: ${CONTEXT_WINDOW})`,
           );
+
+          // Pass the expandedStart offset so positions are relative to the full document
           const extraction = await extractClauseWithLLM(
             expandedText,
             queryType,
+            expandedStart,
           );
 
-          if (extraction.clause && extraction.confidence > 0.3) {
-            // Find the position of the extracted clause in the expanded text
-            const positionInExpanded = findClausePosition(
-              expandedText,
-              extraction.clause,
-              0, // Start from 0, we'll add expandedStart later
+          // With improved extraction that always returns a result, we can use lower threshold
+          // The extraction now includes fallback logic and always returns positions
+          if (
+            extraction.clause &&
+            extraction.confidence >= 0.3 &&
+            extraction.startIndex !== undefined &&
+            extraction.endIndex !== undefined
+          ) {
+            const docStart = extraction.startIndex;
+            const docEnd = extraction.endIndex;
+            const permalink = `cite:${document.id}@${docStart}-${docEnd}`;
+
+            console.log(
+              `[IQL Query] Extracted: "${extraction.clause.slice(0, 50)}..." at ${docStart}-${docEnd} (conf: ${extraction.confidence.toFixed(2)}${extraction.reasoning ? `, ${extraction.reasoning.slice(0, 60)}` : ""})`,
             );
 
-            if (positionInExpanded) {
-              // Map back to document-level positions
-              const docStart = expandedStart + positionInExpanded.start;
-              const docEnd = expandedStart + positionInExpanded.end;
-              const permalink = `cite:${document.id}@${docStart}-${docEnd}`;
-
-              console.log(
-                `[IQL Query] LLM extracted: "${extraction.clause.slice(0, 60)}..." at ${docStart}-${docEnd} (confidence: ${extraction.confidence})`,
-              );
-
-              return {
-                text: extraction.clause,
-                startIndex: docStart,
-                endIndex: docEnd,
-                score: match.score * extraction.confidence,
-                // Also include the full chunk for context
-                chunkText: chunkText,
-                chunkStart: chunkStart,
-                chunkEnd: chunkEnd,
-                citation: {
-                  formatted: document.filename,
-                  permalink,
-                  markdown: `[${document.filename}](${permalink})`,
-                  documentId: document.id,
-                  start: docStart,
-                  end: docEnd,
-                },
-              };
-            } else {
-              console.log(
-                `[IQL Query] LLM extracted clause but couldn't find position, using chunk bounds`,
-              );
-            }
+            return {
+              text: extraction.clause,
+              startIndex: docStart,
+              endIndex: docEnd,
+              score: match.score * extraction.confidence,
+              // Also include the full chunk for context
+              chunkText: chunkText,
+              chunkStart: chunkStart,
+              chunkEnd: chunkEnd,
+              citation: {
+                formatted: document.filename,
+                permalink,
+                markdown: `[${document.filename}](${permalink})`,
+                documentId: document.id,
+                start: docStart,
+                end: docEnd,
+              },
+            };
           } else {
+            // This should rarely happen now with improved fallback logic
             console.log(
-              `[IQL Query] LLM extraction low confidence (${extraction.confidence}), using full chunk`,
+              `[IQL Query] Extraction unusable (conf: ${extraction.confidence}, hasClause: ${!!extraction.clause}), using chunk fallback`,
             );
           }
         } catch (err) {
-          console.error(`[IQL Query] LLM extraction failed for chunk: ${err}`);
+          console.error(`[IQL Query] LLM extraction error: ${err}`);
         }
 
         // Fallback: use the full chunk if extraction fails
