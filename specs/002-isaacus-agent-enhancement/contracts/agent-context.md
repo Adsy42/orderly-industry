@@ -174,3 +174,5 @@ The [CONTEXT] message may include:
 | `document_id` provided but document not ready | Inform user document still processing           |
 | `document_id` doesn't exist in matter         | List available documents, ask for clarification |
 
+
+

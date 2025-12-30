@@ -32,6 +32,8 @@ interface IQLQueryBuilderProps {
   ) => Promise<void>;
   className?: string;
   hideInlineHelp?: boolean; // If true, don't show inline help (help shown at page level)
+  /** Callback to switch to IQL mode with a specific query (used by results component) */
+  onSwitchToIQLMode?: (query: string) => void;
 }
 
 export function IQLQueryBuilder({
@@ -42,13 +44,38 @@ export function IQLQueryBuilder({
   onSaveQuery,
   className,
   hideInlineHelp = false,
+  onSwitchToIQLMode,
 }: IQLQueryBuilderProps) {
   const [query, setQuery] = React.useState(initialQuery);
+  const [mode, setMode] = React.useState<"natural-language" | "iql">(
+    "natural-language",
+  );
+  const [isTranslating, setIsTranslating] = React.useState(false);
+  const [translatedQuery, setTranslatedQuery] = React.useState<string | null>(
+    null,
+  );
+  const [translationExplanation, setTranslationExplanation] = React.useState<
+    string | null
+  >(null);
 
   // Update query when initialQuery prop changes (e.g., from template selector)
   React.useEffect(() => {
     setQuery(initialQuery);
   }, [initialQuery]);
+
+  // Handle switch to IQL mode callback
+  React.useEffect(() => {
+    if (onSwitchToIQLMode) {
+      // Store callback function for results component to use
+      const switchToIQL = (iqlQuery: string) => {
+        setMode("iql");
+        setQuery(iqlQuery);
+      };
+      (
+        window as unknown as { _switchToIQLMode?: (query: string) => void }
+      )._switchToIQLMode = switchToIQL;
+    }
+  }, [onSwitchToIQLMode]);
 
   // Notify parent of query changes
   React.useEffect(() => {
@@ -67,7 +94,7 @@ export function IQLQueryBuilder({
   const [saveDescription, setSaveDescription] = React.useState("");
   const [showSaveDialog, setShowSaveDialog] = React.useState(false);
 
-  // Validate query on change (with operator support)
+  // Validate query on change (mode-specific validation)
   React.useEffect(() => {
     if (!query.trim()) {
       setValidationError(null);
@@ -75,29 +102,121 @@ export function IQLQueryBuilder({
       return;
     }
 
-    // Use advanced validation for queries with operators
-    const hasOperators = /(AND|OR|NOT|>|<|\+)/i.test(query);
-    const validation: IQLValidationResult = hasOperators
-      ? validateIQLQueryWithOperators(query)
-      : validateIQLQuery(query);
+    // In IQL mode, validate IQL syntax
+    if (mode === "iql") {
+      const hasOperators = /(AND|OR|NOT|>|<|\+)/i.test(query);
+      const validation: IQLValidationResult = hasOperators
+        ? validateIQLQueryWithOperators(query)
+        : validateIQLQuery(query);
 
-    if (!validation.valid) {
-      setValidationError(validation.error || "Invalid query syntax");
-      setValidationWarnings([]);
+      if (!validation.valid) {
+        setValidationError(validation.error || "Invalid query syntax");
+        setValidationWarnings([]);
+      } else {
+        setValidationError(null);
+        setValidationWarnings(validation.warnings || []);
+      }
     } else {
+      // In natural language mode, no syntax validation needed
       setValidationError(null);
-      setValidationWarnings(validation.warnings || []);
+      setValidationWarnings([]);
     }
+  }, [query, mode]);
+
+  // Clear validation errors and translation preview when switching modes
+  React.useEffect(() => {
+    setValidationError(null);
+    setValidationWarnings([]);
+    setTranslatedQuery(null);
+    setTranslationExplanation(null);
+  }, [mode]);
+
+  // Clear translation preview when query changes
+  React.useEffect(() => {
+    setTranslatedQuery(null);
+    setTranslationExplanation(null);
   }, [query]);
 
-  const handleExecute = async () => {
+  // Handle translation (NL mode step 1: translate and show preview)
+  const handleTranslate = async () => {
     if (!query.trim()) {
       setError("Please enter a search query");
       return;
     }
 
-    // Check validation
-    const validation = validateIQLQuery(query);
+    setIsTranslating(true);
+    setError(null);
+    setTranslatedQuery(null);
+    setTranslationExplanation(null);
+
+    try {
+      const translateResponse = await fetch("/api/iql/translate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          query: query.trim(),
+        }),
+      });
+
+      if (!translateResponse.ok) {
+        let errorData: Record<string, unknown> = {};
+        try {
+          errorData = await translateResponse.json();
+        } catch {
+          errorData = {
+            error: `Translation failed (HTTP ${translateResponse.status})`,
+          };
+        }
+
+        const errorMessage =
+          (errorData.message as string) ||
+          (errorData.error as string) ||
+          "Could not translate query. Please try rephrasing or use IQL syntax directly.";
+
+        setError(errorMessage);
+        return;
+      }
+
+      const translationResult = await translateResponse.json();
+      const translatedIQL = translationResult.iql;
+
+      // Validate translated IQL
+      const validation = validateIQLQuery(translatedIQL);
+      if (!validation.valid) {
+        setError(
+          `Translation produced invalid IQL: ${validation.error}. Please try rephrasing or use IQL mode directly.`,
+        );
+        return;
+      }
+
+      // Show translation preview
+      setTranslatedQuery(translatedIQL);
+      setTranslationExplanation(translationResult.explanation || null);
+    } catch (translateError) {
+      console.error("[IQL Query Builder] Translation error:", translateError);
+      setError(
+        translateError instanceof Error
+          ? translateError.message
+          : "Translation failed. Please try rephrasing or use IQL syntax directly.",
+      );
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
+  // Execute IQL query (directly or after translation)
+  const handleExecute = async (iqlToExecute?: string) => {
+    const finalQuery = iqlToExecute || query.trim();
+
+    if (!finalQuery) {
+      setError("Please enter a search query");
+      return;
+    }
+
+    // Validate IQL syntax
+    const validation = validateIQLQuery(finalQuery);
     if (!validation.valid) {
       setError(validation.error || "Invalid query syntax");
       return;
@@ -107,6 +226,7 @@ export function IQLQueryBuilder({
     setError(null);
 
     try {
+      // Execute IQL query
       const response = await fetch("/api/iql/query", {
         method: "POST",
         headers: {
@@ -114,7 +234,7 @@ export function IQLQueryBuilder({
         },
         body: JSON.stringify({
           documentId,
-          query: query.trim(),
+          query: finalQuery,
           model: "kanon-universal-classifier",
         }),
       });
@@ -184,7 +304,14 @@ export function IQLQueryBuilder({
       }
 
       const results: IQLQueryResult = await response.json();
+      // Include translated IQL in results if executing from translation preview
+      if (translatedQuery && mode === "natural-language") {
+        results.translatedIQL = translatedQuery;
+      }
       onResults?.(results);
+      // Clear translation preview after successful execution
+      setTranslatedQuery(null);
+      setTranslationExplanation(null);
     } catch (err) {
       console.error("Clause Finder error:", err);
       setError(err instanceof Error ? err.message : "Failed to execute search");
@@ -196,7 +323,18 @@ export function IQLQueryBuilder({
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
       e.preventDefault();
-      handleExecute();
+      if (mode === "natural-language") {
+        if (translatedQuery) {
+          // If already translated, execute
+          handleExecute(translatedQuery);
+        } else {
+          // Otherwise, translate first
+          handleTranslate();
+        }
+      } else {
+        // IQL mode: execute directly
+        handleExecute();
+      }
     }
   };
 
@@ -211,7 +349,10 @@ export function IQLQueryBuilder({
               How to find clauses
             </h4>
             <p className="text-sm text-blue-800">
-              Use built-in clause types like{" "}
+              In <strong>Natural Language</strong> mode, describe what you're
+              looking for in plain English (e.g., "one-sided confidentiality
+              clauses"). In <strong>IQL</strong> mode, use built-in clause types
+              like{" "}
               <code className="rounded bg-blue-100 px-1.5 py-0.5 font-mono text-xs">
                 {"{IS confidentiality clause}"}
               </code>{" "}
@@ -235,18 +376,51 @@ export function IQLQueryBuilder({
       </div>
 
       <div className="space-y-2">
-        <label
-          htmlFor="clause-finder-query"
-          className="text-sm font-medium"
-        >
-          Clause Finder
-        </label>
+        <div className="flex items-center justify-between">
+          <label
+            htmlFor="clause-finder-query"
+            className="text-sm font-medium"
+          >
+            Clause Finder
+          </label>
+          {/* Mode Toggle */}
+          <div className="flex items-center gap-2 rounded-md border p-1">
+            <button
+              type="button"
+              onClick={() => setMode("natural-language")}
+              className={cn(
+                "rounded px-3 py-1 text-sm font-medium transition-colors",
+                mode === "natural-language"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-muted",
+              )}
+            >
+              Natural Language
+            </button>
+            <button
+              type="button"
+              onClick={() => setMode("iql")}
+              className={cn(
+                "rounded px-3 py-1 text-sm font-medium transition-colors",
+                mode === "iql"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:bg-muted",
+              )}
+            >
+              IQL
+            </button>
+          </div>
+        </div>
         <Textarea
           id="clause-finder-query"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Find clauses, e.g., {IS confidentiality clause}"
+          placeholder={
+            mode === "natural-language"
+              ? "Describe what you're looking for, e.g., one-sided confidentiality clauses"
+              : "Find clauses, e.g., {IS confidentiality clause}"
+          }
           className={cn(
             "font-mono text-sm",
             validationError && "border-destructive",
@@ -300,6 +474,71 @@ export function IQLQueryBuilder({
         )}
       </div>
 
+      {/* Translation Preview (NL mode only) */}
+      {mode === "natural-language" && translatedQuery && (
+        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-950/30">
+          <div className="space-y-3">
+            <div>
+              <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+                Translated to IQL:
+              </p>
+              <code className="mt-1 block rounded bg-blue-100 px-3 py-2 font-mono text-sm text-blue-900 dark:bg-blue-900/50 dark:text-blue-100">
+                {translatedQuery}
+              </code>
+              {translationExplanation && (
+                <p className="mt-2 text-xs text-blue-700 dark:text-blue-300">
+                  {translationExplanation}
+                </p>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button
+                onClick={() => handleExecute(translatedQuery)}
+                disabled={isExecuting}
+                size="sm"
+                className="flex-1"
+              >
+                {isExecuting ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Searching...
+                  </>
+                ) : (
+                  <>
+                    <Search className="mr-2 h-4 w-4" />
+                    Run This Query
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setMode("iql");
+                  setQuery(translatedQuery);
+                  setTranslatedQuery(null);
+                  setTranslationExplanation(null);
+                }}
+                disabled={isExecuting}
+              >
+                Edit IQL
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setTranslatedQuery(null);
+                  setTranslationExplanation(null);
+                }}
+                disabled={isExecuting}
+              >
+                Clear
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {error && (
         <div className="bg-destructive/10 text-destructive border-destructive/20 flex items-start gap-2 rounded-md border p-3 text-sm">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -311,25 +550,49 @@ export function IQLQueryBuilder({
       )}
 
       <div className="flex gap-2">
-        <Button
-          onClick={handleExecute}
-          disabled={isExecuting || !query.trim() || !!validationError}
-          className="flex-1"
-          aria-label="Find matching clauses"
-        >
-          {isExecuting ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Searching...
-            </>
-          ) : (
-            <>
-              <Search className="mr-2 h-4 w-4" />
-              Find Clauses
-            </>
-          )}
-        </Button>
-        {onSaveQuery && query.trim() && !validationError && (
+        {/* In NL mode without translation: show Translate button */}
+        {/* In NL mode with translation: hide main button (use preview buttons) */}
+        {/* In IQL mode: show Find Clauses button */}
+        {mode === "natural-language" && !translatedQuery ? (
+          <Button
+            onClick={handleTranslate}
+            disabled={isTranslating || !query.trim()}
+            className="flex-1"
+            aria-label="Translate to IQL"
+          >
+            {isTranslating ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Translating...
+              </>
+            ) : (
+              <>
+                <Search className="mr-2 h-4 w-4" />
+                Translate & Preview
+              </>
+            )}
+          </Button>
+        ) : mode === "iql" ? (
+          <Button
+            onClick={() => handleExecute()}
+            disabled={isExecuting || !query.trim() || !!validationError}
+            className="flex-1"
+            aria-label="Find matching clauses"
+          >
+            {isExecuting ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Searching...
+              </>
+            ) : (
+              <>
+                <Search className="mr-2 h-4 w-4" />
+                Find Clauses
+              </>
+            )}
+          </Button>
+        ) : null}
+        {onSaveQuery && query.trim() && !validationError && mode === "iql" && (
           <Button
             variant="outline"
             onClick={() => setShowSaveDialog(true)}

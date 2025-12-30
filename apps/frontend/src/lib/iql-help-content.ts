@@ -333,6 +333,11 @@ export const SCORE_RANGES: ScoreRange[] = [
  */
 export const USAGE_TIPS = [
   {
+    title: "Use Natural Language mode for easy searches",
+    description:
+      "In Natural Language mode, describe what you're looking for in plain English (e.g., 'one-sided confidentiality clauses'). The system automatically translates your description to optimized IQL syntax. Toggle to IQL mode for direct syntax input.",
+  },
+  {
     title: "Use built-in clause types over custom searches",
     description:
       "Built-in clause types like {IS confidentiality clause} are optimized for accuracy. They outperform custom descriptions in most cases.",

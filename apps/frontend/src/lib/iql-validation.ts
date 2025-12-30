@@ -17,7 +17,7 @@ export interface IQLValidationResult {
 
 /**
  * Check if a query contains IQL operators OUTSIDE of curly brackets.
- * 
+ *
  * Important: Words like "or" inside template names (e.g., "{IS ip assignment or license}")
  * should NOT be detected as operators. Only operators between statements count.
  */
@@ -25,12 +25,12 @@ function hasIQLOperators(query: string): boolean {
   // Remove all content inside curly brackets to avoid false positives
   // e.g., "{IS ip assignment or license}" -> ""
   const queryWithoutStatements = query.replace(/\{[^}]*\}/g, "");
-  
+
   // If nothing left after removing statements, no operators
   if (!queryWithoutStatements.trim()) {
     return false;
   }
-  
+
   const wordOperators = ["AND", "OR", "NOT"];
   const symbolOperators = [">", "<", "+"];
 

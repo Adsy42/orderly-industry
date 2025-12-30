@@ -226,3 +226,5 @@ After basic IQL queries work:
 3. Add query result export (CSV/JSON)
 4. Create query templates UI for power users
 
+
+

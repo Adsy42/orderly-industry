@@ -173,9 +173,9 @@ orderly-industry/
 
 ### Frontend → Vercel (Automatic)
 
-- PRs get preview deployments
 - Merges to `main` deploy to production
 - Environment variables configured in Vercel dashboard
+- **Preview deployments disabled** (see [docs/STAGING_DISABLED.md](docs/STAGING_DISABLED.md))
 
 ### Agent → LangSmith Cloud (Manual)
 
@@ -185,12 +185,23 @@ orderly-industry/
 4. Add environment variables
 5. Deploy
 
-**Current Blocker**: The staging environment is using an old agent deployment with different tools. Need to redeploy to sync.
+### Database → Supabase
 
-### Database → Supabase (Automatic)
+- Migrations applied manually as needed
+- **Preview branches disabled** (see [docs/STAGING_DISABLED.md](docs/STAGING_DISABLED.md))
 
-- PRs get preview branches (via `preview-supabase.yml`)
-- Migrations applied automatically
+---
+
+## 🔧 Environment Configuration
+
+**Important**: All environment variables must be configured. No hardcoded fallbacks.
+
+See **[ENV_SETUP.md](ENV_SETUP.md)** for complete configuration guide:
+
+- Local development setup
+- Production configuration
+- Environment variable helper functions
+- Common issues and solutions
 
 ## 🔑 Environment Variables
 
@@ -219,11 +230,14 @@ LANGSMITH_API_KEY=<your key>
 
 ## 📚 Documentation
 
-| Doc                                                          | Purpose                    |
-| ------------------------------------------------------------ | -------------------------- |
-| [ONBOARDING.md](ONBOARDING.md)                               | Quick setup for new devs   |
-| [CONTRIBUTING.md](CONTRIBUTING.md)                           | Dev workflow & conventions |
-| [specs/004-matters-documents/](specs/004-matters-documents/) | Current feature docs       |
+| Doc                                                          | Purpose                     |
+| ------------------------------------------------------------ | --------------------------- |
+| [ONBOARDING.md](ONBOARDING.md)                               | Quick setup for new devs    |
+| [CONTRIBUTING.md](CONTRIBUTING.md)                           | Dev workflow & conventions  |
+| [ENV_SETUP.md](ENV_SETUP.md)                                 | Environment configuration   |
+| [docs/DEVOPS_LIFECYCLE.md](docs/DEVOPS_LIFECYCLE.md)         | CI/CD & deployment workflow |
+| [docs/STAGING_DISABLED.md](docs/STAGING_DISABLED.md)         | Staging environment status  |
+| [specs/](specs/)                                             | Feature specifications      |
 
 ## 🐛 Known Issues
 

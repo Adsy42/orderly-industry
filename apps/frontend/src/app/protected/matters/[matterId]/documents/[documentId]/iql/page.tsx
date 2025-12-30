@@ -288,6 +288,9 @@ export default function IQLQueryPage() {
             await createQuery(name, query, description, matterId);
           }}
           hideInlineHelp={true}
+          onSwitchToIQLMode={() => {
+            // This prop registers the switch function
+          }}
         />
       </div>
 
@@ -298,6 +301,18 @@ export default function IQLQueryPage() {
             results={results}
             onMatchClick={handleMatchClick}
             matterId={matterId}
+            onSwitchToIQLMode={(query) => {
+              setCurrentQuery(query);
+              // Trigger mode switch via the exposed function
+              const switchFn = (
+                window as unknown as {
+                  _switchToIQLMode?: (query: string) => void;
+                }
+              )._switchToIQLMode;
+              if (switchFn) {
+                switchFn(query);
+              }
+            }}
           />
         </div>
       )}

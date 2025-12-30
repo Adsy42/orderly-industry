@@ -84,12 +84,34 @@ jobs:
           pip install -e ".[dev]"
           pip install pytest pytest-asyncio
 
+      - name: Check for tests directory
+        id: check_tests
+        run: |
+          if [ -d "tests" ] && [ "$(find tests -name '*.py' -type f | wc -l)" -gt 0 ]; then
+            echo "tests_exist=true" >> $GITHUB_OUTPUT
+          else
+            echo "tests_exist=false" >> $GITHUB_OUTPUT
+          fi
+
       - name: Run tests
+        if: steps.check_tests.outputs.tests_exist == 'true'
         run: pytest tests/ -v --tb=short
-        continue-on-error: true  # Continue if no tests exist yet
         env:
           SUPABASE_URL: https://example.supabase.co
           SUPABASE_ANON_KEY: dummy-key-for-tests
+          # Add other required env vars with dummy values for CI
+          OPENAI_API_KEY: dummy-key-for-ci
+          TAVILY_API_KEY: dummy-key-for-ci
+          ISAACUS_API_KEY: dummy-key-for-ci
+
+      - name: Warn if tests are missing
+        if: steps.check_tests.outputs.tests_exist == 'false'
+        run: |
+          echo "⚠️ No tests found in tests/ directory"
+          echo "TODO: Add tests for production readiness"
+          echo "For now, this is non-blocking to allow infrastructure changes"
+
+
 
 
 

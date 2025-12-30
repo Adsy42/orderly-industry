@@ -284,22 +284,21 @@ The command uses MCP tools to diagnose issues:
 - **Supabase**: Check migrations, RLS policies, logs, and security advisors
 - **Vercel**: Parse build logs and deployment failures
 
-### Preview Deployments
+### Quality Gates & Testing
 
-When you open a PR with agent changes, **automatic preview deployments** are triggered:
+**Pre-commit hooks** ensure code quality before committing:
 
-| Service       | Trigger                       | Preview Type           |
-| ------------- | ----------------------------- | ---------------------- |
-| **Vercel**    | Any PR                        | Frontend preview URL   |
-| **Supabase**  | PR with `supabase/` changes   | Branch database        |
-| **LangSmith** | PR with `apps/agent/` changes | Preview agent revision |
+- ✅ Frontend: ESLint, Prettier, TypeScript check, build validation
+- ✅ Agent: Ruff lint/format, type checking (mypy), tests
+- ✅ Database: RLS policy validation for new tables
 
-**LangSmith Preview Flow:**
+**CI/CD Pipeline** runs on every PR:
 
-1. Open PR with agent changes → Preview deployment starts
-2. After ~3-5 minutes → Comment posted with preview URL
-3. Test using URL params: `?apiUrl=PREVIEW_URL&assistantId=deep_research`
-4. Merge/close PR → Production deployment triggered
+- ✅ All pre-commit checks run in CI
+- ✅ Tests are **required** (CI will fail if tests are missing)
+- ✅ Build validation ensures production readiness
+
+**Note**: Preview/staging environments have been disabled to reduce costs. All testing happens locally and in CI before merging to `main`.
 
 ### Before Opening a PR
 
@@ -308,20 +307,22 @@ When you open a PR with agent changes, **automatic preview deployments** are tri
    - Plan completed
    - All tasks in `tasks.md` marked `[x]`
 
-2. **Run quality gates with `/speckit.commit`**
+2. **Run quality gates (pre-commit hooks run automatically)**
    - Linting passes (ESLint, Ruff)
    - Formatting passes (Prettier, Ruff format)
+   - Type checking passes (TypeScript, mypy)
    - Build succeeds (Next.js build)
-   - Tests pass (if configured)
+   - **Tests pass** (required - pre-commit hook will block if tests fail)
 
 3. **Self-review your code**
    - Check against constitution (`.specify/memory/constitution.md`)
    - Verify no secrets committed
    - Conventional commit messages used
+   - All environment variables properly configured (no hardcoded values)
 
-4. **Test your changes**
-   - Local testing completed
-   - Preview deployments verified (if applicable)
+4. **Test your changes locally**
+   - Local testing completed with production-like environment variables
+   - All tests passing
    - No regressions
 
 ### PR Requirements

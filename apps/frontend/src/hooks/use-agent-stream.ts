@@ -4,6 +4,7 @@ import { useStream } from "@langchain/langgraph-sdk/react";
 import { Message } from "@langchain/langgraph-sdk";
 import { useAuth } from "@/providers/AuthProvider";
 import { useMemo } from "react";
+import { getApiUrl, getAssistantId } from "@/lib/env";
 
 interface UseAgentStreamOptions {
   threadId?: string;
@@ -29,8 +30,8 @@ export function useAgentStream(options?: UseAgentStreamOptions) {
   }, [session?.access_token]);
 
   const stream = useStream<{ messages: Message[] }>({
-    apiUrl: process.env.NEXT_PUBLIC_API_URL || "http://localhost:2024",
-    assistantId: process.env.NEXT_PUBLIC_ASSISTANT_ID || "deep_research",
+    apiUrl: getApiUrl(),
+    assistantId: getAssistantId(),
     threadId: options?.threadId ?? null,
     onThreadId: options?.onThreadId,
     defaultHeaders,

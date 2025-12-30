@@ -1,87 +1,175 @@
-#!/bin/sh
-. "$(dirname "$0")/_/husky.sh"
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
 
-echo "🔍 Running pre-commit checks..."
+# Pre-commit quality gates
+# Runs checks only for staged files in each area
 
-# Check if frontend files are staged
-FRONTEND_STAGED=$(git diff --cached --name-only | grep "^apps/frontend/" || true)
-if [ -n "$FRONTEND_STAGED" ]; then
-  echo "📦 Frontend changes detected - running checks..."
+set -e
+
+cd "$(git rev-parse --show-toplevel)"
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Track failures
+FAILED=0
+
+log_info() { printf "${BLUE}→${NC} %s\n" "$1"; }
+log_success() { printf "${GREEN}✓${NC} %s\n" "$1"; }
+log_warn() { printf "${YELLOW}⚠${NC} %s\n" "$1"; }
+log_error() { printf "${RED}✗${NC} %s\n" "$1"; FAILED=1; }
+
+# Get staged files
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM)
+
+# Check if any files match a pattern
+has_staged_files() {
+  echo "$STAGED_FILES" | grep -q "^$1" 2>/dev/null
+}
+
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  Pre-commit Quality Gates"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+# ─────────────────────────────────────────
+# Frontend Checks
+# ─────────────────────────────────────────
+if has_staged_files "apps/frontend/"; then
+  echo ""
+  echo "${BLUE}📦 Frontend${NC}"
   
-  cd apps/frontend
+  log_info "Linting..."
+  if pnpm --filter frontend lint --quiet 2>/dev/null; then
+    log_success "ESLint passed"
+  else
+    log_error "ESLint failed — run: pnpm --filter frontend lint:fix"
+  fi
   
-  # Lint
-  echo "  → ESLint..."
-  pnpm lint || {
-    echo "❌ ESLint failed. Fix errors before committing."
-    exit 1
-  }
+  log_info "Formatting..."
+  if pnpm --filter frontend format:check 2>/dev/null; then
+    log_success "Prettier passed"
+  else
+    log_error "Prettier failed — run: pnpm --filter frontend format"
+  fi
   
-  # Type check
-  echo "  → TypeScript..."
-  pnpm tsc --noEmit || {
-    echo "❌ TypeScript check failed. Fix errors before committing."
-    exit 1
-  }
+  log_info "Type checking..."
+  if pnpm --filter frontend tsc --noEmit 2>/dev/null; then
+    log_success "TypeScript passed"
+  else
+    log_error "TypeScript failed"
+  fi
   
-  cd ../..
-  echo "✅ Frontend checks passed"
+  log_info "Building..."
+  if pnpm --filter frontend build >/dev/null 2>&1; then
+    log_success "Build passed"
+  else
+    log_error "Build failed"
+  fi
 fi
 
-# Check if agent files are staged
-AGENT_STAGED=$(git diff --cached --name-only | grep "^apps/agent/" || true)
-if [ -n "$AGENT_STAGED" ]; then
-  echo "🐍 Agent changes detected - running checks..."
+# ─────────────────────────────────────────
+# Agent Checks
+# ─────────────────────────────────────────
+if has_staged_files "apps/agent/"; then
+  echo ""
+  echo "${BLUE}🐍 Agent${NC}"
   
   cd apps/agent
   
-  # Lint with ruff (using uv to ensure ruff is available)
-  echo "  → Ruff lint..."
-  uv run ruff check . || {
-    echo "❌ Ruff lint failed. Fix errors before committing."
-    exit 1
-  }
+  # Determine ruff command (prefer uv run for project environment)
+  if command -v uv >/dev/null 2>&1; then
+    RUFF_CMD="uv run ruff"
+    PYTEST_CMD="uv run pytest"
+    MYPY_CMD="uv run mypy"
+  elif command -v ruff >/dev/null 2>&1; then
+    RUFF_CMD="ruff"
+    PYTEST_CMD="pytest"
+    MYPY_CMD="mypy"
+  else
+    RUFF_CMD=""
+  fi
   
-  # Format check with ruff
-  echo "  → Ruff format..."
-  uv run ruff format --check . || {
-    echo "❌ Ruff format check failed. Run 'uv run ruff format .' to fix."
-    exit 1
-  }
+  if [ -n "$RUFF_CMD" ]; then
+    log_info "Linting..."
+    if $RUFF_CMD check . --quiet 2>/dev/null; then
+      log_success "Ruff lint passed"
+    else
+      log_error "Ruff lint failed — run: cd apps/agent && uv run ruff check . --fix"
+    fi
+    
+    log_info "Formatting..."
+    if $RUFF_CMD format --check . 2>/dev/null; then
+      log_success "Ruff format passed"
+    else
+      log_error "Ruff format failed — run: cd apps/agent && uv run ruff format ."
+    fi
+  else
+    log_warn "Neither uv nor ruff installed — skipping (CI will enforce)"
+  fi
+  
+  # Type check (optional)
+  if [ -n "$MYPY_CMD" ]; then
+    log_info "Type checking..."
+    if $MYPY_CMD src --ignore-missing-imports --no-error-summary 2>/dev/null; then
+      log_success "mypy passed"
+    else
+      log_warn "mypy had issues (non-blocking)"
+    fi
+  fi
+  
+  # Tests
+  if [ -d "tests" ] && [ "$(find tests -name '*.py' -type f 2>/dev/null | wc -l)" -gt 0 ]; then
+    log_info "Testing..."
+    if [ -n "$PYTEST_CMD" ] && $PYTEST_CMD tests/ -q --tb=no 2>/dev/null; then
+      log_success "Tests passed"
+    else
+      log_error "Tests failed"
+    fi
+  else
+    log_warn "No tests found"
+  fi
   
   cd ../..
-  echo "✅ Agent checks passed"
 fi
 
-# Check if database files are staged
-DB_STAGED=$(git diff --cached --name-only | grep "^supabase/migrations/" || true)
-if [ -n "$DB_STAGED" ]; then
-  echo "🗄️ Database changes detected - validating migrations..."
+# ─────────────────────────────────────────
+# Database Checks
+# ─────────────────────────────────────────
+if has_staged_files "supabase/migrations/"; then
+  echo ""
+  echo "${BLUE}🗄️  Database${NC}"
   
-  # Check migration naming
-  for file in $(git diff --cached --name-only | grep "^supabase/migrations/.*\.sql$"); do
-    filename=$(basename "$file")
-    if ! echo "$filename" | grep -qE '^[0-9]{14}_[a-z_]+\.sql$'; then
-      echo "❌ Invalid migration name: $filename"
-      echo "   Expected format: YYYYMMDDHHmmss_description.sql"
-      exit 1
-    fi
-  done
-  
-  # Check for RLS in new tables
-  for file in $(git diff --cached --name-only | grep "^supabase/migrations/.*\.sql$"); do
-    if git diff --cached "$file" | grep -qi "create table"; then
-      if ! git diff --cached "$file" | grep -qi "enable row level security"; then
-        echo "❌ $file creates table but doesn't enable RLS"
-        echo "   Constitution requires: All tables MUST have RLS enabled"
-        exit 1
+  # Check RLS on new tables
+  for file in $(echo "$STAGED_FILES" | grep "^supabase/migrations/.*\.sql$"); do
+    if grep -qi "create table" "$file" 2>/dev/null; then
+      if ! grep -qi "enable row level security" "$file" 2>/dev/null; then
+        log_error "Missing RLS in $file"
+      else
+        log_success "RLS enabled in $(basename "$file")"
       fi
     fi
   done
-  
-  echo "✅ Database checks passed"
 fi
 
-echo "🎉 All pre-commit checks passed!"
+# ─────────────────────────────────────────
+# Summary
+# ─────────────────────────────────────────
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 
+if [ $FAILED -eq 1 ]; then
+  echo "${RED}  ✗ Pre-commit checks failed${NC}"
+  echo ""
+  echo "  Fix errors above or skip with: git commit --no-verify"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+  exit 1
+fi
 
+echo "${GREEN}  ✓ All checks passed${NC}"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo ""

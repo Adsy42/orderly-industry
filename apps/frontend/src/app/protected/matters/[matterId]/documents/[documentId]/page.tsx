@@ -74,7 +74,7 @@ function HighlightedText({
   return (
     <>
       {before}
-      <mark 
+      <mark
         ref={markRef as React.RefObject<HTMLElement>}
         className="rounded bg-yellow-200 px-0.5 text-gray-900 ring-2 ring-yellow-300"
       >
@@ -113,11 +113,11 @@ function FocusedHighlight({
   // Calculate context window
   const excerptStart = Math.max(0, safeStart - contextChars);
   const excerptEnd = Math.min(text.length, safeEnd + contextChars);
-  
+
   // Adjust positions relative to excerpt
   const relativeStart = safeStart - excerptStart;
   const relativeEnd = safeEnd - excerptStart;
-  
+
   const excerpt = text.slice(excerptStart, excerptEnd);
   const showStartEllipsis = excerptStart > 0;
   const showEndEllipsis = excerptEnd < text.length;
@@ -138,7 +138,8 @@ function FocusedHighlight({
         {showEndEllipsis && <span className="text-gray-400"> ...</span>}
       </p>
       <p className="text-muted-foreground mt-2 text-xs">
-        Position: {start.toLocaleString()}-{end.toLocaleString()} of {text.length.toLocaleString()} chars
+        Position: {start.toLocaleString()}-{end.toLocaleString()} of{" "}
+        {text.length.toLocaleString()} chars
       </p>
     </div>
   );

@@ -274,3 +274,5 @@ SUPABASE_SERVICE_ROLE_KEY=eyJ...  # For processing
 3. **Enhance AI prompts**: Update agent prompts to always include citations
 4. **Monitor quality**: Track extraction quality scores and flag low-quality documents
 
+
+

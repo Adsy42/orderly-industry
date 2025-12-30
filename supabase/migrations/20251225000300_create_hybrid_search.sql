@@ -123,3 +123,5 @@ grant execute on function public.get_chunk_with_context to authenticated;
 grant execute on function public.match_document_chunks to authenticated;
 
 
+
+
