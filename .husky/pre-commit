@@ -81,29 +81,41 @@ if has_staged_files "apps/agent/"; then
   
   cd apps/agent
   
-  # Check for ruff
-  if command -v ruff >/dev/null 2>&1; then
+  # Determine ruff command (prefer uv run for project environment)
+  if command -v uv >/dev/null 2>&1; then
+    RUFF_CMD="uv run ruff"
+    PYTEST_CMD="uv run pytest"
+    MYPY_CMD="uv run mypy"
+  elif command -v ruff >/dev/null 2>&1; then
+    RUFF_CMD="ruff"
+    PYTEST_CMD="pytest"
+    MYPY_CMD="mypy"
+  else
+    RUFF_CMD=""
+  fi
+  
+  if [ -n "$RUFF_CMD" ]; then
     log_info "Linting..."
-    if ruff check . --quiet 2>/dev/null; then
+    if $RUFF_CMD check . --quiet 2>/dev/null; then
       log_success "Ruff lint passed"
     else
-      log_error "Ruff lint failed — run: ruff check . --fix"
+      log_error "Ruff lint failed — run: cd apps/agent && uv run ruff check . --fix"
     fi
     
     log_info "Formatting..."
-    if ruff format --check . 2>/dev/null; then
+    if $RUFF_CMD format --check . 2>/dev/null; then
       log_success "Ruff format passed"
     else
-      log_error "Ruff format failed — run: ruff format ."
+      log_error "Ruff format failed — run: cd apps/agent && uv run ruff format ."
     fi
   else
-    log_warn "Ruff not installed — skipping (CI will enforce)"
+    log_warn "Neither uv nor ruff installed — skipping (CI will enforce)"
   fi
   
   # Type check (optional)
-  if command -v mypy >/dev/null 2>&1; then
+  if [ -n "$MYPY_CMD" ]; then
     log_info "Type checking..."
-    if mypy src --ignore-missing-imports --no-error-summary 2>/dev/null; then
+    if $MYPY_CMD src --ignore-missing-imports --no-error-summary 2>/dev/null; then
       log_success "mypy passed"
     else
       log_warn "mypy had issues (non-blocking)"
@@ -113,7 +125,7 @@ if has_staged_files "apps/agent/"; then
   # Tests
   if [ -d "tests" ] && [ "$(find tests -name '*.py' -type f 2>/dev/null | wc -l)" -gt 0 ]; then
     log_info "Testing..."
-    if pytest tests/ -q --tb=no 2>/dev/null; then
+    if [ -n "$PYTEST_CMD" ] && $PYTEST_CMD tests/ -q --tb=no 2>/dev/null; then
       log_success "Tests passed"
     else
       log_error "Tests failed"
