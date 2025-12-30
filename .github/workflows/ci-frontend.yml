@@ -92,10 +92,61 @@ jobs:
       - name: Build
         run: pnpm build
         env:
-          # Dummy values for build validation
+          # Dummy values for build validation (matching production requirements)
           NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY: dummy-key-for-build
-          NEXT_PUBLIC_API_URL: https://example.com/api
+          NEXT_PUBLIC_API_URL: /api
           NEXT_PUBLIC_ASSISTANT_ID: deep_research
+          # Server-side env vars (not used in build but validate structure)
+          LANGGRAPH_API_URL: https://example.langgraph.app
+          LANGSMITH_API_KEY: dummy-key-for-build
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    needs: [lint, typecheck]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+        working-directory: .
+
+      - name: Check for tests
+        id: check_tests
+        run: |
+          if [ -d "src/__tests__" ] || [ -d "__tests__" ] || grep -q '"test"' package.json; then
+            echo "tests_exist=true" >> $GITHUB_OUTPUT
+          else
+            echo "tests_exist=false" >> $GITHUB_OUTPUT
+          fi
+        working-directory: apps/frontend
+
+      - name: Run tests
+        if: steps.check_tests.outputs.tests_exist == 'true'
+        run: pnpm test
+        working-directory: apps/frontend
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_OR_ANON_KEY: dummy-key-for-tests
+          NEXT_PUBLIC_API_URL: /api
+          NEXT_PUBLIC_ASSISTANT_ID: deep_research
+
+      - name: Fail if tests are missing
+        if: steps.check_tests.outputs.tests_exist == 'false'
+        run: |
+          echo "❌ No tests found in frontend"
+          echo "Tests are required for production readiness. Please add tests before merging."
+          exit 1
 
 

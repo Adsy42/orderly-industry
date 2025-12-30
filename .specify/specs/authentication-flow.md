@@ -286,3 +286,5 @@ SUPABASE_ANON_KEY=eyJhbG...
 2. Access via `auth.jwt() -> 'app_metadata' -> 'role'` in RLS
 3. Add role checks to agent auth handler
 
+
+

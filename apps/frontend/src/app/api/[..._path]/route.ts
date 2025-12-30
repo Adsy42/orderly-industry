@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
+import { getLangGraphApiUrl, getLangSmithApiKey } from "@/lib/env";
 
 // This file acts as a proxy for requests to your LangGraph server.
 // Custom implementation that forwards the Authorization header for JWT auth.
-
-// For local development, proxy to localhost:2024
-// For production, use LANGGRAPH_API_URL (LangSmith deployment) with LANGSMITH_API_KEY
-const API_URL = process.env.LANGGRAPH_API_URL || "http://localhost:2024";
-const API_KEY = process.env.LANGSMITH_API_KEY || "";
+//
+// Configuration:
+// - Local: Set LANGGRAPH_API_URL=http://localhost:2024 in .env.local
+// - Production: Set LANGGRAPH_API_URL to your LangSmith deployment URL
+// - LANGSMITH_API_KEY is also required
 
 export const runtime = "edge";
 
@@ -20,6 +21,11 @@ function getCorsHeaders() {
 
 async function handleRequest(req: NextRequest, method: string) {
   try {
+    // Get environment variables at request time (not module load time)
+    // This ensures errors are thrown at runtime, not during build
+    const API_URL = getLangGraphApiUrl();
+    const API_KEY = getLangSmithApiKey();
+
     // Extract path after /api/
     const path = req.nextUrl.pathname.replace(/^\/?api\//, "");
 
@@ -35,10 +41,8 @@ async function handleRequest(req: NextRequest, method: string) {
     // Build headers - forward Authorization header from the original request
     const headers: Record<string, string> = {};
 
-    // Add LangSmith API key if available (for deployed graphs)
-    if (API_KEY) {
-      headers["x-api-key"] = API_KEY;
-    }
+    // Add LangSmith API key (required)
+    headers["x-api-key"] = API_KEY;
 
     // Forward Authorization header from browser (contains Supabase JWT)
     const authHeader = req.headers.get("authorization");

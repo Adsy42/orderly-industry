@@ -26,3 +26,5 @@ create index if not exists idx_documents_structure_extracted
   where structure_extracted = false;
 
 
+
+

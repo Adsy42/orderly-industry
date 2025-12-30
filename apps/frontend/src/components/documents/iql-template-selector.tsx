@@ -71,7 +71,7 @@ export function IQLTemplateSelector({
       }
       return;
     }
-    
+
     // For templates that require parameters, show the input form
     setSelectedTemplate(template);
     setParameterValue("");
@@ -156,21 +156,27 @@ export function IQLTemplateSelector({
                         <h4 className="text-sm font-medium">
                           {template.displayName}
                         </h4>
-                        <p className={cn(
-                          "mt-1 line-clamp-2 text-xs transition-colors",
-                          "text-muted-foreground",
-                          "group-hover:text-primary-foreground/80",
-                          selectedTemplate?.name === template.name && "text-primary-foreground/80",
-                        )}>
+                        <p
+                          className={cn(
+                            "mt-1 line-clamp-2 text-xs transition-colors",
+                            "text-muted-foreground",
+                            "group-hover:text-primary-foreground/80",
+                            selectedTemplate?.name === template.name &&
+                              "text-primary-foreground/80",
+                          )}
+                        >
                           {template.description}
                         </p>
                         {template.requiresParameter && (
-                          <p className={cn(
-                            "mt-1 text-xs transition-colors",
-                            "text-muted-foreground",
-                            "group-hover:text-primary-foreground/70",
-                            selectedTemplate?.name === template.name && "text-primary-foreground/70",
-                          )}>
+                          <p
+                            className={cn(
+                              "mt-1 text-xs transition-colors",
+                              "text-muted-foreground",
+                              "group-hover:text-primary-foreground/70",
+                              selectedTemplate?.name === template.name &&
+                                "text-primary-foreground/70",
+                            )}
+                          >
                             ⚙️ Requires: {template.parameterName}
                           </p>
                         )}

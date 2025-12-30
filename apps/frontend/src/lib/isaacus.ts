@@ -493,7 +493,8 @@ export function segmentSentences(text: string): SentenceWithPosition[] {
 
     if (originalText.length > 0) {
       // Find the actual start position (skip leading whitespace)
-      const leadingWhitespace = text.slice(start).match(/^\s*/)?.[0].length || 0;
+      const leadingWhitespace =
+        text.slice(start).match(/^\s*/)?.[0].length || 0;
       const actualStart = start + leadingWhitespace;
       const actualEnd = actualStart + originalText.length;
 
@@ -616,7 +617,11 @@ Return JSON: { "indices": [0], "confidence": 0.0-1.0, "reasoning": "brief explan
     const content = response.choices[0]?.message?.content;
     if (!content) {
       // Fallback: return first 2 sentences as reasonable default
-      return createFallbackResult(sentences, chunkStartOffset, "LLM returned no content");
+      return createFallbackResult(
+        sentences,
+        chunkStartOffset,
+        "LLM returned no content",
+      );
     }
 
     const parsed = JSON.parse(content);

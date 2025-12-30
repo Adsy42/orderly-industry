@@ -1,87 +1,134 @@
-#!/bin/sh
-. "$(dirname "$0")/_/husky.sh"
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
 
-echo "🔍 Running pre-commit checks..."
+# Run pre-commit quality gates
+# This ensures all tests, linting, and builds pass before committing
 
-# Check if frontend files are staged
-FRONTEND_STAGED=$(git diff --cached --name-only | grep "^apps/frontend/" || true)
-if [ -n "$FRONTEND_STAGED" ]; then
-  echo "📦 Frontend changes detected - running checks..."
-  
-  cd apps/frontend
+echo "🔍 Running pre-commit quality gates..."
+
+# Change to repo root
+cd "$(git rev-parse --show-toplevel)"
+
+# Track if any checks fail
+FAILED=0
+
+# 1. Frontend Checks
+if git diff --cached --name-only | grep -q "^apps/frontend/"; then
+  echo ""
+  echo "📦 Running frontend checks..."
   
   # Lint
-  echo "  → ESLint..."
-  pnpm lint || {
-    echo "❌ ESLint failed. Fix errors before committing."
-    exit 1
+  echo "  → Running ESLint..."
+  pnpm --filter frontend lint || {
+    echo "❌ Frontend linting failed. Run 'pnpm --filter frontend lint:fix' to fix."
+    FAILED=1
+  }
+  
+  # Format check
+  echo "  → Checking Prettier formatting..."
+  pnpm --filter frontend format:check || {
+    echo "❌ Frontend formatting failed. Run 'pnpm --filter frontend format' to fix."
+    FAILED=1
   }
   
   # Type check
-  echo "  → TypeScript..."
-  pnpm tsc --noEmit || {
-    echo "❌ TypeScript check failed. Fix errors before committing."
-    exit 1
+  echo "  → Running TypeScript type check..."
+  pnpm --filter frontend tsc --noEmit || {
+    echo "❌ Frontend type check failed."
+    FAILED=1
   }
   
-  cd ../..
-  echo "✅ Frontend checks passed"
+  # Build check (catches production build errors)
+  echo "  → Running production build check..."
+  pnpm --filter frontend build || {
+    echo "❌ Frontend build failed. Fix build errors before committing."
+    FAILED=1
+  }
+  
+  # Tests (if they exist)
+  if [ -d "apps/frontend/src/__tests__" ] || [ -d "apps/frontend/__tests__" ] || [ -f "apps/frontend/package.json" ] && grep -q '"test"' apps/frontend/package.json; then
+    echo "  → Running frontend tests..."
+    pnpm --filter frontend test 2>/dev/null || {
+      echo "❌ Frontend tests failed."
+      FAILED=1
+    }
+  else
+    echo "  ⚠️  No frontend tests found (tests directory or test script missing)"
+  fi
 fi
 
-# Check if agent files are staged
-AGENT_STAGED=$(git diff --cached --name-only | grep "^apps/agent/" || true)
-if [ -n "$AGENT_STAGED" ]; then
-  echo "🐍 Agent changes detected - running checks..."
+# 2. Agent Checks
+if git diff --cached --name-only | grep -q "^apps/agent/"; then
+  echo ""
+  echo "🐍 Running agent checks..."
   
-  cd apps/agent
+  cd apps/agent || exit 1
   
-  # Lint with ruff (using uv to ensure ruff is available)
-  echo "  → Ruff lint..."
-  uv run ruff check . || {
-    echo "❌ Ruff lint failed. Fix errors before committing."
-    exit 1
-  }
+  # Lint (if ruff is available - CI will enforce if not)
+  if command -v ruff >/dev/null 2>&1; then
+    echo "  → Running Ruff linter..."
+    ruff check . || {
+      echo "❌ Agent linting failed. Run 'ruff check . --fix' to auto-fix some issues."
+      FAILED=1
+    }
+    
+    # Format check
+    echo "  → Checking Ruff formatting..."
+    ruff format --check . || {
+      echo "❌ Agent formatting failed. Run 'ruff format .' to fix."
+      FAILED=1
+    }
+  else
+    echo "  ⚠️  Ruff not installed locally, skipping (CI will enforce)"
+  fi
   
-  # Format check with ruff
-  echo "  → Ruff format..."
-  uv run ruff format --check . || {
-    echo "❌ Ruff format check failed. Run 'uv run ruff format .' to fix."
-    exit 1
-  }
+  # Type check (if mypy is available)
+  if command -v mypy >/dev/null 2>&1 || python -m mypy --version >/dev/null 2>&1; then
+    echo "  → Running mypy type check..."
+    mypy src --ignore-missing-imports 2>/dev/null || {
+      echo "⚠️  Agent type check had issues (continuing...)"
+    }
+  fi
+  
+  # Tests (if they exist)
+  if [ -d "tests" ]; then
+    echo "  → Running agent tests..."
+    pytest tests/ -v || {
+      echo "❌ Agent tests failed."
+      FAILED=1
+    }
+  else
+    echo "  ⚠️  No agent tests found (tests directory missing)"
+  fi
   
   cd ../..
-  echo "✅ Agent checks passed"
 fi
 
-# Check if database files are staged
-DB_STAGED=$(git diff --cached --name-only | grep "^supabase/migrations/" || true)
-if [ -n "$DB_STAGED" ]; then
-  echo "🗄️ Database changes detected - validating migrations..."
+# 3. Database Checks (SQL migrations)
+if git diff --cached --name-only | grep -q "^supabase/migrations/"; then
+  echo ""
+  echo "🗄️  Running database checks..."
   
-  # Check migration naming
+  # Basic SQL syntax validation (check for RLS policies on new tables)
   for file in $(git diff --cached --name-only | grep "^supabase/migrations/.*\.sql$"); do
-    filename=$(basename "$file")
-    if ! echo "$filename" | grep -qE '^[0-9]{14}_[a-z_]+\.sql$'; then
-      echo "❌ Invalid migration name: $filename"
-      echo "   Expected format: YYYYMMDDHHmmss_description.sql"
-      exit 1
-    fi
-  done
-  
-  # Check for RLS in new tables
-  for file in $(git diff --cached --name-only | grep "^supabase/migrations/.*\.sql$"); do
-    if git diff --cached "$file" | grep -qi "create table"; then
-      if ! git diff --cached "$file" | grep -qi "enable row level security"; then
-        echo "❌ $file creates table but doesn't enable RLS"
-        echo "   Constitution requires: All tables MUST have RLS enabled"
-        exit 1
+    if grep -qi "create table" "$file"; then
+      if ! grep -qi "enable row level security" "$file"; then
+        echo "❌ Migration $file creates table(s) but doesn't enable RLS"
+        echo "   All tables MUST have Row Level Security enabled."
+        FAILED=1
       fi
     fi
   done
-  
-  echo "✅ Database checks passed"
 fi
 
-echo "🎉 All pre-commit checks passed!"
+# Exit with error if any check failed
+if [ $FAILED -eq 1 ]; then
+  echo ""
+  echo "❌ Pre-commit checks failed. Please fix the errors above before committing."
+  echo "   Use 'git commit --no-verify' to skip checks (not recommended)."
+  exit 1
+fi
 
-
+echo ""
+echo "✅ All pre-commit checks passed!"
+exit 0

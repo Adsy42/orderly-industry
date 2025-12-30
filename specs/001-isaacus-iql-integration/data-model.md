@@ -205,3 +205,5 @@ USING ((select auth.uid()) = user_id);
 - Query templates (user-defined templates, not just Isaacus templates)
 - Matter-scoped query execution (apply query to all documents in matter)
 
+
+

@@ -173,9 +173,9 @@ orderly-industry/
 
 ### Frontend → Vercel (Automatic)
 
-- PRs get preview deployments
 - Merges to `main` deploy to production
 - Environment variables configured in Vercel dashboard
+- **Preview deployments disabled** (see `STAGING_DISABLED.md`)
 
 ### Agent → LangSmith Cloud (Manual)
 
@@ -185,12 +185,23 @@ orderly-industry/
 4. Add environment variables
 5. Deploy
 
-**Current Blocker**: The staging environment is using an old agent deployment with different tools. Need to redeploy to sync.
+### Database → Supabase
 
-### Database → Supabase (Automatic)
+- Migrations applied manually as needed
+- **Preview branches disabled** (see `STAGING_DISABLED.md`)
 
-- PRs get preview branches (via `preview-supabase.yml`)
-- Migrations applied automatically
+---
+
+## 🔧 Environment Configuration
+
+**Important**: All environment variables must be configured. No hardcoded fallbacks.
+
+See **[ENV_SETUP.md](ENV_SETUP.md)** for complete configuration guide:
+
+- Local development setup
+- Production configuration
+- Environment variable helper functions
+- Common issues and solutions
 
 ## 🔑 Environment Variables
 

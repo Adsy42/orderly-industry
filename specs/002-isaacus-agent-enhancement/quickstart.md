@@ -257,3 +257,5 @@ After basic integration is complete:
 2. **Confidence Indicators**: Add color coding for score ranges
 3. **Saved Queries**: Enable saving successful IQL queries for reuse
 
+
+
