@@ -75,7 +75,7 @@ All testing happens in local development and CI, which is free.
 
 If you were relying on preview deployments:
 
-1. **Use local development** - Set up environment variables per `ENV_SETUP.md`
+1. **Use local development** - Set up environment variables per [ENV_SETUP.md](../ENV_SETUP.md)
 2. **Run tests locally** - Use `pnpm test` or `pytest` before committing
 3. **CI validation** - Let GitHub Actions validate before merging
 

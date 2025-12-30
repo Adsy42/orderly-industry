@@ -357,10 +357,10 @@ All CI workflows must pass before merge:
 | `.github/workflows/ci-frontend.yml` | Frontend CI pipeline |
 | `.github/workflows/ci-agent.yml` | Agent CI pipeline |
 | `.github/workflows/ci-database.yml` | Database CI pipeline |
-| `.github/workflows/preview-supabase.yml` | Supabase preview deployments |
-| `.github/workflows/preview-agent.yml` | LangSmith preview validation |
 | `.github/workflows/deploy-agent.yml` | Production agent deployment |
+| `.husky/pre-commit` | Pre-commit quality gates |
 | `CONTRIBUTING.md` | Development workflow & conventions |
+| `ENV_SETUP.md` | Environment configuration |
 | `.specify/memory/constitution.md` | Core principles & coding standards |
 | `.cursor/commands/` | SpecKit slash command definitions |
 

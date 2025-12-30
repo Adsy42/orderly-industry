@@ -1,134 +1,163 @@
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
 
-# Run pre-commit quality gates
-# This ensures all tests, linting, and builds pass before committing
+# Pre-commit quality gates
+# Runs checks only for staged files in each area
 
-echo "🔍 Running pre-commit quality gates..."
+set -e
 
-# Change to repo root
 cd "$(git rev-parse --show-toplevel)"
 
-# Track if any checks fail
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Track failures
 FAILED=0
 
-# 1. Frontend Checks
-if git diff --cached --name-only | grep -q "^apps/frontend/"; then
+log_info() { printf "${BLUE}→${NC} %s\n" "$1"; }
+log_success() { printf "${GREEN}✓${NC} %s\n" "$1"; }
+log_warn() { printf "${YELLOW}⚠${NC} %s\n" "$1"; }
+log_error() { printf "${RED}✗${NC} %s\n" "$1"; FAILED=1; }
+
+# Get staged files
+STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM)
+
+# Check if any files match a pattern
+has_staged_files() {
+  echo "$STAGED_FILES" | grep -q "^$1" 2>/dev/null
+}
+
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo "  Pre-commit Quality Gates"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
+# ─────────────────────────────────────────
+# Frontend Checks
+# ─────────────────────────────────────────
+if has_staged_files "apps/frontend/"; then
   echo ""
-  echo "📦 Running frontend checks..."
+  echo "${BLUE}📦 Frontend${NC}"
   
-  # Lint
-  echo "  → Running ESLint..."
-  pnpm --filter frontend lint || {
-    echo "❌ Frontend linting failed. Run 'pnpm --filter frontend lint:fix' to fix."
-    FAILED=1
-  }
-  
-  # Format check
-  echo "  → Checking Prettier formatting..."
-  pnpm --filter frontend format:check || {
-    echo "❌ Frontend formatting failed. Run 'pnpm --filter frontend format' to fix."
-    FAILED=1
-  }
-  
-  # Type check
-  echo "  → Running TypeScript type check..."
-  pnpm --filter frontend tsc --noEmit || {
-    echo "❌ Frontend type check failed."
-    FAILED=1
-  }
-  
-  # Build check (catches production build errors)
-  echo "  → Running production build check..."
-  pnpm --filter frontend build || {
-    echo "❌ Frontend build failed. Fix build errors before committing."
-    FAILED=1
-  }
-  
-  # Tests (if they exist)
-  if [ -d "apps/frontend/src/__tests__" ] || [ -d "apps/frontend/__tests__" ] || [ -f "apps/frontend/package.json" ] && grep -q '"test"' apps/frontend/package.json; then
-    echo "  → Running frontend tests..."
-    pnpm --filter frontend test 2>/dev/null || {
-      echo "❌ Frontend tests failed."
-      FAILED=1
-    }
+  log_info "Linting..."
+  if pnpm --filter frontend lint --quiet 2>/dev/null; then
+    log_success "ESLint passed"
   else
-    echo "  ⚠️  No frontend tests found (tests directory or test script missing)"
+    log_error "ESLint failed — run: pnpm --filter frontend lint:fix"
+  fi
+  
+  log_info "Formatting..."
+  if pnpm --filter frontend format:check 2>/dev/null; then
+    log_success "Prettier passed"
+  else
+    log_error "Prettier failed — run: pnpm --filter frontend format"
+  fi
+  
+  log_info "Type checking..."
+  if pnpm --filter frontend tsc --noEmit 2>/dev/null; then
+    log_success "TypeScript passed"
+  else
+    log_error "TypeScript failed"
+  fi
+  
+  log_info "Building..."
+  if pnpm --filter frontend build >/dev/null 2>&1; then
+    log_success "Build passed"
+  else
+    log_error "Build failed"
   fi
 fi
 
-# 2. Agent Checks
-if git diff --cached --name-only | grep -q "^apps/agent/"; then
+# ─────────────────────────────────────────
+# Agent Checks
+# ─────────────────────────────────────────
+if has_staged_files "apps/agent/"; then
   echo ""
-  echo "🐍 Running agent checks..."
+  echo "${BLUE}🐍 Agent${NC}"
   
-  cd apps/agent || exit 1
+  cd apps/agent
   
-  # Lint (if ruff is available - CI will enforce if not)
+  # Check for ruff
   if command -v ruff >/dev/null 2>&1; then
-    echo "  → Running Ruff linter..."
-    ruff check . || {
-      echo "❌ Agent linting failed. Run 'ruff check . --fix' to auto-fix some issues."
-      FAILED=1
-    }
+    log_info "Linting..."
+    if ruff check . --quiet 2>/dev/null; then
+      log_success "Ruff lint passed"
+    else
+      log_error "Ruff lint failed — run: ruff check . --fix"
+    fi
     
-    # Format check
-    echo "  → Checking Ruff formatting..."
-    ruff format --check . || {
-      echo "❌ Agent formatting failed. Run 'ruff format .' to fix."
-      FAILED=1
-    }
+    log_info "Formatting..."
+    if ruff format --check . 2>/dev/null; then
+      log_success "Ruff format passed"
+    else
+      log_error "Ruff format failed — run: ruff format ."
+    fi
   else
-    echo "  ⚠️  Ruff not installed locally, skipping (CI will enforce)"
+    log_warn "Ruff not installed — skipping (CI will enforce)"
   fi
   
-  # Type check (if mypy is available)
-  if command -v mypy >/dev/null 2>&1 || python -m mypy --version >/dev/null 2>&1; then
-    echo "  → Running mypy type check..."
-    mypy src --ignore-missing-imports 2>/dev/null || {
-      echo "⚠️  Agent type check had issues (continuing...)"
-    }
+  # Type check (optional)
+  if command -v mypy >/dev/null 2>&1; then
+    log_info "Type checking..."
+    if mypy src --ignore-missing-imports --no-error-summary 2>/dev/null; then
+      log_success "mypy passed"
+    else
+      log_warn "mypy had issues (non-blocking)"
+    fi
   fi
   
-  # Tests (if they exist)
-  if [ -d "tests" ]; then
-    echo "  → Running agent tests..."
-    pytest tests/ -v || {
-      echo "❌ Agent tests failed."
-      FAILED=1
-    }
+  # Tests
+  if [ -d "tests" ] && [ "$(find tests -name '*.py' -type f 2>/dev/null | wc -l)" -gt 0 ]; then
+    log_info "Testing..."
+    if pytest tests/ -q --tb=no 2>/dev/null; then
+      log_success "Tests passed"
+    else
+      log_error "Tests failed"
+    fi
   else
-    echo "  ⚠️  No agent tests found (tests directory missing)"
+    log_warn "No tests found"
   fi
   
   cd ../..
 fi
 
-# 3. Database Checks (SQL migrations)
-if git diff --cached --name-only | grep -q "^supabase/migrations/"; then
+# ─────────────────────────────────────────
+# Database Checks
+# ─────────────────────────────────────────
+if has_staged_files "supabase/migrations/"; then
   echo ""
-  echo "🗄️  Running database checks..."
+  echo "${BLUE}🗄️  Database${NC}"
   
-  # Basic SQL syntax validation (check for RLS policies on new tables)
-  for file in $(git diff --cached --name-only | grep "^supabase/migrations/.*\.sql$"); do
-    if grep -qi "create table" "$file"; then
-      if ! grep -qi "enable row level security" "$file"; then
-        echo "❌ Migration $file creates table(s) but doesn't enable RLS"
-        echo "   All tables MUST have Row Level Security enabled."
-        FAILED=1
+  # Check RLS on new tables
+  for file in $(echo "$STAGED_FILES" | grep "^supabase/migrations/.*\.sql$"); do
+    if grep -qi "create table" "$file" 2>/dev/null; then
+      if ! grep -qi "enable row level security" "$file" 2>/dev/null; then
+        log_error "Missing RLS in $file"
+      else
+        log_success "RLS enabled in $(basename "$file")"
       fi
     fi
   done
 fi
 
-# Exit with error if any check failed
+# ─────────────────────────────────────────
+# Summary
+# ─────────────────────────────────────────
+echo ""
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+
 if [ $FAILED -eq 1 ]; then
+  echo "${RED}  ✗ Pre-commit checks failed${NC}"
   echo ""
-  echo "❌ Pre-commit checks failed. Please fix the errors above before committing."
-  echo "   Use 'git commit --no-verify' to skip checks (not recommended)."
+  echo "  Fix errors above or skip with: git commit --no-verify"
+  echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
   exit 1
 fi
 
+echo "${GREEN}  ✓ All checks passed${NC}"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
-echo "✅ All pre-commit checks passed!"
-exit 0

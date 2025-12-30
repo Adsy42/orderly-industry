@@ -74,6 +74,8 @@ pnpm dev:all
 | ------------------------------------------------------------------ | --------------------------------------------- |
 | [README.md](README.md)                                             | Architecture, deployment, full setup          |
 | [CONTRIBUTING.md](CONTRIBUTING.md)                                 | Development workflow, conventions, PR process |
+| [ENV_SETUP.md](ENV_SETUP.md)                                       | Environment variables & configuration         |
+| [docs/DEVOPS_LIFECYCLE.md](docs/DEVOPS_LIFECYCLE.md)               | CI/CD pipeline & quality gates                |
 | [.specify/memory/constitution.md](.specify/memory/constitution.md) | Core principles, coding standards             |
 | [.cursor/rules/](.cursor/rules/)                                   | Database & SQL coding rules                   |
 

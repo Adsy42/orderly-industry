@@ -175,7 +175,7 @@ orderly-industry/
 
 - Merges to `main` deploy to production
 - Environment variables configured in Vercel dashboard
-- **Preview deployments disabled** (see `STAGING_DISABLED.md`)
+- **Preview deployments disabled** (see [docs/STAGING_DISABLED.md](docs/STAGING_DISABLED.md))
 
 ### Agent → LangSmith Cloud (Manual)
 
@@ -188,7 +188,7 @@ orderly-industry/
 ### Database → Supabase
 
 - Migrations applied manually as needed
-- **Preview branches disabled** (see `STAGING_DISABLED.md`)
+- **Preview branches disabled** (see [docs/STAGING_DISABLED.md](docs/STAGING_DISABLED.md))
 
 ---
 
@@ -230,11 +230,14 @@ LANGSMITH_API_KEY=<your key>
 
 ## 📚 Documentation
 
-| Doc                                                          | Purpose                    |
-| ------------------------------------------------------------ | -------------------------- |
-| [ONBOARDING.md](ONBOARDING.md)                               | Quick setup for new devs   |
-| [CONTRIBUTING.md](CONTRIBUTING.md)                           | Dev workflow & conventions |
-| [specs/004-matters-documents/](specs/004-matters-documents/) | Current feature docs       |
+| Doc                                                          | Purpose                     |
+| ------------------------------------------------------------ | --------------------------- |
+| [ONBOARDING.md](ONBOARDING.md)                               | Quick setup for new devs    |
+| [CONTRIBUTING.md](CONTRIBUTING.md)                           | Dev workflow & conventions  |
+| [ENV_SETUP.md](ENV_SETUP.md)                                 | Environment configuration   |
+| [docs/DEVOPS_LIFECYCLE.md](docs/DEVOPS_LIFECYCLE.md)         | CI/CD & deployment workflow |
+| [docs/STAGING_DISABLED.md](docs/STAGING_DISABLED.md)         | Staging environment status  |
+| [specs/](specs/)                                             | Feature specifications      |
 
 ## 🐛 Known Issues
 

@@ -1,5 +1,5 @@
 {
-  "name": "deep-research-app",
+  "name": "orderly-industry",
   "private": true,
   "scripts": {
     "dev": "pnpm --filter frontend dev",
@@ -11,12 +11,12 @@
     "lint:all": "pnpm lint && pnpm lint:agent",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "format:agent": "cd apps/agent && ruff format .",
-    "test": "pnpm test:frontend && pnpm test:agent",
-    "test:frontend": "pnpm --filter frontend test 2>/dev/null || echo '⚠️  Frontend tests not configured'",
-    "test:agent": "cd apps/agent && pytest tests/ -v 2>/dev/null || echo '⚠️  Agent tests not configured'",
-    "test:all": "pnpm test:frontend && pnpm test:agent",
-    "prepare": "husky install",
-    "pre-commit": "bash .husky/pre-commit"
+    "format:all": "pnpm format && pnpm format:agent",
+    "typecheck": "pnpm --filter frontend tsc --noEmit",
+    "test": "pnpm --filter frontend test",
+    "test:agent": "cd apps/agent && pytest tests/ -v",
+    "test:all": "pnpm test && pnpm test:agent",
+    "prepare": "husky install"
   },
   "devDependencies": {
     "concurrently": "^9.1.0",
