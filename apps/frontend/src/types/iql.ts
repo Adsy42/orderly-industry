@@ -11,6 +11,8 @@ export interface IQLQueryResult {
   matches: IQLMatch[];
   executedAt: string;
   model: string;
+  /** Translated IQL query if query was translated from natural language */
+  translatedIQL?: string;
 }
 
 export interface IQLMatchCitation {

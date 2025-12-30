@@ -14,6 +14,7 @@ import {
   Copy,
   Check,
   ExternalLink,
+  ArrowRight,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,8 @@ interface IQLResultsProps {
   onMatchClick?: (match: IQLQueryResult["matches"][0]) => void;
   className?: string;
   matterId?: string;
+  /** Callback to switch to IQL mode with translated query */
+  onSwitchToIQLMode?: (query: string) => void;
 }
 
 export function IQLResults({
@@ -35,7 +38,19 @@ export function IQLResults({
   onMatchClick,
   className,
   matterId,
+  onSwitchToIQLMode,
 }: IQLResultsProps) {
+  const [copied, setCopied] = React.useState(false);
+
+  const handleCopyIQL = async (iql: string) => {
+    try {
+      await navigator.clipboard.writeText(iql);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy IQL:", err);
+    }
+  };
   if (!results) {
     return null;
   }
@@ -145,7 +160,47 @@ export function IQLResults({
             <span className="font-medium">{formatScore(results.score)}</span>
           </div>
         </div>
-        <div className="text-muted-foreground mt-2 text-xs">
+        <div className="text-muted-foreground mt-2 space-y-1 text-xs">
+          {results.translatedIQL && results.translatedIQL !== results.query && (
+            <div className="rounded-md border border-blue-200 bg-blue-50 p-2 dark:border-blue-800 dark:bg-blue-950/20">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="mb-1 font-medium text-blue-900 dark:text-blue-100">
+                    Translated IQL Query:
+                  </p>
+                  <code className="block rounded bg-blue-100 px-2 py-1 break-all text-blue-900 dark:bg-blue-900/50 dark:text-blue-100">
+                    {results.translatedIQL}
+                  </code>
+                </div>
+                <div className="flex shrink-0 gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleCopyIQL(results.translatedIQL!)}
+                    className="h-7 px-2"
+                    title="Copy IQL query"
+                  >
+                    {copied ? (
+                      <Check className="h-3 w-3" />
+                    ) : (
+                      <Copy className="h-3 w-3" />
+                    )}
+                  </Button>
+                  {onSwitchToIQLMode && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onSwitchToIQLMode(results.translatedIQL!)}
+                      className="h-7 px-2"
+                      title="Switch to IQL mode with this query"
+                    >
+                      <ArrowRight className="h-3 w-3" />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+          )}
           <p>
             Query:{" "}
             <code className="bg-muted rounded px-1">{results.query}</code>
