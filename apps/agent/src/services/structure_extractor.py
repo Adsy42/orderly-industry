@@ -567,5 +567,3 @@ def verify_content_hash(content: str, stored_hash: str) -> bool:
         True if hashes match.
     """
     return generate_content_hash(content) == stored_hash
-
-
