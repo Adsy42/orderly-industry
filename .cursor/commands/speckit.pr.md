@@ -532,3 +532,5 @@ This command bridges the gap between implementation and review by:
 4. **Quality**: Includes review checklist from constitution
 5. **Context**: Gives reviewers all information needed for effective review
 
+
+

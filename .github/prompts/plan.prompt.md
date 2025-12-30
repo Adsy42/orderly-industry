@@ -98,3 +98,5 @@ Document any research needed:
 - Frontend UI: `.specify/specs/frontend-chat-ui.md`
 - Cursor Rules: `.cursor/rules/`
 
+
+

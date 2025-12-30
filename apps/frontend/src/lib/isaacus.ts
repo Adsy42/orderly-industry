@@ -493,7 +493,8 @@ export function segmentSentences(text: string): SentenceWithPosition[] {
 
     if (originalText.length > 0) {
       // Find the actual start position (skip leading whitespace)
-      const leadingWhitespace = text.slice(start).match(/^\s*/)?.[0].length || 0;
+      const leadingWhitespace =
+        text.slice(start).match(/^\s*/)?.[0].length || 0;
       const actualStart = start + leadingWhitespace;
       const actualEnd = actualStart + originalText.length;
 
@@ -527,7 +528,8 @@ function getOpenAIClient(): OpenAI {
  * Uses GPT-4o-mini to identify which sentence(s) from a pre-segmented list
  * are MOST RELEVANT to the IQL query. The key insight is that IQL has already
  * determined this chunk is semantically relevant - the LLM's job is to find
- * the BEST sentences, not to re-validate relevance.
+ * the BEST sentences, not to re-validate relevance. This avoids the "returns everything" problem
+ * by forcing the LLM to choose from discrete sentence options.
  *
  * @param chunkText - The text chunk from IQL classification (already semantically matched)
  * @param queryType - What we're looking for (e.g., "termination clause", "confidentiality provision")
@@ -615,7 +617,11 @@ Return JSON: { "indices": [0], "confidence": 0.0-1.0, "reasoning": "brief explan
     const content = response.choices[0]?.message?.content;
     if (!content) {
       // Fallback: return first 2 sentences as reasonable default
-      return createFallbackResult(sentences, chunkStartOffset, "LLM returned no content");
+      return createFallbackResult(
+        sentences,
+        chunkStartOffset,
+        "LLM returned no content",
+      );
     }
 
     const parsed = JSON.parse(content);

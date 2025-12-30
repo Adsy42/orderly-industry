@@ -22,6 +22,7 @@ import { createClient } from "@/lib/supabase/client";
 import type { Session } from "@supabase/supabase-js";
 import { getContentString } from "@/components/thread/utils";
 import type { Message } from "@langchain/langgraph-sdk";
+import { getApiUrl, getAssistantId } from "@/lib/env";
 
 export type StateType = { messages: Message[]; ui?: UIMessage[] };
 
@@ -274,24 +275,18 @@ const DEFAULT_ASSISTANT_ID = "deep_research";
  * The LangGraph SDK requires a full URL (not relative path) for the URL constructor.
  * In production, requests go through /api/* passthrough route.
  */
-function getDefaultApiUrl(): string {
-  // If running in browser, construct full URL using origin
-  if (typeof window !== "undefined") {
-    return `${window.location.origin}/api`;
-  }
-  // SSR fallback - this shouldn't be used for actual requests
-  return "http://localhost:3000/api";
-}
+// Note: getApiUrl() handles environment variable resolution
+// Client-side: Uses NEXT_PUBLIC_API_URL (defaults to '/api' for Next.js proxy)
+// Server-side: Uses LANGGRAPH_API_URL (required in production)
 
 export const StreamProvider: React.FC<{ children: ReactNode }> = ({
   children,
 }) => {
-  // Get environment variables with direct access (Next.js inlines NEXT_PUBLIC_* at build time)
-  // Fall back to sensible defaults so users never see a config form
-  const envApiUrl: string =
-    process.env.NEXT_PUBLIC_API_URL || getDefaultApiUrl();
-  const envAssistantId: string =
-    process.env.NEXT_PUBLIC_ASSISTANT_ID || DEFAULT_ASSISTANT_ID;
+  // Get environment variables with validation
+  // In browser, getApiUrl() uses NEXT_PUBLIC_API_URL (defaults to '/api' for Next.js proxy)
+  // Assistant ID defaults to 'deep_research' if not set
+  const envApiUrl: string = getApiUrl();
+  const envAssistantId: string = getAssistantId();
   // #region agent log
   fetch("http://127.0.0.1:7243/ingest/b05c2d04-a0a4-474b-97d6-e4c51366f6f1", {
     method: "POST",

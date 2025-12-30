@@ -49,8 +49,11 @@ interface AgentStructureResponse {
   error?: string;
 }
 
-// Get LangGraph agent URL from environment
-const LANGGRAPH_URL = process.env.LANGGRAPH_URL || "http://localhost:2024";
+import { getLangGraphApiUrl, getLangSmithApiKey } from "@/lib/env";
+
+// Get LangGraph agent URL from environment at request time (not module load time)
+// In production, LANGGRAPH_API_URL must be set to your LangSmith deployment URL
+// LANGSMITH_API_KEY is also required
 
 export async function POST(request: NextRequest) {
   let supabase: Awaited<ReturnType<typeof createClient>> | null = null;
@@ -132,6 +135,10 @@ export async function POST(request: NextRequest) {
       .update({ processing_status: "structuring" })
       .eq("id", document_id);
 
+    // Get environment variables at request time (not module load time)
+    const LANGGRAPH_URL = getLangGraphApiUrl();
+    const LANGSMITH_API_KEY = getLangSmithApiKey();
+
     // Call LangGraph agent for structure extraction
     let structureResult: AgentStructureResponse;
     try {
@@ -141,7 +148,7 @@ export async function POST(request: NextRequest) {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${process.env.LANGGRAPH_API_KEY || ""}`,
+            Authorization: `Bearer ${LANGSMITH_API_KEY}`,
           },
           body: JSON.stringify({
             document_id,
