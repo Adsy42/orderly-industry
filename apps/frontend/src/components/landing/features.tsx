@@ -61,16 +61,6 @@ const features = [
 export function Features() {
   return (
     <>
-      {/* Trusted By Section */}
-      <section className="dark:bg-midnight border-b border-zinc-100 bg-zinc-50 py-24 dark:border-slate-800/30">
-        <div className="mx-auto max-w-4xl px-6 text-center">
-          <p className="font-serif text-2xl leading-relaxed text-zinc-800 antialiased md:text-3xl dark:text-slate-200">
-            “Everything you need for faster, safer legal work — without
-            enterprise lock-in.”
-          </p>
-        </div>
-      </section>
-
       {/* Feature Grid */}
       <section className="mx-auto max-w-[1600px] px-6 py-24">
         <div className="mb-16 text-center">

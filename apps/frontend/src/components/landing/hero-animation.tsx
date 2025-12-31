@@ -46,7 +46,9 @@ export function HeroAnimation() {
             {/* Main Document View */}
             <div className="relative flex h-[380px] flex-col md:h-[450px]">
               {/* Document Text */}
-              <div className="hide-scrollbar dark:bg-navy relative flex-1 overflow-hidden bg-white p-6 pb-28 font-serif text-sm leading-relaxed text-zinc-800 md:overflow-y-auto md:p-8 md:pb-10 md:text-base dark:text-slate-300">
+              <div className="hide-scrollbar dark:bg-navy relative flex-1 overflow-hidden bg-white p-6 pb-20 font-serif text-sm leading-relaxed text-zinc-800 md:overflow-y-auto md:p-8 md:pb-24 md:text-base dark:text-slate-300">
+                {/* Bottom gradient fade to hide text behind prompt */}
+                <div className="dark:from-navy pointer-events-none absolute inset-x-0 bottom-0 z-10 h-24 bg-gradient-to-t from-white via-white/90 to-transparent md:h-28 dark:via-[#0f172a]/90"></div>
                 <div className="pointer-events-none space-y-6 opacity-40 transition-opacity duration-700 select-none">
                   <p className="text-zinc-600 dark:text-slate-500">
                     1.1 This Agreement is subject to the Retail Leases Act 1994

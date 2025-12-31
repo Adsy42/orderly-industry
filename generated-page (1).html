@@ -1,0 +1,643 @@
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Orderly - Legal AI</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+      tailwind.config = {
+        darkMode: 'class',
+        theme: {
+          extend: {
+            colors: {
+              midnight: '#0a0f1a',
+              navy: '#111827',
+            },
+            fontFamily: {
+              sans: ['Inter', 'system-ui', 'sans-serif'],
+              serif: ['Playfair Display', 'Georgia', 'serif'],
+            },
+          }
+        }
+      }
+    </script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin="">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Playfair+Display:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+    <style>
+      body {
+        font-family: 'Inter', system-ui, sans-serif;
+      }
+
+      .hide-scrollbar::-webkit-scrollbar {
+        display: none;
+      }
+      .hide-scrollbar {
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+      }
+
+      /* Intro Animation */
+      @keyframes clip-reveal {
+        0% { 
+          clip-path: inset(40% 12% 40% 12% round 30px); 
+          transform: scale(0.9); 
+          opacity: 0; 
+        }
+        40% { opacity: 1; }
+        100% { 
+          clip-path: inset(0% 0% 0% 0%); 
+          transform: scale(1); 
+        }
+      }
+      .animate-intro {
+        animation: clip-reveal 2.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+        will-change: clip-path, transform, opacity;
+      }
+
+      /* Cycle Animations - 15s total cycle */
+      @keyframes cycle-show-1 { 
+        0%, 5% { opacity: 0; } 
+        8%, 28% { opacity: 1; } 
+        33%, 100% { opacity: 0; } 
+      }
+      @keyframes cycle-show-2 { 
+        0%, 38% { opacity: 0; } 
+        41%, 61% { opacity: 1; } 
+        66%, 100% { opacity: 0; } 
+      }
+      @keyframes cycle-show-3 { 
+        0%, 71% { opacity: 0; } 
+        74%, 94% { opacity: 1; } 
+        100% { opacity: 0; } 
+      }
+
+      @keyframes cycle-pop-1 { 
+        0%, 5% { opacity: 0; transform: translateY(8px) scale(0.96); } 
+        10%, 28% { opacity: 1; transform: translateY(0) scale(1); } 
+        33%, 100% { opacity: 0; transform: translateY(8px) scale(0.96); } 
+      }
+      @keyframes cycle-pop-2 { 
+        0%, 38% { opacity: 0; transform: translateY(8px) scale(0.96); } 
+        43%, 61% { opacity: 1; transform: translateY(0) scale(1); } 
+        66%, 100% { opacity: 0; transform: translateY(8px) scale(0.96); } 
+      }
+      @keyframes cycle-pop-3 { 
+        0%, 71% { opacity: 0; transform: translateY(8px) scale(0.96); } 
+        76%, 94% { opacity: 1; transform: translateY(0) scale(1); } 
+        100% { opacity: 0; transform: translateY(8px) scale(0.96); } 
+      }
+
+      .animate-cycle-1 { animation: cycle-show-1 15s ease-in-out infinite; }
+      .animate-cycle-2 { animation: cycle-show-2 15s ease-in-out infinite; }
+      .animate-cycle-3 { animation: cycle-show-3 15s ease-in-out infinite; }
+
+      .animate-pop-1 { animation: cycle-pop-1 15s cubic-bezier(0.16, 1, 0.3, 1) infinite; }
+      .animate-pop-2 { animation: cycle-pop-2 15s cubic-bezier(0.16, 1, 0.3, 1) infinite; }
+      .animate-pop-3 { animation: cycle-pop-3 15s cubic-bezier(0.16, 1, 0.3, 1) infinite; }
+
+      /* Synchronized Typing Animations */
+      .type-cycle-1 { 
+        display: block; 
+        overflow: hidden; 
+        white-space: nowrap; 
+        border-right: 2px solid transparent; 
+        width: 0; 
+        animation: typing-sync-1 15s steps(35, end) infinite; 
+      }
+      .type-cycle-2 { 
+        display: block; 
+        overflow: hidden; 
+        white-space: nowrap; 
+        border-right: 2px solid transparent; 
+        width: 0; 
+        animation: typing-sync-2 15s steps(40, end) infinite; 
+      }
+      .type-cycle-3 { 
+        display: block; 
+        overflow: hidden; 
+        white-space: nowrap; 
+        border-right: 2px solid transparent; 
+        width: 0; 
+        animation: typing-sync-3 15s steps(35, end) infinite; 
+      }
+
+      @keyframes typing-sync-1 {
+        0%, 5% { width: 0; border-right-color: transparent; }
+        6% { width: 0; border-right-color: currentColor; }
+        15% { width: 100%; border-right-color: currentColor; }
+        18%, 100% { width: 100%; border-right-color: transparent; }
+      }
+      @keyframes typing-sync-2 {
+        0%, 38% { width: 0; border-right-color: transparent; }
+        39% { width: 0; border-right-color: currentColor; }
+        48% { width: 100%; border-right-color: currentColor; }
+        51%, 100% { width: 100%; border-right-color: transparent; }
+      }
+      @keyframes typing-sync-3 {
+        0%, 71% { width: 0; border-right-color: transparent; }
+        72% { width: 0; border-right-color: currentColor; }
+        81% { width: 100%; border-right-color: currentColor; }
+        84%, 100% { width: 100%; border-right-color: transparent; }
+      }
+
+      /* Synchronized Sending Dots */
+      @keyframes sending-sync {
+        0%, 15% { opacity: 0; }
+        16%, 28% { opacity: 1; }
+        29%, 48% { opacity: 0; }
+        49%, 61% { opacity: 1; }
+        62%, 81% { opacity: 0; }
+        82%, 94% { opacity: 1; }
+        95%, 100% { opacity: 0; }
+      }
+      .sending-dots-sync {
+        animation: sending-sync 15s linear infinite;
+      }
+
+      /* Spinner Animation */
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+      .animate-spin {
+        animation: spin 1s linear infinite;
+      }
+
+      /* Subtle pulse for hero section */
+      @keyframes subtle-pulse {
+        0%, 100% { opacity: 0.9; }
+        50% { opacity: 1; }
+      }
+    </style>
+  </head>
+  <body class="bg-white dark:bg-midnight text-zinc-900 dark:text-white antialiased overflow-x-hidden transition-colors duration-300">
+    <!-- Wrapper for Animation -->
+    <div class="animate-intro w-full min-h-screen bg-white dark:bg-midnight">
+      <!-- Navigation -->
+      <nav class="w-full flex justify-between items-center py-6 px-6 md:px-12 max-w-[1800px] mx-auto bg-white/80 dark:bg-midnight/80 backdrop-blur-md sticky top-0 z-50 transition-colors duration-300 border-b border-transparent dark:border-slate-800/50">
+        <div class="flex items-center gap-2">
+          <!-- Logo SVG -->
+          <a href="#" class="flex items-center gap-3 group">
+            <div class="relative w-8 h-8 text-zinc-950 dark:text-blue-400 transition-colors">
+              <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" class="w-full h-full stroke-current stroke-2">
+                <path d="M12 10C12 10 16 8 18 12C20 16 16 20 16 24C16 28 20 30 22 30" stroke-linecap="round" stroke-linejoin="round"></path>
+                <path d="M10 14C10 14 8 12 8 10" stroke-linecap="round" stroke-linejoin="round"></path>
+                <path d="M24 26C24 26 26 28 26 30" stroke-linecap="round" stroke-linejoin="round"></path>
+                <path d="M18 12C18 12 22 10 22 14C22 18 18 20 18 24" stroke-linecap="round" stroke-linejoin="round" class="opacity-50"></path>
+              </svg>
+            </div>
+            <span class="font-sans text-2xl tracking-tight text-zinc-950 dark:text-white font-medium">
+              Orderly
+            </span>
+          </a>
+        </div>
+
+        <div class="hidden lg:flex items-center gap-8">
+          <a href="#" class="text-base text-zinc-600 dark:text-slate-300 hover:text-zinc-900 dark:hover:text-white transition-colors flex items-center gap-1">
+            Product
+            <span class="text-[10px] align-top opacity-50">+</span>
+          </a>
+          <a href="#" class="text-base text-zinc-600 dark:text-slate-300 hover:text-zinc-900 dark:hover:text-white transition-colors flex items-center gap-1">
+            Solutions
+            <span class="text-[10px] align-top opacity-50">+</span>
+          </a>
+          <a href="#" class="text-base text-zinc-600 dark:text-slate-300 hover:text-zinc-900 dark:hover:text-white transition-colors">
+            Security
+          </a>
+          <a href="#" class="text-base text-zinc-600 dark:text-slate-300 hover:text-zinc-900 dark:hover:text-white transition-colors">
+            Customers
+          </a>
+          <a href="#" class="text-base text-zinc-600 dark:text-slate-300 hover:text-zinc-900 dark:hover:text-white transition-colors flex items-center gap-1">
+            News
+            <span class="text-[10px] align-top opacity-50">+</span>
+          </a>
+        </div>
+
+        <div class="hidden lg:flex items-center gap-6">
+          <!-- Theme Toggle -->
+          <button onclick="document.documentElement.classList.toggle('dark')" class="p-2 rounded-full hover:bg-zinc-100 dark:hover:bg-slate-800 text-zinc-600 dark:text-blue-200 transition-colors" aria-label="Toggle dark mode">
+            <i data-lucide="sun" class="w-5 h-5 hidden dark:block"></i>
+            <i data-lucide="moon" class="w-5 h-5 block dark:hidden"></i>
+          </button>
+          <a href="#" class="text-base text-zinc-600 dark:text-slate-300 hover:text-zinc-900 dark:hover:text-white transition-colors">
+            Log in
+          </a>
+          <a href="#" class="text-base px-4 py-2 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-midnight hover:bg-zinc-800 dark:hover:bg-blue-50 transition-colors font-medium">
+            Get Started
+          </a>
+        </div>
+
+        <div class="lg:hidden flex items-center gap-4">
+          <button onclick="document.documentElement.classList.toggle('dark')" class="text-zinc-900 dark:text-white" aria-label="Toggle dark mode">
+            <i data-lucide="sun" class="w-5 h-5 hidden dark:block"></i>
+            <i data-lucide="moon" class="w-5 h-5 block dark:hidden"></i>
+          </button>
+          <button class="text-zinc-900 dark:text-white" aria-label="Menu">
+            <i data-lucide="menu" class="w-6 h-6"></i>
+          </button>
+        </div>
+      </nav>
+
+      <!-- Main Content -->
+      <main>
+        <!-- Hero Text Section -->
+        <section class="pt-20 pb-12 md:pt-32 md:pb-16 px-6 max-w-[1800px] mx-auto text-center">
+          <h1 class="text-5xl md:text-7xl font-serif text-zinc-950 dark:text-white tracking-tight mb-6 leading-[1.1]">
+            Legal AI built for Australian law.
+          </h1>
+          <p class="text-xl md:text-2xl text-zinc-600 dark:text-slate-300 mb-10 max-w-2xl mx-auto leading-relaxed font-light">
+            Contract review and legal analysis designed for Australian practice.
+          </p>
+          <div class="flex flex-col items-center gap-3">
+            <a href="#" class="px-8 py-4 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-midnight hover:bg-zinc-800 dark:hover:bg-blue-50 transition-colors text-lg font-medium">
+              Try it free on a contract
+            </a>
+            <p class="text-sm text-zinc-500 dark:text-slate-500">
+              No credit card. No sales call.
+            </p>
+          </div>
+        </section>
+
+        <!-- Hero Visual Section -->
+        <section class="w-full h-[650px] md:h-[90vh] bg-[#EAE4D3] dark:bg-midnight relative overflow-hidden group transition-colors duration-500">
+          <!-- Image Container -->
+          <div class="w-full h-full flex items-end justify-center md:justify-start md:pl-[10%] pb-0 relative">
+            <img src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=2576&auto=format&fit=crop" alt="Legal Professional" class="h-[90%] md:h-full w-auto object-cover object-center md:object-[center_30%] mix-blend-multiply dark:mix-blend-overlay opacity-90 dark:opacity-40 grayscale-[20%] dark:grayscale-[100%] contrast-[1.1] transition-all duration-500">
+            <div class="absolute inset-0 bg-gradient-to-t from-transparent via-transparent to-transparent dark:to-midnight/40 pointer-events-none"></div>
+          </div>
+
+          <!-- Floating AI Interface -->
+          <div class="absolute bottom-10 md:bottom-20 left-1/2 -translate-x-1/2 w-[95%] md:w-[80%] max-w-4xl z-20">
+            <!-- Card Container -->
+            <div class="bg-white dark:bg-navy rounded-xl shadow-[0_30px_60px_-15px_rgba(0,0,0,0.15)] dark:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.6)] overflow-hidden border border-zinc-200 dark:border-slate-700/50 ring-1 ring-black/5 dark:ring-white/5">
+              <!-- Window Header -->
+              <div class="flex items-center justify-between px-4 py-3 border-b border-zinc-100 dark:border-slate-700 bg-zinc-50/80 dark:bg-slate-800/80 backdrop-blur-sm">
+                <div class="flex items-center gap-2">
+                  <div class="w-3 h-3 rounded-full bg-zinc-300 dark:bg-slate-600"></div>
+                  <div class="w-3 h-3 rounded-full bg-zinc-300 dark:bg-slate-600"></div>
+                </div>
+                <div class="text-xs font-medium text-zinc-500 dark:text-slate-400 font-sans flex items-center gap-2">
+                  <i data-lucide="file-text" class="w-3 h-3"></i>
+                  Services Agreement (VIC).docx
+                </div>
+                <div class="w-4"></div>
+              </div>
+
+              <!-- Main Document View -->
+              <div class="relative h-[480px] md:h-[400px] flex flex-col">
+                <!-- Document Text -->
+                <div class="p-6 md:p-10 pb-28 md:pb-10 font-serif text-zinc-800 dark:text-slate-300 text-sm md:text-base leading-relaxed overflow-y-auto hide-scrollbar flex-1 relative bg-white dark:bg-navy">
+                  <div class="space-y-6 opacity-40 select-none pointer-events-none transition-opacity duration-700">
+                    <p class="text-zinc-600 dark:text-slate-500">
+                      1.1 Definitions. In this Agreement, unless the context
+                      requires otherwise, words have their standard meaning
+                      under Victorian law.
+                    </p>
+                    <p class="text-zinc-600 dark:text-slate-500">
+                      2.1 Services. The Supplier shall provide the Services to
+                      the Customer in accordance with the Schedule.
+                    </p>
+                  </div>
+                  <div class="space-y-6 mt-6">
+                    <!-- Cycle 1: Indemnity -->
+                    <div class="relative group">
+                      <div class="absolute -inset-2 rounded-lg bg-red-50 dark:bg-red-900/20 opacity-0 animate-cycle-1 transition-opacity"></div>
+                      <div class="absolute -top-16 right-0 md:-right-8 z-20 w-56 md:w-64 opacity-0 animate-pop-1 pointer-events-none">
+                        <div class="bg-white dark:bg-slate-800 shadow-xl border border-red-200 dark:border-red-800/50 p-3 rounded-lg flex items-start gap-3">
+                          <div class="mt-0.5 p-1 bg-red-100 dark:bg-red-900/30 rounded-full shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-red-600 dark:text-red-400">
+                              <circle cx="12" cy="12" r="10"></circle>
+                              <line x1="12" y1="8" x2="12" y2="12"></line>
+                              <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                            </svg>
+                          </div>
+                          <div>
+                            <p class="text-xs font-semibold text-zinc-900 dark:text-white mb-1">
+                              Unusual Limit Detected
+                            </p>
+                            <p class="text-xs text-zinc-600 dark:text-slate-300 leading-snug">
+                              $50k is significantly below market standard
+                              (~$2M).
+                            </p>
+                          </div>
+                        </div>
+                        <div class="absolute top-full right-1/2 translate-x-1/2 -mt-[1px] w-3 h-3 bg-white dark:bg-slate-800 border-r border-b border-red-200 dark:border-red-800/50 transform rotate-45"></div>
+                      </div>
+                      <p class="relative z-10 text-zinc-800 dark:text-slate-200">
+                        <strong>12.4 Indemnity cap.</strong>
+                        The Supplier's total liability under this clause shall
+                        not exceed
+                        <span class="border-b border-zinc-300 dark:border-zinc-600">
+                          $50,000 in aggregate
+                        </span>
+                        .
+                      </p>
+                    </div>
+                    <!-- Cycle 2: Termination -->
+                    <div class="relative group">
+                      <div class="absolute -inset-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 opacity-0 animate-cycle-2 transition-opacity"></div>
+                      <div class="absolute -top-16 right-0 md:-right-8 z-20 w-56 md:w-64 opacity-0 animate-pop-2 pointer-events-none">
+                        <div class="bg-white dark:bg-slate-800 shadow-xl border border-amber-200 dark:border-amber-800/50 p-3 rounded-lg flex items-start gap-3">
+                          <div class="mt-0.5 p-1 bg-amber-100 dark:bg-amber-900/30 rounded-full shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-amber-600 dark:text-amber-400">
+                              <circle cx="12" cy="12" r="10"></circle>
+                              <polyline points="12 6 12 12 16 14"></polyline>
+                            </svg>
+                          </div>
+                          <div>
+                            <p class="text-xs font-semibold text-zinc-900 dark:text-white mb-1">
+                              Notice Period Flag
+                            </p>
+                            <p class="text-xs text-zinc-600 dark:text-slate-300 leading-snug">
+                              30 days may be insufficient for complex service
+                              transition.
+                            </p>
+                          </div>
+                        </div>
+                        <div class="absolute top-full right-1/2 translate-x-1/2 -mt-[1px] w-3 h-3 bg-white dark:bg-slate-800 border-r border-b border-amber-200 dark:border-amber-800/50 transform rotate-45"></div>
+                      </div>
+                      <p class="relative z-10 text-zinc-800 dark:text-slate-200">
+                        <strong>13.1 Termination.</strong>
+                        Either party may terminate this Agreement by giving 30
+                        days written notice.
+                      </p>
+                    </div>
+                    <!-- Cycle 3: Governing Law -->
+                    <div class="relative group">
+                      <div class="absolute -inset-2 rounded-lg bg-blue-50 dark:bg-blue-900/20 opacity-0 animate-cycle-3 transition-opacity"></div>
+                      <div class="absolute -top-16 right-0 md:-right-8 z-20 w-56 md:w-64 opacity-0 animate-pop-3 pointer-events-none">
+                        <div class="bg-white dark:bg-slate-800 shadow-xl border border-blue-200 dark:border-blue-800/50 p-3 rounded-lg flex items-start gap-3">
+                          <div class="mt-0.5 p-1 bg-blue-100 dark:bg-blue-900/30 rounded-full shrink-0">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-blue-600 dark:text-blue-400">
+                              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                              <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                            </svg>
+                          </div>
+                          <div>
+                            <p class="text-xs font-semibold text-zinc-900 dark:text-white mb-1">
+                              Victorian Law
+                            </p>
+                            <p class="text-xs text-zinc-600 dark:text-slate-300 leading-snug">
+                              Compliant with jurisdiction requirements for this
+                              matter.
+                            </p>
+                          </div>
+                        </div>
+                        <div class="absolute top-full right-1/2 translate-x-1/2 -mt-[1px] w-3 h-3 bg-white dark:bg-slate-800 border-r border-b border-blue-200 dark:border-blue-800/50 transform rotate-45"></div>
+                      </div>
+                      <p class="relative z-10 text-zinc-800 dark:text-slate-200">
+                        <strong>14. Governing Law.</strong>
+                        This Agreement is governed by the laws of Victoria.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- AI Prompt Interface (Bottom Overlay) -->
+                <div class="absolute bottom-3 left-3 right-3 md:bottom-6 md:left-6 md:right-6 z-30">
+                  <div class="bg-white dark:bg-slate-900 rounded-lg shadow-lg border border-zinc-200 dark:border-slate-700 p-1 flex items-center gap-2 md:gap-3 pr-2 md:pr-3">
+                    <div class="w-8 h-8 rounded bg-zinc-100 dark:bg-slate-800 flex items-center justify-center shrink-0 ml-1">
+                      <i data-lucide="sparkles" class="w-4 h-4 text-zinc-900 dark:text-blue-400"></i>
+                    </div>
+                    <div class="flex-1 h-8 flex items-center overflow-hidden relative">
+                      <div class="absolute inset-y-0 left-0 flex items-center w-fit opacity-0 animate-cycle-1">
+                        <div class="relative">
+                          <span class="text-xs md:text-sm font-medium opacity-0 pr-1" aria-hidden="true">
+                            Check for unusual liability caps...
+                          </span>
+                          <span class="type-cycle-1 absolute top-0 left-0 text-xs md:text-sm text-zinc-800 dark:text-slate-200 font-medium">
+                            Check for unusual liability caps...
+                          </span>
+                        </div>
+                      </div>
+                      <div class="absolute inset-y-0 left-0 flex items-center w-fit opacity-0 animate-cycle-2">
+                        <div class="relative">
+                          <span class="text-xs md:text-sm font-medium opacity-0 pr-1" aria-hidden="true">
+                            Identify termination notice periods...
+                          </span>
+                          <span class="type-cycle-2 absolute top-0 left-0 text-xs md:text-sm text-zinc-800 dark:text-slate-200 font-medium">
+                            Identify termination notice periods...
+                          </span>
+                        </div>
+                      </div>
+                      <div class="absolute inset-y-0 left-0 flex items-center w-fit opacity-0 animate-cycle-3">
+                        <div class="relative">
+                          <span class="text-xs md:text-sm font-medium opacity-0 pr-1" aria-hidden="true">
+                            Verify governing law compliance...
+                          </span>
+                          <span class="type-cycle-3 absolute top-0 left-0 text-xs md:text-sm text-zinc-800 dark:text-slate-200 font-medium">
+                            Verify governing law compliance...
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <div class="sending-dots-sync w-5 h-5 flex items-center justify-center opacity-0">
+                      <div class="w-4 h-4 border-2 border-zinc-300 dark:border-slate-600 border-t-zinc-900 dark:border-t-blue-400 rounded-full animate-spin"></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Gradient Overlay -->
+          <div class="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-white dark:from-midnight to-transparent pointer-events-none"></div>
+        </section>
+
+        <!-- Trusted By Section -->
+        <section class="py-24 bg-zinc-50 dark:bg-midnight border-b border-zinc-100 dark:border-slate-800/30">
+          <div class="max-w-4xl mx-auto px-6 text-center">
+            <p class="text-2xl md:text-3xl font-serif text-zinc-800 dark:text-slate-200 leading-relaxed antialiased">
+              "Everything you need for faster, safer legal work — without
+              enterprise lock-in."
+            </p>
+          </div>
+        </section>
+
+        <!-- Feature Grid -->
+        <section class="py-24 px-6 max-w-[1600px] mx-auto">
+          <div class="mb-16 text-center">
+            <h2 class="text-sm font-semibold tracking-wide uppercase text-zinc-500 dark:text-slate-400 mb-3">
+              Platform capabilities
+            </h2>
+            <p class="text-3xl md:text-4xl font-serif text-zinc-900 dark:text-white leading-tight">
+              Built for Australian firms, from day one.
+            </p>
+          </div>
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 md:gap-12">
+            <!-- Counsel -->
+            <div class="group p-6 rounded-xl hover:bg-zinc-50 dark:hover:bg-slate-800/50 transition-colors">
+              <div class="w-10 h-10 flex items-center justify-center text-zinc-900 dark:text-white mb-6">
+                <i data-lucide="scale" class="w-6 h-6 stroke-[1.5]"></i>
+              </div>
+              <h3 class="text-xl font-semibold text-zinc-900 dark:text-white mb-3 tracking-tight">
+                Counsel
+              </h3>
+              <p class="text-base font-medium text-zinc-700 dark:text-slate-200 mb-2">
+                Confident analysis and drafting under Australian law.
+              </p>
+              <p class="text-sm text-zinc-500 dark:text-slate-400 leading-relaxed">
+                Review contracts and draft clauses using AI grounded in
+                Australian statutes and practice.
+              </p>
+            </div>
+            <!-- Research -->
+            <div class="group p-6 rounded-xl hover:bg-zinc-50 dark:hover:bg-slate-800/50 transition-colors">
+              <div class="w-10 h-10 flex items-center justify-center text-zinc-900 dark:text-white mb-6">
+                <i data-lucide="library" class="w-6 h-6 stroke-[1.5]"></i>
+              </div>
+              <h3 class="text-xl font-semibold text-zinc-900 dark:text-white mb-3 tracking-tight">
+                Research
+                <span class="ml-2 inline-flex items-center rounded-full bg-zinc-100 dark:bg-slate-700 px-2 py-0.5 text-xs font-medium text-zinc-500 dark:text-slate-400 align-middle">
+                  Coming Soon
+                </span>
+              </h3>
+              <p class="text-base font-medium text-zinc-700 dark:text-slate-200 mb-2">
+                Answers backed by Australian legal authority.
+              </p>
+              <p class="text-sm text-zinc-500 dark:text-slate-400 leading-relaxed">
+                Reach defensible conclusions faster with cited legislation and
+                case law.
+              </p>
+            </div>
+            <!-- Workspace -->
+            <div class="group p-6 rounded-xl hover:bg-zinc-50 dark:hover:bg-slate-800/50 transition-colors">
+              <div class="w-10 h-10 flex items-center justify-center text-zinc-900 dark:text-white mb-6">
+                <i data-lucide="folder-kanban" class="w-6 h-6 stroke-[1.5]"></i>
+              </div>
+              <h3 class="text-xl font-semibold text-zinc-900 dark:text-white mb-3 tracking-tight">
+                Workspace
+                <span class="ml-2 inline-flex items-center rounded-full bg-zinc-100 dark:bg-slate-700 px-2 py-0.5 text-xs font-medium text-zinc-500 dark:text-slate-400 align-middle">
+                  Coming Soon
+                </span>
+              </h3>
+              <p class="text-base font-medium text-zinc-700 dark:text-slate-200 mb-2">
+                Documents and matters, review-ready at scale.
+              </p>
+              <p class="text-sm text-zinc-500 dark:text-slate-400 leading-relaxed">
+                Work securely across single agreements or high-volume Australian
+                matters.
+              </p>
+            </div>
+            <!-- Workflows -->
+            <div class="group p-6 rounded-xl hover:bg-zinc-50 dark:hover:bg-slate-800/50 transition-colors">
+              <div class="w-10 h-10 flex items-center justify-center text-zinc-900 dark:text-white mb-6">
+                <i data-lucide="git-branch" class="w-6 h-6 stroke-[1.5]"></i>
+              </div>
+              <h3 class="text-xl font-semibold text-zinc-900 dark:text-white mb-3 tracking-tight">
+                Workflows
+                <span class="ml-2 inline-flex items-center rounded-full bg-zinc-100 dark:bg-slate-700 px-2 py-0.5 text-xs font-medium text-zinc-500 dark:text-slate-400 align-middle">
+                  Coming Soon
+                </span>
+              </h3>
+              <p class="text-base font-medium text-zinc-700 dark:text-slate-200 mb-2">
+                Consistent outcomes for repeatable legal work.
+              </p>
+              <p class="text-sm text-zinc-500 dark:text-slate-400 leading-relaxed">
+                Standardise common tasks so every review follows the same
+                process.
+              </p>
+            </div>
+            <!-- Integrations -->
+            <div class="group p-6 rounded-xl hover:bg-zinc-50 dark:hover:bg-slate-800/50 transition-colors">
+              <div class="w-10 h-10 flex items-center justify-center text-zinc-900 dark:text-white mb-6">
+                <i data-lucide="puzzle" class="w-6 h-6 stroke-[1.5]"></i>
+              </div>
+              <h3 class="text-xl font-semibold text-zinc-900 dark:text-white mb-3 tracking-tight">
+                Integrations
+                <span class="ml-2 inline-flex items-center rounded-full bg-zinc-100 dark:bg-slate-700 px-2 py-0.5 text-xs font-medium text-zinc-500 dark:text-slate-400 align-middle">
+                  Coming Soon
+                </span>
+              </h3>
+              <p class="text-base font-medium text-zinc-700 dark:text-slate-200 mb-2">
+                AI where Australian lawyers already work.
+              </p>
+              <p class="text-sm text-zinc-500 dark:text-slate-400 leading-relaxed">
+                Use AI inside familiar document workflows without disruption.
+              </p>
+            </div>
+            <!-- Playbooks -->
+            <div class="group p-6 rounded-xl hover:bg-zinc-50 dark:hover:bg-slate-800/50 transition-colors">
+              <div class="w-10 h-10 flex items-center justify-center text-zinc-900 dark:text-white mb-6">
+                <i data-lucide="book-open" class="w-6 h-6 stroke-[1.5]"></i>
+              </div>
+              <h3 class="text-xl font-semibold text-zinc-900 dark:text-white mb-3 tracking-tight">
+                Playbooks
+                <span class="ml-2 inline-flex items-center rounded-full bg-zinc-100 dark:bg-slate-700 px-2 py-0.5 text-xs font-medium text-zinc-500 dark:text-slate-400 align-middle">
+                  Coming Soon
+                </span>
+              </h3>
+              <p class="text-base font-medium text-zinc-700 dark:text-slate-200 mb-2">
+                Firm-wide standards, built once and reused.
+              </p>
+              <p class="text-sm text-zinc-500 dark:text-slate-400 leading-relaxed">
+                Capture proven approaches so quality stays consistent across
+                matters.
+              </p>
+            </div>
+          </div>
+        </section>
+        
+        <!-- CTA Section -->
+        <section class="py-24 bg-white dark:bg-midnight border-t border-zinc-100 dark:border-slate-800/30 text-center">
+          <div class="max-w-2xl mx-auto px-6">
+            <h2 class="text-3xl md:text-5xl font-serif text-zinc-950 dark:text-white mb-8 tracking-tight">
+              See it work on a real Australian contract.
+            </h2>
+            <div class="flex flex-col items-center gap-4">
+              <a href="#" class="px-8 py-4 rounded-full bg-zinc-900 dark:bg-white text-white dark:text-midnight hover:bg-zinc-800 dark:hover:bg-blue-50 transition-colors text-lg font-medium">
+                Try it free now
+              </a>
+              <p class="text-sm text-zinc-500 dark:text-slate-500">
+                No credit card. No obligation.
+              </p>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer class="py-12 px-6 border-t border-zinc-100 dark:border-slate-800/30 bg-white dark:bg-midnight transition-colors">
+        <div class="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center gap-6">
+          <div class="flex items-center gap-2">
+            <svg viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 stroke-zinc-900 dark:stroke-white stroke-2">
+              <path d="M12 10C12 10 16 8 18 12C20 16 16 20 16 24C16 28 20 30 22 30" stroke-linecap="round" stroke-linejoin="round"></path>
+              <path d="M10 14C10 14 8 12 8 10" stroke-linecap="round" stroke-linejoin="round"></path>
+              <path d="M24 26C24 26 26 28 26 30" stroke-linecap="round" stroke-linejoin="round"></path>
+              <path d="M18 12C18 12 22 10 22 14C22 18 18 20 18 24" stroke-linecap="round" stroke-linejoin="round" class="opacity-50"></path>
+            </svg>
+            <span class="font-sans text-xl font-medium text-zinc-900 dark:text-white">
+              Orderly
+            </span>
+          </div>
+          <p class="text-zinc-500 dark:text-slate-500 text-sm">
+            © 2024 Orderly AI Inc. All rights reserved.
+          </p>
+          <div class="flex gap-6">
+            <a href="#" class="text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors">
+              <i data-lucide="twitter" class="w-5 h-5"></i>
+            </a>
+            <a href="#" class="text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors">
+              <i data-lucide="linkedin" class="w-5 h-5"></i>
+            </a>
+            <a href="#" class="text-zinc-400 hover:text-zinc-900 dark:hover:text-white transition-colors">
+              <i data-lucide="github" class="w-5 h-5"></i>
+            </a>
+          </div>
+        </div>
+      </footer>
+    </div>
+
+    <script>
+      // Initialize Lucide icons
+      lucide.createIcons();
+      
+      // Re-initialize icons when theme changes (in case of dynamic content)
+      const observer = new MutationObserver(() => {
+        lucide.createIcons();
+      });
+      observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    </script>
+  
+</body>
+</html>
