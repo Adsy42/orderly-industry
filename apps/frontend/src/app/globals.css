@@ -168,4 +168,309 @@
       oklch(0.96 0.02 260) 100%
     );
   }
+
+  /* Hide scrollbar utility */
+  .hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+}
+
+/* ===========================================
+   Hero Animation - Coordinated 3-Cycle System
+   Total duration: 12s (4s per cycle)
+   =========================================== */
+
+/* Cycle timing breakdown (each 4s cycle):
+   0.0s - 1.2s: Typing animation
+   1.2s - 1.4s: Loading spinner shows
+   1.4s - 3.4s: Popup visible + highlight
+   3.4s - 4.0s: Fade out, transition to next
+*/
+
+/* Background highlight animations for each clause */
+@keyframes cycle-1-highlight {
+  0%,
+  100% {
+    opacity: 0;
+  }
+  11.67%,
+  28.33% {
+    opacity: 1;
+  } /* 1.4s to 3.4s of 12s */
+  33.33% {
+    opacity: 0;
+  }
+}
+
+@keyframes cycle-2-highlight {
+  0%,
+  33.33% {
+    opacity: 0;
+  }
+  45%,
+  61.67% {
+    opacity: 1;
+  } /* 5.4s to 7.4s of 12s */
+  66.67% {
+    opacity: 0;
+  }
+}
+
+@keyframes cycle-3-highlight {
+  0%,
+  66.67% {
+    opacity: 0;
+  }
+  78.33%,
+  95% {
+    opacity: 1;
+  } /* 9.4s to 11.4s of 12s */
+  100% {
+    opacity: 0;
+  }
+}
+
+.animate-cycle-1 {
+  animation: cycle-1-highlight 12s ease-in-out infinite;
+}
+
+.animate-cycle-2 {
+  animation: cycle-2-highlight 12s ease-in-out infinite;
+}
+
+.animate-cycle-3 {
+  animation: cycle-3-highlight 12s ease-in-out infinite;
+}
+
+/* Popup tooltip animations */
+@keyframes pop-1 {
+  0%,
+  8% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.95);
+  }
+  11.67% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  28.33% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  33.33%,
+  100% {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+}
+
+@keyframes pop-2 {
+  0%,
+  41.33% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.95);
+  }
+  45% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  61.67% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  66.67%,
+  100% {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+}
+
+@keyframes pop-3 {
+  0%,
+  74.67% {
+    opacity: 0;
+    transform: translateY(8px) scale(0.95);
+  }
+  78.33% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  95% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+}
+
+.animate-pop-1 {
+  animation: pop-1 12s ease-out infinite;
+}
+
+.animate-pop-2 {
+  animation: pop-2 12s ease-out infinite;
+}
+
+.animate-pop-3 {
+  animation: pop-3 12s ease-out infinite;
+}
+
+/* Prompt container visibility animations */
+@keyframes prompt-1 {
+  0% {
+    opacity: 1;
+  }
+  30% {
+    opacity: 1;
+  }
+  33.33%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes prompt-2 {
+  0%,
+  33.33% {
+    opacity: 0;
+  }
+  36.67% {
+    opacity: 1;
+  }
+  63.33% {
+    opacity: 1;
+  }
+  66.67%,
+  100% {
+    opacity: 0;
+  }
+}
+
+@keyframes prompt-3 {
+  0%,
+  66.67% {
+    opacity: 0;
+  }
+  70% {
+    opacity: 1;
+  }
+  96.67% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.animate-prompt-1 {
+  animation: prompt-1 12s ease-in-out infinite;
+}
+
+.animate-prompt-2 {
+  animation: prompt-2 12s ease-in-out infinite;
+}
+
+.animate-prompt-3 {
+  animation: prompt-3 12s ease-in-out infinite;
+}
+
+/* Typewriter effect animations */
+@keyframes typewriter-1 {
+  0% {
+    width: 0;
+  }
+  10% {
+    width: 100%;
+  }
+  30%,
+  100% {
+    width: 100%;
+  }
+}
+
+@keyframes typewriter-2 {
+  0%,
+  33.33% {
+    width: 0;
+  }
+  43.33% {
+    width: 100%;
+  }
+  63.33%,
+  100% {
+    width: 100%;
+  }
+}
+
+@keyframes typewriter-3 {
+  0%,
+  66.67% {
+    width: 0;
+  }
+  76.67% {
+    width: 100%;
+  }
+  96.67%,
+  100% {
+    width: 100%;
+  }
+}
+
+.type-cycle-1 {
+  display: inline-block;
+  overflow: hidden;
+  white-space: nowrap;
+  animation: typewriter-1 12s steps(40, end) infinite;
+}
+
+.type-cycle-2 {
+  display: inline-block;
+  overflow: hidden;
+  white-space: nowrap;
+  animation: typewriter-2 12s steps(40, end) infinite;
+}
+
+.type-cycle-3 {
+  display: inline-block;
+  overflow: hidden;
+  white-space: nowrap;
+  animation: typewriter-3 12s steps(40, end) infinite;
+}
+
+/* Loading spinner sync animation */
+@keyframes sending-sync {
+  0%,
+  8.33% {
+    opacity: 1;
+  }
+  11.67%,
+  33.33% {
+    opacity: 0;
+  }
+  36.67%,
+  41.67% {
+    opacity: 1;
+  }
+  45%,
+  66.67% {
+    opacity: 0;
+  }
+  70%,
+  75% {
+    opacity: 1;
+  }
+  78.33%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.sending-dots-sync {
+  animation: sending-sync 12s ease-in-out infinite;
 }
