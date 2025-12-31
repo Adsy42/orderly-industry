@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { Comparison } from "@/components/landing/comparison";
 import { Features } from "@/components/landing/features";
 import { Footer } from "@/components/landing/footer";
 import { Hero } from "@/components/landing/hero";
@@ -10,6 +11,7 @@ export default function LandingPage() {
       <Navbar />
       <main>
         <Hero />
+        <Comparison />
         <Features />
         {/* CTA Section */}
         <section className="dark:bg-midnight border-t border-zinc-100 bg-white py-24 text-center dark:border-slate-800/30">
