@@ -294,3 +294,5 @@ supabase gen types typescript --local > types/supabase.ts
 
 
 
+
+
