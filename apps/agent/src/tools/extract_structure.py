@@ -107,3 +107,5 @@ async def extract_document_structure(
             "document_id": document_id,
             "error": str(e),
         }
+
+

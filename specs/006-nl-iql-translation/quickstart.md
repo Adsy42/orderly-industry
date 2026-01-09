@@ -126,3 +126,5 @@ If translation fails or produces invalid results:
 - **View Examples**: Check "Show Example Queries" for common search patterns
 - **Learn Operators**: Review "Show Operators Guide" to understand IQL boolean logic
 
+
+

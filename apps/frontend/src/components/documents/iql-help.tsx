@@ -109,7 +109,7 @@ function QueryCard({ example, onInsert }: QueryCardProps) {
             <button
               type="button"
               onClick={handleInsert}
-              className="rounded p-1.5 text-blue-600 transition-colors hover:bg-blue-50"
+              className="rounded p-1.5 text-stone-700 transition-colors hover:bg-stone-100 dark:text-stone-300 dark:hover:bg-stone-700"
               title="Insert into query"
             >
               <Zap className="h-3.5 w-3.5" />
@@ -146,7 +146,7 @@ function OperatorCard({ op }: { op: OperatorInfo }) {
   return (
     <div className="space-y-2 rounded-lg border bg-white p-3">
       <div className="flex items-center gap-2">
-        <code className="rounded bg-blue-100 px-2 py-0.5 font-mono text-sm font-bold text-blue-800">
+        <code className="rounded bg-stone-200 px-2 py-0.5 font-mono text-sm font-bold text-stone-800 dark:bg-stone-700 dark:text-stone-200">
           {op.operator}
         </code>
         <span className="text-sm font-medium text-gray-900">{op.name}</span>
@@ -210,7 +210,9 @@ export function IQLHelp({ onInsertQuery, className }: IQLHelpProps) {
       <AccordionSection
         id="practice-areas"
         title="Examples by Practice Area"
-        icon={<Briefcase className="h-4 w-4 text-blue-500" />}
+        icon={
+          <Briefcase className="h-4 w-4 text-stone-600 dark:text-stone-400" />
+        }
         isOpen={openSections.has("practice-areas")}
         onToggle={() => toggleSection("practice-areas")}
       >
@@ -347,7 +349,7 @@ export function IQLHelp({ onInsertQuery, className }: IQLHelpProps) {
       <AccordionSection
         id="scoring"
         title="Understanding Results"
-        icon={<Scale className="h-4 w-4 text-indigo-500" />}
+        icon={<Scale className="h-4 w-4 text-stone-600 dark:text-stone-400" />}
         isOpen={openSections.has("scoring")}
         onToggle={() => toggleSection("scoring")}
       >

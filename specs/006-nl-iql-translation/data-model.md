@@ -112,3 +112,5 @@ Results Display
 - Mode preference not persisted (users can choose mode each session)
 - Existing saved queries functionality (`saved_iql_queries` table) unaffected
 
+
+

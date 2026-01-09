@@ -93,7 +93,7 @@ function SectionNode({
   return (
     <div className="select-none">
       <div
-        className={`flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 ${isSelected ? "bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300" : "text-gray-700 dark:text-gray-300"} `}
+        className={`flex cursor-pointer items-center gap-1 rounded-md px-2 py-1.5 text-sm hover:bg-gray-100 dark:hover:bg-gray-800 ${isSelected ? "bg-stone-100 text-stone-800 dark:bg-stone-700 dark:text-stone-200" : "text-gray-700 dark:text-gray-300"} `}
         style={{ paddingLeft: `${depth * 16 + 8}px` }}
         onClick={handleClick}
       >

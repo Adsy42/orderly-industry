@@ -1,12 +1,20 @@
 "use client";
 
 import * as React from "react";
-import { FileSearch, FileText, Briefcase, Loader2 } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
 import {
-  IQLQueryBuilder,
-  type IQLQueryBuilderProps,
-} from "@/components/documents/iql-query-builder";
+  FileSearch,
+  FileText,
+  Briefcase,
+  Loader2,
+  ChevronDown,
+  ChevronRight,
+  BookOpen,
+  Save,
+  Lightbulb,
+  HelpCircle,
+} from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import { IQLQueryBuilder } from "@/components/documents/iql-query-builder";
 import { IQLResults } from "@/components/documents/iql-results";
 import { IQLTemplateSelector } from "@/components/documents/iql-template-selector";
 import { SavedQueries } from "@/components/documents/saved-queries";
@@ -14,8 +22,8 @@ import { IQLExampleQueries } from "@/components/documents/iql-example-queries";
 import { IQLOperatorsGuide } from "@/components/documents/iql-operators-guide";
 import { IQLUnderstandingResults } from "@/components/documents/iql-understanding-results";
 import { useSavedIQLQueries } from "@/hooks/use-saved-iql-queries";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { PageHeader } from "@/components/shared/page-header";
+import { EmptyState } from "@/components/shared/empty-state";
 import {
   Select,
   SelectContent,
@@ -23,6 +31,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { cn } from "@/lib/utils";
 import type { IQLQueryResult } from "@/types/iql";
 
 interface Matter {
@@ -40,33 +49,27 @@ interface Document {
   uploaded_at: string;
 }
 
+type HelpSection = "templates" | "saved" | "examples" | "operators" | "results";
+
 export default function IQLAnalyzerPage() {
-  // State for matter and document selection
   const [matters, setMatters] = React.useState<Matter[]>([]);
   const [documents, setDocuments] = React.useState<Document[]>([]);
   const [selectedMatterId, setSelectedMatterId] = React.useState<string>("");
   const [selectedDocumentId, setSelectedDocumentId] =
     React.useState<string>("");
 
-  // Loading states
   const [isLoadingMatters, setIsLoadingMatters] = React.useState(true);
   const [isLoadingDocuments, setIsLoadingDocuments] = React.useState(false);
 
-  // Query state
   const [results, setResults] = React.useState<IQLQueryResult | null>(null);
   const [currentQuery, setCurrentQuery] = React.useState("");
-  const [showTemplates, setShowTemplates] = React.useState(false);
-  const [showSavedQueries, setShowSavedQueries] = React.useState(false);
-  const [showExamples, setShowExamples] = React.useState(false);
-  const [showOperators, setShowOperators] = React.useState(false);
-  const [showUnderstanding, setShowUnderstanding] = React.useState(false);
+  const [expandedSection, setExpandedSection] =
+    React.useState<HelpSection | null>("templates");
 
-  // Saved queries hook
   const { createQuery } = useSavedIQLQueries({
     matterId: selectedMatterId || undefined,
   });
 
-  // Fetch matters on mount
   React.useEffect(() => {
     async function fetchMatters() {
       setIsLoadingMatters(true);
@@ -90,7 +93,6 @@ export default function IQLAnalyzerPage() {
     fetchMatters();
   }, []);
 
-  // Fetch documents when matter is selected
   React.useEffect(() => {
     if (!selectedMatterId) {
       setDocuments([]);
@@ -110,7 +112,7 @@ export default function IQLAnalyzerPage() {
 
         if (error) throw error;
         setDocuments(data || []);
-        setSelectedDocumentId(""); // Reset document selection
+        setSelectedDocumentId("");
       } catch (err) {
         console.error("Error fetching documents:", err);
       } finally {
@@ -121,7 +123,6 @@ export default function IQLAnalyzerPage() {
     fetchDocuments();
   }, [selectedMatterId]);
 
-  // Reset results when document changes
   React.useEffect(() => {
     setResults(null);
   }, [selectedDocumentId]);
@@ -131,8 +132,11 @@ export default function IQLAnalyzerPage() {
   };
 
   const handleMatchClick = (match: IQLQueryResult["matches"][0]) => {
-    // TODO: Navigate to document viewer at match position
     console.log("Navigate to match:", match);
+  };
+
+  const toggleSection = (section: HelpSection) => {
+    setExpandedSection(expandedSection === section ? null : section);
   };
 
   const selectedDocument = documents.find((d) => d.id === selectedDocumentId);
@@ -141,373 +145,324 @@ export default function IQLAnalyzerPage() {
     (d) => d.processing_status === "ready",
   );
 
+  const helpSections: {
+    id: HelpSection;
+    label: string;
+    icon: React.ElementType;
+  }[] = [
+    { id: "templates", label: "Clause Types", icon: BookOpen },
+    { id: "saved", label: "Saved Searches", icon: Save },
+    { id: "examples", label: "Example Queries", icon: Lightbulb },
+    { id: "operators", label: "Operators Guide", icon: HelpCircle },
+    { id: "results", label: "Understanding Results", icon: FileText },
+  ];
+
   return (
-    <div className="container mx-auto max-w-5xl px-4 py-8">
-      {/* Header */}
-      <div className="mb-8">
-        <div className="mb-2 flex items-center gap-3">
-          <FileSearch className="text-primary h-8 w-8" />
-          <h1 className="text-3xl font-bold tracking-tight">Clause Finder</h1>
-        </div>
-        <p className="text-muted-foreground">
-          Find and analyze clauses in your legal documents. Select a matter and
-          document to begin.
-        </p>
-      </div>
+    <div>
+      {/* Page Header */}
+      <PageHeader
+        title="Clause Finder"
+        subtitle="Find and analyze clauses in your legal documents"
+        icon={FileSearch}
+      />
 
-      {/* Selection Card */}
-      <Card className="mb-8 p-6">
-        <div className="grid gap-6 md:grid-cols-2">
-          {/* Matter Selector */}
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 text-sm font-medium">
-              <Briefcase className="h-4 w-4" />
-              Select Matter
-            </label>
-            <Select
-              value={selectedMatterId}
-              onValueChange={setSelectedMatterId}
-              disabled={isLoadingMatters}
-            >
-              <SelectTrigger>
-                <SelectValue
-                  placeholder={
-                    isLoadingMatters ? "Loading matters..." : "Choose a matter"
-                  }
-                />
-              </SelectTrigger>
-              <SelectContent>
-                {matters.length === 0 && !isLoadingMatters ? (
-                  <div className="text-muted-foreground py-6 text-center text-sm">
-                    No active matters found
-                  </div>
-                ) : (
-                  matters.map((matter) => (
-                    <SelectItem
-                      key={matter.id}
-                      value={matter.id}
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{matter.title}</span>
-                        <span className="text-muted-foreground text-xs">
-                          #{matter.matter_number}
-                        </span>
+      {/* Two Column Layout */}
+      <div className="flex gap-8">
+        {/* Main Column */}
+        <div className="min-w-0 flex-1">
+          {/* Selection Card */}
+          <div className="mb-8 rounded-2xl border border-stone-200 bg-white p-6 dark:border-stone-700 dark:bg-stone-800/50">
+            <div className="grid gap-6 md:grid-cols-2">
+              {/* Matter Selector */}
+              <div className="space-y-3">
+                <label className="flex items-center gap-2 text-sm font-medium text-zinc-900 dark:text-white">
+                  <Briefcase className="text-muted-foreground h-4 w-4" />
+                  Select Matter
+                </label>
+                <Select
+                  value={selectedMatterId}
+                  onValueChange={setSelectedMatterId}
+                  disabled={isLoadingMatters}
+                >
+                  <SelectTrigger className="rounded-xl border-stone-200 bg-white dark:border-stone-700 dark:bg-stone-800">
+                    <SelectValue
+                      placeholder={
+                        isLoadingMatters
+                          ? "Loading matters..."
+                          : "Choose a matter"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {matters.length === 0 && !isLoadingMatters ? (
+                      <div className="text-muted-foreground py-6 text-center text-sm">
+                        No active matters found
                       </div>
-                    </SelectItem>
-                  ))
-                )}
-              </SelectContent>
-            </Select>
-            {matters.length === 0 && !isLoadingMatters && (
-              <p className="text-muted-foreground text-xs">
-                Create a matter first to analyze documents
-              </p>
-            )}
-          </div>
-
-          {/* Document Selector */}
-          <div className="space-y-2">
-            <label className="flex items-center gap-2 text-sm font-medium">
-              <FileText className="h-4 w-4" />
-              Select Document
-            </label>
-            <Select
-              value={selectedDocumentId}
-              onValueChange={setSelectedDocumentId}
-              disabled={!selectedMatterId || isLoadingDocuments}
-            >
-              <SelectTrigger>
-                <SelectValue
-                  placeholder={
-                    !selectedMatterId
-                      ? "Select a matter first"
-                      : isLoadingDocuments
-                        ? "Loading documents..."
-                        : "Choose a document"
-                  }
-                />
-              </SelectTrigger>
-              <SelectContent>
-                {documents.length === 0 && !isLoadingDocuments ? (
-                  <div className="text-muted-foreground py-6 text-center text-sm">
-                    No documents in this matter
-                  </div>
-                ) : (
-                  documents.map((doc) => {
-                    const isReady = doc.processing_status === "ready";
-                    return (
-                      <SelectItem
-                        key={doc.id}
-                        value={doc.id}
-                        disabled={!isReady}
-                      >
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={!isReady ? "text-muted-foreground" : ""}
-                          >
-                            {doc.filename}
-                          </span>
-                          {!isReady && (
-                            <span className="text-xs text-amber-500">
-                              ({doc.processing_status})
+                    ) : (
+                      matters.map((matter) => (
+                        <SelectItem
+                          key={matter.id}
+                          value={matter.id}
+                        >
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{matter.title}</span>
+                            <span className="text-muted-foreground text-xs">
+                              #{matter.matter_number}
                             </span>
-                          )}
-                        </div>
-                      </SelectItem>
-                    );
-                  })
+                          </div>
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+                {matters.length === 0 && !isLoadingMatters && (
+                  <p className="text-muted-foreground text-xs">
+                    Create a matter first to analyze documents
+                  </p>
                 )}
-              </SelectContent>
-            </Select>
-            {selectedMatterId && documents.length > 0 && (
-              <p className="text-muted-foreground text-xs">
-                {readyDocuments.length} of {documents.length} document
-                {documents.length !== 1 ? "s" : ""} ready for analysis
-              </p>
-            )}
-          </div>
-        </div>
-      </Card>
-
-      {/* Document Not Ready Warning */}
-      {selectedDocumentId && !isDocumentReady && selectedDocument && (
-        <Card className="mb-8 border-amber-200 bg-amber-50 p-6 dark:border-amber-900 dark:bg-amber-950">
-          <div className="flex items-start gap-3">
-            <Loader2 className="mt-0.5 h-5 w-5 animate-spin text-amber-600" />
-            <div>
-              <h3 className="font-medium text-amber-800 dark:text-amber-200">
-                Document Processing
-              </h3>
-              <p className="text-sm text-amber-700 dark:text-amber-300">
-                This document is still being processed (
-                {selectedDocument.processing_status}). Please wait for text
-                extraction to complete before searching for clauses.
-              </p>
-            </div>
-          </div>
-        </Card>
-      )}
-
-      {/* Clause Finder Interface - Only show when document is selected and ready */}
-      {selectedDocumentId && isDocumentReady && (
-        <>
-          {/* Help Section Toggles */}
-          <div className="mb-4 flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowTemplates(!showTemplates);
-                if (!showTemplates) {
-                  setShowSavedQueries(false);
-                  setShowExamples(false);
-                  setShowOperators(false);
-                  setShowUnderstanding(false);
-                }
-              }}
-            >
-              {showTemplates ? "Hide" : "Show"} Clause Types
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowSavedQueries(!showSavedQueries);
-                if (!showSavedQueries) {
-                  setShowTemplates(false);
-                  setShowExamples(false);
-                  setShowOperators(false);
-                  setShowUnderstanding(false);
-                }
-              }}
-            >
-              {showSavedQueries ? "Hide" : "Show"} Saved Searches
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowExamples(!showExamples);
-                if (!showExamples) {
-                  setShowTemplates(false);
-                  setShowSavedQueries(false);
-                  setShowOperators(false);
-                  setShowUnderstanding(false);
-                }
-              }}
-            >
-              {showExamples ? "Hide" : "Show"} Example Queries
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowOperators(!showOperators);
-                if (!showOperators) {
-                  setShowTemplates(false);
-                  setShowSavedQueries(false);
-                  setShowExamples(false);
-                  setShowUnderstanding(false);
-                }
-              }}
-            >
-              {showOperators ? "Hide" : "Show"} Operators Guide
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => {
-                setShowUnderstanding(!showUnderstanding);
-                if (!showUnderstanding) {
-                  setShowTemplates(false);
-                  setShowSavedQueries(false);
-                  setShowExamples(false);
-                  setShowOperators(false);
-                }
-              }}
-            >
-              {showUnderstanding ? "Hide" : "Show"} Understanding Results
-            </Button>
-          </div>
-
-          {/* Template Selector */}
-          {showTemplates && (
-            <div className="mb-8">
-              <IQLTemplateSelector
-                onSelectTemplate={(query) => {
-                  setCurrentQuery(query);
-                  setShowTemplates(false);
-                }}
-              />
-            </div>
-          )}
-
-          {/* Saved Searches */}
-          {showSavedQueries && (
-            <div className="mb-8">
-              <h2 className="mb-4 text-lg font-semibold">Saved Searches</h2>
-              <SavedQueries
-                onSelectQuery={(query) => {
-                  setCurrentQuery(query);
-                  setShowSavedQueries(false);
-                }}
-                matterId={selectedMatterId}
-              />
-            </div>
-          )}
-
-          {/* Example Queries */}
-          {showExamples && (
-            <div className="mb-8">
-              <IQLExampleQueries
-                onInsertQuery={(insertedQuery) =>
-                  setCurrentQuery(insertedQuery)
-                }
-              />
-            </div>
-          )}
-
-          {/* Operators Guide */}
-          {showOperators && (
-            <div className="mb-8">
-              <IQLOperatorsGuide />
-            </div>
-          )}
-
-          {/* Understanding Results */}
-          {showUnderstanding && (
-            <div className="mb-8">
-              <IQLUnderstandingResults />
-            </div>
-          )}
-
-          {/* Clause Finder */}
-          <div className="mb-8">
-            <Card className="p-6">
-              <div className="mb-4">
-                <h2 className="text-lg font-semibold">Find Clauses</h2>
-                <p className="text-muted-foreground text-sm">
-                  Searching in: <strong>{selectedDocument?.filename}</strong>
-                </p>
               </div>
-              <IQLQueryBuilder
-                documentId={selectedDocumentId}
-                onResults={handleResults}
-                initialQuery={currentQuery}
-                onQueryChange={setCurrentQuery}
-                onSaveQuery={async (name, query, description) => {
-                  await createQuery(name, query, description, selectedMatterId);
-                }}
-                hideInlineHelp={true}
-              />
-            </Card>
+
+              {/* Document Selector */}
+              <div className="space-y-3">
+                <label className="flex items-center gap-2 text-sm font-medium text-zinc-900 dark:text-white">
+                  <FileText className="text-muted-foreground h-4 w-4" />
+                  Select Document
+                </label>
+                <Select
+                  value={selectedDocumentId}
+                  onValueChange={setSelectedDocumentId}
+                  disabled={!selectedMatterId || isLoadingDocuments}
+                >
+                  <SelectTrigger className="rounded-xl border-stone-200 bg-white dark:border-stone-700 dark:bg-stone-800">
+                    <SelectValue
+                      placeholder={
+                        !selectedMatterId
+                          ? "Select a matter first"
+                          : isLoadingDocuments
+                            ? "Loading documents..."
+                            : "Choose a document"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {documents.length === 0 && !isLoadingDocuments ? (
+                      <div className="text-muted-foreground py-6 text-center text-sm">
+                        No documents in this matter
+                      </div>
+                    ) : (
+                      documents.map((doc) => {
+                        const isReady = doc.processing_status === "ready";
+                        return (
+                          <SelectItem
+                            key={doc.id}
+                            value={doc.id}
+                            disabled={!isReady}
+                          >
+                            <div className="flex items-center gap-2">
+                              <span
+                                className={
+                                  !isReady ? "text-muted-foreground" : ""
+                                }
+                              >
+                                {doc.filename}
+                              </span>
+                              {!isReady && (
+                                <span className="text-xs text-amber-500">
+                                  ({doc.processing_status})
+                                </span>
+                              )}
+                            </div>
+                          </SelectItem>
+                        );
+                      })
+                    )}
+                  </SelectContent>
+                </Select>
+                {selectedMatterId && documents.length > 0 && (
+                  <p className="text-muted-foreground text-xs">
+                    {readyDocuments.length} of {documents.length} document
+                    {documents.length !== 1 ? "s" : ""} ready for analysis
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
 
-          {/* Results */}
-          {results && (
-            <div>
-              <IQLResults
-                results={results}
-                onMatchClick={handleMatchClick}
-              />
+          {/* Document Processing Warning */}
+          {selectedDocumentId && !isDocumentReady && selectedDocument && (
+            <div className="mb-8 rounded-2xl border border-amber-200 bg-amber-50 p-6 dark:border-amber-900 dark:bg-amber-950">
+              <div className="flex items-start gap-3">
+                <Loader2 className="mt-0.5 h-5 w-5 animate-spin text-amber-600" />
+                <div>
+                  <h3 className="font-medium text-amber-800 dark:text-amber-200">
+                    Document Processing
+                  </h3>
+                  <p className="text-sm text-amber-700 dark:text-amber-300">
+                    This document is still being processed (
+                    {selectedDocument.processing_status}). Please wait for text
+                    extraction to complete.
+                  </p>
+                </div>
+              </div>
             </div>
           )}
-        </>
-      )}
 
-      {/* Empty State - No document selected */}
-      {!selectedDocumentId && selectedMatterId && documents.length > 0 && (
-        <Card className="p-12 text-center">
-          <FileText className="text-muted-foreground mx-auto mb-4 h-12 w-12" />
-          <h2 className="mb-2 text-xl font-semibold">Select a Document</h2>
-          <p className="text-muted-foreground">
-            Choose a document from the dropdown above to start finding clauses.
-          </p>
-        </Card>
-      )}
+          {/* Query Builder - Only show when document is ready */}
+          {selectedDocumentId && isDocumentReady && (
+            <>
+              <div className="mb-8 rounded-2xl border border-stone-200 bg-white p-6 dark:border-stone-700 dark:bg-stone-800/50">
+                <div className="mb-4">
+                  <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">
+                    Find Clauses
+                  </h2>
+                  <p className="text-muted-foreground text-sm">
+                    Searching in:{" "}
+                    <strong className="text-foreground">
+                      {selectedDocument?.filename}
+                    </strong>
+                  </p>
+                </div>
+                <IQLQueryBuilder
+                  documentId={selectedDocumentId}
+                  onResults={handleResults}
+                  initialQuery={currentQuery}
+                  onQueryChange={setCurrentQuery}
+                  onSaveQuery={async (name, query, description) => {
+                    await createQuery(
+                      name,
+                      query,
+                      description,
+                      selectedMatterId,
+                    );
+                  }}
+                  hideInlineHelp={true}
+                />
+              </div>
 
-      {/* Empty State - No documents in matter */}
-      {selectedMatterId && documents.length === 0 && !isLoadingDocuments && (
-        <Card className="p-12 text-center">
-          <FileText className="text-muted-foreground mx-auto mb-4 h-12 w-12" />
-          <h2 className="mb-2 text-xl font-semibold">No Documents Found</h2>
-          <p className="text-muted-foreground mb-4">
-            This matter doesn&apos;t have any documents yet. Upload documents to
-            the matter first.
-          </p>
-          <Button
-            variant="outline"
-            onClick={() =>
-              (window.location.href = `/protected/matters/${selectedMatterId}`)
-            }
-          >
-            Go to Matter
-          </Button>
-        </Card>
-      )}
+              {/* Results */}
+              {results && (
+                <div className="rounded-2xl border border-stone-200 bg-white p-6 dark:border-stone-700 dark:bg-stone-800/50">
+                  <IQLResults
+                    results={results}
+                    onMatchClick={handleMatchClick}
+                  />
+                </div>
+              )}
+            </>
+          )}
 
-      {/* Empty State - No matter selected */}
-      {!selectedMatterId && !isLoadingMatters && matters.length > 0 && (
-        <Card className="p-12 text-center">
-          <Briefcase className="text-muted-foreground mx-auto mb-4 h-12 w-12" />
-          <h2 className="mb-2 text-xl font-semibold">Select a Matter</h2>
-          <p className="text-muted-foreground">
-            Choose a matter from the dropdown above to see its documents.
-          </p>
-        </Card>
-      )}
+          {/* Empty States */}
+          {!selectedDocumentId && selectedMatterId && documents.length > 0 && (
+            <EmptyState
+              icon={FileText}
+              title="Select a Document"
+              description="Choose a document from the dropdown above to start finding clauses."
+            />
+          )}
 
-      {/* Empty State - No matters */}
-      {!isLoadingMatters && matters.length === 0 && (
-        <Card className="p-12 text-center">
-          <Briefcase className="text-muted-foreground mx-auto mb-4 h-12 w-12" />
-          <h2 className="mb-2 text-xl font-semibold">No Matters Found</h2>
-          <p className="text-muted-foreground mb-4">
-            Create a matter and upload documents to start finding clauses.
-          </p>
-          <Button
-            variant="outline"
-            onClick={() => (window.location.href = "/protected/matters")}
-          >
-            Go to Matters
-          </Button>
-        </Card>
-      )}
+          {selectedMatterId &&
+            documents.length === 0 &&
+            !isLoadingDocuments && (
+              <EmptyState
+                icon={FileText}
+                title="No Documents Found"
+                description="This matter doesn't have any documents yet. Upload documents to the matter first."
+                action={{
+                  label: "Go to Matter",
+                  onClick: () =>
+                    (window.location.href = `/protected/matters/${selectedMatterId}`),
+                }}
+              />
+            )}
+
+          {!selectedMatterId && !isLoadingMatters && matters.length > 0 && (
+            <EmptyState
+              icon={Briefcase}
+              title="Select a Matter"
+              description="Choose a matter from the dropdown above to see its documents."
+            />
+          )}
+
+          {!isLoadingMatters && matters.length === 0 && (
+            <EmptyState
+              icon={Briefcase}
+              title="No Matters Found"
+              description="Create a matter and upload documents to start finding clauses."
+              action={{
+                label: "Go to Matters",
+                onClick: () => (window.location.href = "/protected/matters"),
+              }}
+            />
+          )}
+        </div>
+
+        {/* Help Sidebar - Only show when document is ready */}
+        {selectedDocumentId && isDocumentReady && (
+          <div className="hidden w-80 shrink-0 space-y-4 lg:block">
+            {helpSections.map((section) => {
+              const Icon = section.icon;
+              const isExpanded = expandedSection === section.id;
+
+              return (
+                <div
+                  key={section.id}
+                  className="rounded-2xl border border-stone-200 bg-white dark:border-stone-700 dark:bg-stone-800/50"
+                >
+                  <button
+                    onClick={() => toggleSection(section.id)}
+                    className={cn(
+                      "flex w-full items-center justify-between p-4",
+                      "text-sm font-semibold text-zinc-900 dark:text-white",
+                      "transition-colors hover:bg-stone-50 dark:hover:bg-stone-700/50",
+                      isExpanded &&
+                        "border-b border-stone-100 dark:border-stone-700",
+                    )}
+                  >
+                    <span className="flex items-center gap-2">
+                      <Icon className="text-muted-foreground h-4 w-4" />
+                      {section.label}
+                    </span>
+                    {isExpanded ? (
+                      <ChevronDown className="text-muted-foreground h-4 w-4" />
+                    ) : (
+                      <ChevronRight className="text-muted-foreground h-4 w-4" />
+                    )}
+                  </button>
+
+                  {isExpanded && (
+                    <div className="max-h-96 overflow-y-auto p-4">
+                      {section.id === "templates" && (
+                        <IQLTemplateSelector
+                          onSelectTemplate={(query) => {
+                            setCurrentQuery(query);
+                          }}
+                        />
+                      )}
+                      {section.id === "saved" && (
+                        <SavedQueries
+                          onSelectQuery={(query) => {
+                            setCurrentQuery(query);
+                          }}
+                          matterId={selectedMatterId}
+                        />
+                      )}
+                      {section.id === "examples" && (
+                        <IQLExampleQueries
+                          onInsertQuery={(insertedQuery) =>
+                            setCurrentQuery(insertedQuery)
+                          }
+                        />
+                      )}
+                      {section.id === "operators" && <IQLOperatorsGuide />}
+                      {section.id === "results" && <IQLUnderstandingResults />}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

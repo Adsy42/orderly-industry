@@ -29,7 +29,7 @@ function renderInterruptStateItem(value: any): React.ReactNode {
         href={value}
         target="_blank"
         rel="noopener noreferrer"
-        className="break-all text-blue-600 underline hover:text-blue-800"
+        className="break-all text-stone-700 underline hover:text-stone-900 dark:text-stone-300 dark:hover:text-stone-100"
       >
         {value}
       </a>

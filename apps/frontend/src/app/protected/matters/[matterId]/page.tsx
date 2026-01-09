@@ -1,11 +1,9 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { formatDistanceToNow, format } from "date-fns";
 import {
-  ArrowLeft,
   FileText,
   Clock,
   Pencil,
@@ -13,7 +11,7 @@ import {
   Upload,
   Loader2,
   Users,
-  X,
+  Calendar,
 } from "lucide-react";
 import {
   useMatters,
@@ -28,14 +26,26 @@ import {
   DocumentUpload,
   DocumentSearch,
 } from "@/components/documents";
+import { PageHeader } from "@/components/shared/page-header";
+import { EmptyState } from "@/components/shared/empty-state";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 
 const statusColors: Record<string, string> = {
-  active: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
-  closed: "bg-slate-500/10 text-slate-400 border-slate-500/20",
-  archived: "bg-amber-500/10 text-amber-500 border-amber-500/20",
+  active:
+    "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+  closed: "bg-zinc-100 text-zinc-500 dark:bg-slate-700 dark:text-slate-400",
+  archived:
+    "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
 };
 
 export default function MatterDetailPage() {
@@ -58,10 +68,8 @@ export default function MatterDetailPage() {
     React.useState<Document | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-  // Participants management
   const { participants } = useParticipants({ matterId });
 
-  // Document management
   const {
     documents,
     isLoading: isLoadingDocuments,
@@ -88,7 +96,6 @@ export default function MatterDetailPage() {
     }
   };
 
-  // Fetch matter on mount
   React.useEffect(() => {
     async function fetchMatter() {
       setIsLoading(true);
@@ -138,37 +145,43 @@ export default function MatterDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto max-w-5xl px-4 py-8">
+      <div>
         <div className="mb-8">
-          <Skeleton className="mb-4 h-8 w-32" />
+          <Skeleton className="mb-4 h-5 w-32" />
           <Skeleton className="mb-2 h-10 w-64" />
           <Skeleton className="h-5 w-48" />
         </div>
-        <div className="grid gap-6 md:grid-cols-3">
-          <Skeleton className="h-24" />
-          <Skeleton className="h-24" />
-          <Skeleton className="h-24" />
+        <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton
+              key={i}
+              className="h-28 rounded-2xl"
+            />
+          ))}
         </div>
+        <Skeleton className="h-64 rounded-2xl" />
       </div>
     );
   }
 
   if (error || !matter) {
     return (
-      <div className="container mx-auto max-w-5xl px-4 py-8">
-        <Link
-          href="/protected/matters"
-          className="text-muted-foreground hover:text-foreground mb-8 inline-flex items-center text-sm"
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Matters
-        </Link>
-        <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-16">
-          <h2 className="mb-2 text-xl font-semibold">Matter not found</h2>
-          <p className="text-muted-foreground">
-            {error || "This matter does not exist or you don't have access."}
-          </p>
-        </div>
+      <div>
+        <PageHeader
+          title="Matter not found"
+          breadcrumbs={[{ label: "Matters", href: "/protected/matters" }]}
+        />
+        <EmptyState
+          icon={FileText}
+          title="Matter not found"
+          description={
+            error || "This matter does not exist or you don't have access."
+          }
+          action={{
+            label: "Back to Matters",
+            onClick: () => router.push("/protected/matters"),
+          }}
+        />
       </div>
     );
   }
@@ -176,119 +189,141 @@ export default function MatterDetailPage() {
   const documentCount = matter.documents?.[0]?.count ?? 0;
 
   return (
-    <div className="container mx-auto max-w-5xl px-4 py-8">
-      {/* Back Link */}
-      <Link
-        href="/protected/matters"
-        className="text-muted-foreground hover:text-foreground mb-8 inline-flex items-center text-sm"
-      >
-        <ArrowLeft className="mr-2 h-4 w-4" />
-        Back to Matters
-      </Link>
-
-      {/* Header */}
-      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="text-muted-foreground mb-1 text-sm font-medium">
-            {matter.matter_number}
-          </p>
-          <h1 className="text-3xl font-bold tracking-tight">{matter.title}</h1>
-          <div className="mt-3 flex flex-wrap items-center gap-3">
-            <span
-              className={cn(
-                "rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize",
-                statusColors[matter.status],
-              )}
+    <div>
+      {/* Page Header with Breadcrumbs */}
+      <PageHeader
+        title={matter.title}
+        breadcrumbs={[
+          { label: "Matters", href: "/protected/matters" },
+          { label: matter.matter_number },
+        ]}
+        actions={
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsEditDialogOpen(true)}
+              className="rounded-xl"
             >
-              {matter.status}
-            </span>
-            <span className="text-muted-foreground flex items-center gap-1.5 text-sm">
-              <Clock className="h-3.5 w-3.5" />
-              Updated{" "}
-              {formatDistanceToNow(new Date(matter.updated_at), {
-                addSuffix: true,
-              })}
-            </span>
+              <Pencil className="mr-2 h-4 w-4" />
+              Edit
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => setIsDeleteDialogOpen(true)}
+              className="rounded-xl"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete
+            </Button>
           </div>
-        </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setIsEditDialogOpen(true)}
-          >
-            <Pencil className="mr-2 h-4 w-4" />
-            Edit
-          </Button>
-          <Button
-            variant="destructive"
-            onClick={() => setIsDeleteDialogOpen(true)}
-          >
-            <Trash2 className="mr-2 h-4 w-4" />
-            Delete
-          </Button>
-        </div>
+        }
+      />
+
+      {/* Status and Meta */}
+      <div className="mb-8 flex flex-wrap items-center gap-3">
+        <span
+          className={cn(
+            "rounded-full px-3 py-1 text-xs font-medium capitalize",
+            statusColors[matter.status],
+          )}
+        >
+          {matter.status}
+        </span>
+        <span className="text-muted-foreground flex items-center gap-1.5 text-sm">
+          <Clock className="h-3.5 w-3.5" />
+          Updated{" "}
+          {formatDistanceToNow(new Date(matter.updated_at), {
+            addSuffix: true,
+          })}
+        </span>
       </div>
 
       {/* Description */}
       {matter.description && (
-        <div className="bg-card mb-8 rounded-lg border p-4">
-          <h2 className="text-muted-foreground mb-2 text-sm font-semibold">
+        <div className="mb-8 rounded-2xl border border-zinc-200 bg-white p-6 dark:border-slate-700 dark:bg-slate-800/50">
+          <h2 className="text-muted-foreground mb-2 text-sm font-semibold tracking-wide uppercase">
             Description
           </h2>
-          <p className="text-sm">{matter.description}</p>
+          <p className="text-sm leading-relaxed text-zinc-600 dark:text-slate-400">
+            {matter.description}
+          </p>
         </div>
       )}
 
-      {/* Stats */}
-      <div className="mb-8 grid gap-4 sm:grid-cols-3">
-        <div className="bg-card rounded-lg border p-4">
-          <div className="flex items-center gap-3">
-            <div className="bg-primary/10 rounded-full p-2">
-              <FileText className="text-primary h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{documentCount}</p>
-              <p className="text-muted-foreground text-sm">Documents</p>
-            </div>
+      {/* Stats Row */}
+      <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {/* Documents Stat */}
+        <div className="rounded-2xl border border-stone-200 bg-white p-5 transition-all duration-200 hover:shadow-md dark:border-stone-700 dark:bg-stone-800/50">
+          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-stone-200 text-stone-700 dark:bg-stone-700 dark:text-stone-300">
+            <FileText className="h-6 w-6" />
           </div>
+          <p className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">
+            {documentCount}
+          </p>
+          <p className="text-muted-foreground mt-1 text-sm">Documents</p>
         </div>
-        <div
-          className="bg-card hover:border-primary/50 cursor-pointer rounded-lg border p-4 transition-colors"
+
+        {/* Participants Stat */}
+        <button
           onClick={() => setIsParticipantsDialogOpen(true)}
+          className={cn(
+            "rounded-2xl border border-stone-200 bg-white p-5 text-left",
+            "transition-all duration-200",
+            "hover:border-stone-400 hover:shadow-md",
+            "dark:border-stone-700 dark:bg-stone-800/50 dark:hover:border-stone-500",
+          )}
         >
-          <div className="flex items-center gap-3">
-            <div className="bg-primary/10 rounded-full p-2">
-              <Users className="text-primary h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{participants.length + 1}</p>
-              <p className="text-muted-foreground text-sm">Participants</p>
-            </div>
+          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-stone-200 text-stone-700 dark:bg-stone-700 dark:text-stone-300">
+            <Users className="h-6 w-6" />
           </div>
-        </div>
-        <div className="bg-card rounded-lg border p-4">
-          <div className="flex items-center gap-3">
-            <div className="bg-primary/10 rounded-full p-2">
-              <Clock className="text-primary h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-sm font-medium">
-                {format(new Date(matter.created_at), "MMM d, yyyy")}
-              </p>
-              <p className="text-muted-foreground text-sm">Created</p>
-            </div>
+          <p className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">
+            {participants.length + 1}
+          </p>
+          <p className="text-muted-foreground mt-1 text-sm">Participants</p>
+        </button>
+
+        {/* Created Date Stat */}
+        <div className="rounded-2xl border border-stone-200 bg-white p-5 transition-all duration-200 hover:shadow-md dark:border-stone-700 dark:bg-stone-800/50">
+          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-stone-200 text-stone-700 dark:bg-stone-700 dark:text-stone-300">
+            <Calendar className="h-6 w-6" />
           </div>
+          <p className="text-lg font-semibold tracking-tight text-zinc-900 dark:text-white">
+            {format(new Date(matter.created_at), "MMM d, yyyy")}
+          </p>
+          <p className="text-muted-foreground mt-1 text-sm">Created</p>
         </div>
+
+        {/* Upload Action Card */}
+        <button
+          onClick={() => setIsUploadDialogOpen(true)}
+          className={cn(
+            "rounded-2xl border-2 border-dashed border-stone-200 bg-stone-50/50 p-5 text-left",
+            "transition-all duration-200",
+            "hover:border-stone-400 hover:bg-stone-100",
+            "dark:border-stone-700 dark:bg-stone-800/30 dark:hover:border-stone-500 dark:hover:bg-stone-700/50",
+          )}
+        >
+          <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-zinc-100 text-zinc-400 dark:bg-slate-700 dark:text-slate-500">
+            <Upload className="h-6 w-6" />
+          </div>
+          <p className="font-semibold text-zinc-900 dark:text-white">
+            Upload Files
+          </p>
+          <p className="text-muted-foreground mt-1 text-sm">
+            Add documents to this matter
+          </p>
+        </button>
       </div>
 
       {/* Document Search */}
       {documents.length > 0 && (
         <div className="mb-8">
-          <h2 className="mb-4 text-lg font-semibold">Search Documents</h2>
+          <h2 className="mb-4 text-lg font-semibold text-zinc-900 dark:text-white">
+            Search Documents
+          </h2>
           <DocumentSearch
             matterId={matterId}
             onResultClick={(result) => {
-              // Could navigate to document or highlight
               const doc = documents.find((d) => d.id === result.document_id);
               if (doc) {
                 handleDownloadDocument(doc);
@@ -299,9 +334,9 @@ export default function MatterDetailPage() {
       )}
 
       {/* Documents Section */}
-      <div className="rounded-lg border">
-        <div className="flex items-center justify-between border-b p-4">
-          <h2 className="text-lg font-semibold">
+      <div className="rounded-2xl border border-zinc-200 bg-white dark:border-slate-700 dark:bg-slate-800/50">
+        <div className="flex items-center justify-between border-b border-zinc-100 p-6 dark:border-slate-700/50">
+          <h2 className="text-lg font-semibold text-zinc-900 dark:text-white">
             Documents
             <span className="text-muted-foreground ml-2 text-sm font-normal">
               ({documents.length})
@@ -310,12 +345,13 @@ export default function MatterDetailPage() {
           <Button
             size="sm"
             onClick={() => setIsUploadDialogOpen(true)}
+            className="rounded-xl"
           >
             <Upload className="mr-2 h-4 w-4" />
             Upload
           </Button>
         </div>
-        <div className="p-4">
+        <div className="p-6">
           <DocumentList
             documents={documents}
             isLoading={isLoadingDocuments}
@@ -327,130 +363,147 @@ export default function MatterDetailPage() {
       </div>
 
       {/* Edit Dialog */}
-      {isEditDialogOpen && (
-        <div className="bg-background/80 fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm">
-          <div className="bg-card relative w-full max-w-lg rounded-lg border p-6 shadow-lg">
-            <h2 className="mb-6 text-xl font-semibold">Edit Matter</h2>
-            <MatterForm
-              matter={matter}
-              onSubmit={handleEdit}
-              onCancel={() => setIsEditDialogOpen(false)}
-              isSubmitting={isSubmitting}
-            />
-          </div>
-        </div>
-      )}
+      <Dialog
+        open={isEditDialogOpen}
+        onOpenChange={setIsEditDialogOpen}
+      >
+        <DialogContent className="rounded-2xl sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-xl">Edit Matter</DialogTitle>
+            <DialogDescription>
+              Update the details for this matter.
+            </DialogDescription>
+          </DialogHeader>
+          <MatterForm
+            matter={matter}
+            onSubmit={handleEdit}
+            onCancel={() => setIsEditDialogOpen(false)}
+            isSubmitting={isSubmitting}
+          />
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      {isDeleteDialogOpen && (
-        <div className="bg-background/80 fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm">
-          <div className="bg-card relative w-full max-w-md rounded-lg border p-6 shadow-lg">
-            <h2 className="mb-4 text-xl font-semibold">Delete Matter</h2>
-            <p className="text-muted-foreground mb-6">
-              Are you sure you want to delete <strong>{matter.title}</strong>?
-              This will permanently remove all documents and cannot be undone.
-            </p>
-            <div className="flex justify-end gap-3">
-              <Button
-                variant="outline"
-                onClick={() => setIsDeleteDialogOpen(false)}
-                disabled={isSubmitting}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={handleDelete}
-                disabled={isSubmitting}
-              >
-                {isSubmitting && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                )}
-                Delete
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Dialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+      >
+        <DialogContent className="rounded-2xl sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl">Delete Matter</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to delete{" "}
+              <strong className="text-foreground">{matter.title}</strong>? This
+              will permanently remove all documents and cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-3 sm:gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsDeleteDialogOpen(false)}
+              disabled={isSubmitting}
+              className="rounded-xl"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={isSubmitting}
+              className="rounded-xl"
+            >
+              {isSubmitting && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Upload Dialog */}
-      {isUploadDialogOpen && (
-        <div className="bg-background/80 fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm">
-          <div className="bg-card relative w-full max-w-lg rounded-lg border p-6 shadow-lg">
-            <div className="mb-6 flex items-center justify-between">
-              <h2 className="text-xl font-semibold">Upload Documents</h2>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setIsUploadDialogOpen(false)}
-              >
-                <X className="h-4 w-4" />
-              </Button>
-            </div>
-            <DocumentUpload
-              matterId={matterId}
-              onUploadComplete={() => {
-                // Refetch documents to show the new upload
-                refetchDocuments();
-              }}
-            />
-            <div className="mt-6 flex justify-end">
-              <Button
-                variant="outline"
-                onClick={() => setIsUploadDialogOpen(false)}
-              >
-                Done
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+      <Dialog
+        open={isUploadDialogOpen}
+        onOpenChange={setIsUploadDialogOpen}
+      >
+        <DialogContent className="rounded-2xl sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-xl">Upload Documents</DialogTitle>
+            <DialogDescription>
+              Add documents to this matter. Supported formats: PDF, DOCX, TXT.
+            </DialogDescription>
+          </DialogHeader>
+          <DocumentUpload
+            matterId={matterId}
+            onUploadComplete={() => {
+              refetchDocuments();
+            }}
+          />
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setIsUploadDialogOpen(false)}
+              className="rounded-xl"
+            >
+              Done
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Participants Dialog */}
-      {isParticipantsDialogOpen && (
-        <div className="bg-background/80 fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm">
-          <div className="bg-card relative w-full max-w-lg rounded-lg border p-6 shadow-lg">
-            <ParticipantsManager
-              matterId={matterId}
-              isOwner={matter.created_by === matter.created_by} // TODO: Compare with current user ID
-              onClose={() => setIsParticipantsDialogOpen(false)}
-            />
-          </div>
-        </div>
-      )}
+      <Dialog
+        open={isParticipantsDialogOpen}
+        onOpenChange={setIsParticipantsDialogOpen}
+      >
+        <DialogContent className="rounded-2xl sm:max-w-lg">
+          <ParticipantsManager
+            matterId={matterId}
+            isOwner={true}
+            onClose={() => setIsParticipantsDialogOpen(false)}
+          />
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Document Confirmation */}
-      {deletingDocument && (
-        <div className="bg-background/80 fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm">
-          <div className="bg-card relative w-full max-w-md rounded-lg border p-6 shadow-lg">
-            <h2 className="mb-4 text-xl font-semibold">Delete Document</h2>
-            <p className="text-muted-foreground mb-6">
+      <Dialog
+        open={!!deletingDocument}
+        onOpenChange={(open) => !open && setDeletingDocument(null)}
+      >
+        <DialogContent className="rounded-2xl sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl">Delete Document</DialogTitle>
+            <DialogDescription>
               Are you sure you want to delete{" "}
-              <strong>{deletingDocument.filename}</strong>? This action cannot
-              be undone.
-            </p>
-            <div className="flex justify-end gap-3">
-              <Button
-                variant="outline"
-                onClick={() => setDeletingDocument(null)}
-                disabled={isSubmitting}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={handleDeleteDocument}
-                disabled={isSubmitting}
-              >
-                {isSubmitting && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                )}
-                Delete
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+              <strong className="text-foreground">
+                {deletingDocument?.filename}
+              </strong>
+              ? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-3 sm:gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setDeletingDocument(null)}
+              disabled={isSubmitting}
+              className="rounded-xl"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteDocument}
+              disabled={isSubmitting}
+              className="rounded-xl"
+            >
+              {isSubmitting && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

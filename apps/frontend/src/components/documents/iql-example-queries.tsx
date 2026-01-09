@@ -44,7 +44,7 @@ function QueryCard({ example, onInsert }: QueryCardProps) {
             <button
               type="button"
               onClick={handleInsert}
-              className="rounded p-1.5 text-blue-600 transition-colors hover:bg-blue-50"
+              className="rounded p-1.5 text-stone-700 transition-colors hover:bg-stone-100 dark:text-stone-300 dark:hover:bg-stone-700"
               title="Insert into query"
             >
               <Zap className="h-3.5 w-3.5" />
@@ -112,8 +112,8 @@ export function IQLExampleQueries({
           className="space-y-3"
         >
           <div>
-            <h3 className="flex items-center gap-2 text-lg font-semibold text-gray-900">
-              <Briefcase className="h-5 w-5 text-blue-500" />
+            <h3 className="flex items-center gap-2 text-lg font-semibold text-gray-900 dark:text-white">
+              <Briefcase className="h-5 w-5 text-stone-600 dark:text-stone-400" />
               {area.title}
             </h3>
             {area.description && (

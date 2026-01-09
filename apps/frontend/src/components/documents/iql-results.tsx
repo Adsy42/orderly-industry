@@ -118,16 +118,6 @@ export function IQLResults({
     URL.revokeObjectURL(url);
   };
 
-  const handleMatchClick = (match: IQLQueryResult["matches"][0]) => {
-    if (onMatchClick) {
-      onMatchClick(match);
-    } else {
-      // Default behavior: scroll to match position if possible
-      // This is a placeholder - actual navigation would require document viewer integration
-      console.log("Navigate to match:", match);
-    }
-  };
-
   return (
     <div className={cn("space-y-4", className)}>
       {/* Overall Results Summary */}
@@ -162,13 +152,13 @@ export function IQLResults({
         </div>
         <div className="text-muted-foreground mt-2 space-y-1 text-xs">
           {results.translatedIQL && results.translatedIQL !== results.query && (
-            <div className="rounded-md border border-blue-200 bg-blue-50 p-2 dark:border-blue-800 dark:bg-blue-950/20">
+            <div className="rounded-md border border-stone-200 bg-stone-50 p-2 dark:border-stone-700 dark:bg-stone-800/30">
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0 flex-1">
-                  <p className="mb-1 font-medium text-blue-900 dark:text-blue-100">
+                  <p className="mb-1 font-medium text-stone-900 dark:text-stone-100">
                     Translated IQL Query:
                   </p>
-                  <code className="block rounded bg-blue-100 px-2 py-1 break-all text-blue-900 dark:bg-blue-900/50 dark:text-blue-100">
+                  <code className="block rounded bg-stone-200 px-2 py-1 break-all text-stone-900 dark:bg-stone-700 dark:text-stone-100">
                     {results.translatedIQL}
                   </code>
                 </div>
@@ -274,9 +264,9 @@ function MatchCard({
       ? match.text
       : match.text.slice(0, MAX_EXCERPT_LENGTH) + "...";
 
-  const documentHref = matterId
-    ? `/protected/matters/${matterId}/documents/${documentId}?start=${match.startIndex}&end=${match.endIndex}`
-    : `/protected/documents/${documentId}?start=${match.startIndex}&end=${match.endIndex}`;
+  // Link to PDF viewer with highlighting
+  // Note: Page number defaults to 1 - the PDF viewer will use text position mapping to find the correct location
+  const pdfViewerHref = `/protected/documents/view/${documentId}?start=${match.startIndex}&end=${match.endIndex}&page=1${matterId ? `&matterId=${matterId}` : ""}&text=${encodeURIComponent(match.text.substring(0, 200))}`;
 
   const citationMarkdown =
     match.citation?.markdown ??
@@ -358,7 +348,7 @@ function MatchCard({
             </p>
             <div className="flex items-center gap-2">
               <Link
-                href={documentHref}
+                href={pdfViewerHref}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-muted-foreground inline-flex items-center gap-1 text-xs hover:underline"

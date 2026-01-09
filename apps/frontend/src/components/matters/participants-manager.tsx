@@ -36,8 +36,8 @@ const roleConfig = {
     label: "Counsel",
     icon: Briefcase,
     description: "Full access to view, upload, and manage documents",
-    color: "text-blue-500",
-    bgColor: "bg-blue-500/10",
+    color: "text-stone-700 dark:text-stone-300",
+    bgColor: "bg-stone-200 dark:bg-stone-700",
   },
   client: {
     label: "Client",
@@ -118,8 +118,8 @@ export function ParticipantsManager({
       {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="bg-primary/10 rounded-full p-2">
-            <Shield className="text-primary h-5 w-5" />
+          <div className="rounded-full bg-stone-200 p-2 dark:bg-stone-700">
+            <Shield className="h-5 w-5 text-stone-700 dark:text-stone-300" />
           </div>
           <div>
             <h2 className="text-lg font-semibold">Participants</h2>

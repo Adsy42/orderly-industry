@@ -41,8 +41,10 @@ async function handleRequest(req: NextRequest, method: string) {
     // Build headers - forward Authorization header from the original request
     const headers: Record<string, string> = {};
 
-    // Add LangSmith API key (required)
-    headers["x-api-key"] = API_KEY;
+    // Add LangSmith API key if set (required for cloud, optional for local dev)
+    if (API_KEY) {
+      headers["x-api-key"] = API_KEY;
+    }
 
     // Forward Authorization header from browser (contains Supabase JWT)
     const authHeader = req.headers.get("authorization");

@@ -1,18 +1,24 @@
 """Document structure extraction service.
 
-Extracts hierarchical structure from legal documents using the `unstructured`
-library. Detects sections, headings, paragraphs, and generates structural
+Extracts hierarchical structure from legal documents using Azure Document
+Intelligence. Detects sections, headings, paragraphs, and generates structural
 citations for precise legal grounding.
+
+Requires environment variables:
+- AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT
+- AZURE_DOCUMENT_INTELLIGENCE_KEY
 """
 
+import asyncio
 import hashlib
-import io
+import os
 import re
 import uuid
 from dataclasses import dataclass, field
 from typing import Any
 
-from markdownify import markdownify
+# Timeout for Azure Document Intelligence API calls (seconds)
+AZURE_TIMEOUT_SECONDS = 120
 
 
 @dataclass
@@ -92,164 +98,254 @@ class StructureExtractor:
         file_content: bytes,
         file_type: str,
     ) -> ExtractionResult:
-        """Extract structure from a document.
+        """Extract structure from a document using Azure Document Intelligence.
 
         Args:
             document_id: UUID of the document.
             file_content: Raw bytes of the document.
-            file_type: File extension (pdf, docx, txt).
+            file_type: File extension (pdf, docx, doc).
+
+        Returns:
+            ExtractionResult with sections, chunks, and normalized markdown.
+
+        Raises:
+            ValueError: If Azure credentials are not configured or file type unsupported.
+        """
+        # Validate file type
+        supported_types = ("pdf", "docx", "doc")
+        if file_type.lower() not in supported_types:
+            return ExtractionResult(
+                document_id=document_id,
+                error=f"Unsupported file type: {file_type}. Supported: {', '.join(supported_types)}",
+            )
+
+        # Get Azure credentials at call time (not module load)
+        azure_endpoint = os.environ.get("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT")
+        azure_key = os.environ.get("AZURE_DOCUMENT_INTELLIGENCE_KEY")
+
+        if not azure_endpoint or not azure_key:
+            return ExtractionResult(
+                document_id=document_id,
+                error="Azure Document Intelligence not configured. Set AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT and AZURE_DOCUMENT_INTELLIGENCE_KEY environment variables.",
+            )
+
+        return await self._extract_with_azure(document_id, file_content, file_type, azure_endpoint, azure_key)
+
+    async def _extract_with_azure(
+        self,
+        document_id: str,
+        file_content: bytes,
+        file_type: str,
+        azure_endpoint: str,
+        azure_key: str,
+    ) -> ExtractionResult:
+        """Extract using Azure Document Intelligence.
+
+        Args:
+            document_id: UUID of the document.
+            file_content: Raw bytes of the document.
+            file_type: File extension.
+            azure_endpoint: Azure Document Intelligence endpoint URL.
+            azure_key: Azure Document Intelligence API key.
 
         Returns:
             ExtractionResult with sections, chunks, and normalized markdown.
         """
+        from azure.ai.documentintelligence import DocumentIntelligenceClient
+        from azure.ai.documentintelligence.models import AnalyzeDocumentRequest
+        from azure.core.credentials import AzureKeyCredential
+
+        print(f"[StructureExtractor] Using Azure Document Intelligence for {file_type}")
+
+        client = DocumentIntelligenceClient(
+            endpoint=azure_endpoint,
+            credential=AzureKeyCredential(azure_key),
+        )
+
+        # Analyze document with prebuilt-layout model (best for structure)
+        # Run in thread to avoid blocking the event loop
+        def _analyze():
+            poller = client.begin_analyze_document(
+                "prebuilt-layout",
+                AnalyzeDocumentRequest(bytes_source=file_content),
+            )
+            return poller.result()
+
         try:
-            # Import unstructured here to handle import errors gracefully
-            from unstructured.partition.auto import partition
-
-            # Determine content type
-            content_type = self._get_content_type(file_type)
-
-            # Extract elements with structure preservation
-            elements = partition(
-                file=io.BytesIO(file_content),
-                content_type=content_type,
-                strategy="hi_res" if self.use_hi_res else "fast",
-                include_page_breaks=True,
-                include_metadata=True,
+            result = await asyncio.wait_for(
+                asyncio.to_thread(_analyze),
+                timeout=AZURE_TIMEOUT_SECONDS,
             )
-
-            # Build section tree from elements
-            sections = self._build_section_tree(elements)
-
-            # Create chunks with citations
-            chunks = self._create_chunks_with_citations(elements, sections)
-
-            # Generate normalized markdown
-            normalized_markdown = self._generate_normalized_markdown(elements)
-
-            # Calculate extraction quality
-            quality = self._calculate_extraction_quality(elements, sections)
-
-            # Get page count
-            page_count = self._get_page_count(elements)
-
+        except asyncio.TimeoutError:
             return ExtractionResult(
                 document_id=document_id,
-                sections=sections,
-                chunks=chunks,
-                normalized_markdown=normalized_markdown,
-                extraction_quality=quality,
-                page_count=page_count,
-                error=None,
+                error=f"Azure Document Intelligence timed out after {AZURE_TIMEOUT_SECONDS} seconds",
             )
 
-        except ImportError as e:
-            return ExtractionResult(
-                document_id=document_id,
-                error=f"Missing dependency: {e}. Install with: pip install unstructured",
-            )
-        except Exception as e:
-            return ExtractionResult(
-                document_id=document_id,
-                error=f"Extraction failed: {str(e)}",
-            )
-
-    def _get_content_type(self, file_type: str) -> str:
-        """Map file extension to MIME type."""
-        content_types = {
-            "pdf": "application/pdf",
-            "docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            "doc": "application/msword",
-            "txt": "text/plain",
-            "rtf": "application/rtf",
-        }
-        return content_types.get(file_type.lower(), "application/octet-stream")
-
-    def _build_section_tree(self, elements: list[Any]) -> list[SectionData]:
-        """Build hierarchical section tree from extracted elements.
-
-        Args:
-            elements: List of unstructured elements.
-
-        Returns:
-            List of SectionData objects representing the document structure.
-        """
-        from unstructured.documents.elements import Title
-
+        # Extract sections from paragraphs with roles
         sections: list[SectionData] = []
-        section_stack: list[SectionData] = []  # Stack for tracking hierarchy
-        sequence_by_parent: dict[str | None, int] = {}
+        chunks: list[ChunkData] = []
+        markdown_lines: list[str] = []
 
-        for element in elements:
-            if isinstance(element, Title):
-                title_text = str(element).strip()
-                if not title_text:
+        section_stack: list[SectionData] = []
+        chunk_index = 0
+        paragraph_index = 0
+
+        # Process paragraphs
+        if result.paragraphs:
+            for para in result.paragraphs:
+                role = para.role if hasattr(para, "role") else None
+                content = para.content.strip() if para.content else ""
+
+                if not content:
                     continue
 
-                # Determine section level from element metadata or heading style
-                level = self._detect_heading_level(element, title_text)
-
-                # Extract section number if present
-                section_number = self._extract_section_number(title_text)
-
-                # Pop sections from stack that are at same or higher level
-                while section_stack and section_stack[-1].level >= level:
-                    section_stack.pop()
-
-                # Determine parent
-                parent_id = section_stack[-1].id if section_stack else None
-
-                # Build path
-                path = [s.title or s.section_number or "" for s in section_stack]
-                path.append(title_text)
-
-                # Get sequence number for this parent
-                seq = sequence_by_parent.get(parent_id, 0)
-                sequence_by_parent[parent_id] = seq + 1
-
                 # Get page number
-                page = self._get_element_page(element)
+                page = None
+                if para.bounding_regions and len(para.bounding_regions) > 0:
+                    page = para.bounding_regions[0].page_number
 
-                # Create section
-                section = SectionData(
-                    id=str(uuid.uuid4()),
-                    parent_id=parent_id,
-                    section_number=section_number,
-                    title=title_text,
-                    level=level,
-                    sequence=seq,
-                    path=path,
-                    start_page=page,
-                    end_page=page,
-                    content="",
-                )
+                # Check if this is a heading/title
+                if role in ("title", "sectionHeading", "heading"):
+                    # Determine level
+                    level = 1
+                    if role == "sectionHeading":
+                        level = self._detect_heading_level(None, content)
 
-                sections.append(section)
-                section_stack.append(section)
+                    # Pop sections at same or higher level
+                    while section_stack and section_stack[-1].level >= level:
+                        section_stack.pop()
 
-        # Update end_page for each section
-        self._update_section_end_pages(sections)
+                    parent_id = section_stack[-1].id if section_stack else None
+                    path = [s.title or "" for s in section_stack] + [content]
 
-        return sections
+                    section = SectionData(
+                        id=str(uuid.uuid4()),
+                        parent_id=parent_id,
+                        section_number=self._extract_section_number(content),
+                        title=content,
+                        level=level,
+                        sequence=len(sections),
+                        path=path,
+                        start_page=page,
+                        end_page=page,
+                        content="",
+                    )
+                    sections.append(section)
+                    section_stack.append(section)
+
+                    # Add section chunk
+                    chunks.append(ChunkData(
+                        id=str(uuid.uuid4()),
+                        section_id=section.id,
+                        parent_chunk_id=None,
+                        chunk_level="section",
+                        chunk_index=chunk_index,
+                        content=content,
+                        content_hash=self._generate_content_hash(content),
+                        citation={
+                            "page": page,
+                            "section_path": path,
+                            "paragraph_index": None,
+                            "heading": content,
+                            "context_before": None,
+                            "context_after": None,
+                        },
+                    ))
+                    chunk_index += 1
+
+                    markdown_lines.append(f"{'#' * level} {content}")
+                    markdown_lines.append("")
+                else:
+                    # Regular paragraph
+                    current_section = section_stack[-1] if section_stack else None
+                    section_path = [s.title or "" for s in section_stack]
+
+                    chunks.append(ChunkData(
+                        id=str(uuid.uuid4()),
+                        section_id=current_section.id if current_section else None,
+                        parent_chunk_id=None,
+                        chunk_level="paragraph",
+                        chunk_index=chunk_index,
+                        content=content,
+                        content_hash=self._generate_content_hash(content),
+                        citation={
+                            "page": page,
+                            "section_path": section_path,
+                            "paragraph_index": paragraph_index,
+                            "heading": current_section.title if current_section else None,
+                            "context_before": None,
+                            "context_after": None,
+                        },
+                    ))
+                    chunk_index += 1
+                    paragraph_index += 1
+
+                    markdown_lines.append(content)
+                    markdown_lines.append("")
+
+        # Process tables
+        if result.tables:
+            for table in result.tables:
+                table_md = self._azure_table_to_markdown(table)
+                markdown_lines.append(table_md)
+                markdown_lines.append("")
+
+        normalized_markdown = "\n".join(markdown_lines).strip()
+        page_count = result.pages[-1].page_number if result.pages else 0
+
+        # Calculate quality (Azure generally produces high-quality results)
+        quality = 0.9 if sections else 0.7
+
+        print(f"[StructureExtractor] Azure extracted {len(sections)} sections, {len(chunks)} chunks")
+
+        return ExtractionResult(
+            document_id=document_id,
+            sections=sections,
+            chunks=chunks,
+            normalized_markdown=normalized_markdown,
+            extraction_quality=quality,
+            page_count=page_count,
+            error=None,
+        )
+
+    def _azure_table_to_markdown(self, table: Any) -> str:
+        """Convert Azure table to markdown format."""
+        if not table.cells:
+            return ""
+
+        # Find table dimensions
+        max_row = max(cell.row_index for cell in table.cells) + 1
+        max_col = max(cell.column_index for cell in table.cells) + 1
+
+        # Create grid
+        grid = [["" for _ in range(max_col)] for _ in range(max_row)]
+
+        for cell in table.cells:
+            content = cell.content.strip() if cell.content else ""
+            grid[cell.row_index][cell.column_index] = content
+
+        # Build markdown table
+        lines = []
+        for i, row in enumerate(grid):
+            line = "| " + " | ".join(row) + " |"
+            lines.append(line)
+            if i == 0:
+                # Add separator after header
+                lines.append("| " + " | ".join(["---"] * max_col) + " |")
+
+        return "\n".join(lines)
 
     def _detect_heading_level(self, element: Any, title_text: str) -> int:
-        """Detect heading level from element metadata or content.
+        """Detect heading level from content patterns.
 
         Args:
-            element: Unstructured element.
+            element: Element (unused, kept for API compatibility).
             title_text: The heading text.
 
         Returns:
             Heading level (1-6).
         """
-        # Try to get from metadata
-        metadata = getattr(element, "metadata", None)
-        if metadata:
-            # Check for category_depth
-            depth = getattr(metadata, "category_depth", None)
-            if depth is not None:
-                return min(max(int(depth), 1), 6)
-
         # Infer from section number pattern
         if re.match(r"^\d+\.\d+\.\d+", title_text):
             return 3
@@ -280,265 +376,6 @@ class StructureExtractor:
                 return match.group(0).strip()
         return None
 
-    def _get_element_page(self, element: Any) -> int | None:
-        """Get page number from element metadata."""
-        metadata = getattr(element, "metadata", None)
-        if metadata:
-            page = getattr(metadata, "page_number", None)
-            if page is not None:
-                return int(page)
-        return None
-
-    def _update_section_end_pages(self, sections: list[SectionData]) -> None:
-        """Update end_page for each section based on subsequent sections."""
-        for i, section in enumerate(sections):
-            # Find the next section at same or higher level
-            for j in range(i + 1, len(sections)):
-                if sections[j].level <= section.level:
-                    # Previous section's page is our end page
-                    if sections[j].start_page:
-                        section.end_page = sections[j].start_page
-                    break
-
-    def _create_chunks_with_citations(
-        self,
-        elements: list[Any],
-        sections: list[SectionData],
-    ) -> list[ChunkData]:
-        """Create chunks with structural citations.
-
-        Args:
-            elements: List of unstructured elements.
-            sections: List of sections for context.
-
-        Returns:
-            List of ChunkData objects.
-        """
-        from unstructured.documents.elements import (
-            ListItem,
-            NarrativeText,
-            Title,
-        )
-
-        chunks: list[ChunkData] = []
-        current_section: SectionData | None = None
-        section_index = 0
-        chunk_index = 0
-        paragraph_index = 0
-
-        # First, create section-level chunks
-        section_chunks: dict[str, ChunkData] = {}
-        for section in sections:
-            section_chunk = ChunkData(
-                id=str(uuid.uuid4()),
-                section_id=section.id,
-                parent_chunk_id=None,
-                chunk_level="section",
-                chunk_index=chunk_index,
-                content=section.title or "",
-                content_hash=self._generate_content_hash(section.title or ""),
-                citation={
-                    "page": section.start_page,
-                    "section_path": section.path,
-                    "paragraph_index": None,
-                    "heading": section.title,
-                    "context_before": None,
-                    "context_after": None,
-                },
-            )
-            section_chunks[section.id] = section_chunk
-            chunks.append(section_chunk)
-            chunk_index += 1
-
-        # Now create paragraph-level chunks
-        prev_content: str | None = None
-
-        for element in elements:
-            # Update current section when we hit a Title
-            if isinstance(element, Title):
-                title_text = str(element).strip()
-                # Find matching section
-                if section_index < len(sections):
-                    if sections[section_index].title == title_text:
-                        current_section = sections[section_index]
-                        section_index += 1
-                        paragraph_index = 0
-                continue
-
-            # Process paragraph content
-            if isinstance(element, (NarrativeText, ListItem)):
-                content = str(element).strip()
-                if not content:
-                    continue
-
-                page = self._get_element_page(element)
-                section_path = current_section.path if current_section else []
-                heading = current_section.title if current_section else None
-
-                # Get parent chunk (section-level)
-                parent_chunk_id = None
-                if current_section and current_section.id in section_chunks:
-                    parent_chunk_id = section_chunks[current_section.id].id
-
-                # Get context
-                context_before = prev_content[-50:] if prev_content else None
-
-                chunk = ChunkData(
-                    id=str(uuid.uuid4()),
-                    section_id=current_section.id if current_section else None,
-                    parent_chunk_id=parent_chunk_id,
-                    chunk_level="paragraph",
-                    chunk_index=chunk_index,
-                    content=content,
-                    content_hash=self._generate_content_hash(content),
-                    citation={
-                        "page": page,
-                        "section_path": section_path,
-                        "paragraph_index": paragraph_index,
-                        "heading": heading,
-                        "context_before": context_before,
-                        "context_after": None,  # Will be updated in next iteration
-                    },
-                )
-
-                # Update previous chunk's context_after
-                if chunks and chunks[-1].chunk_level == "paragraph":
-                    chunks[-1].citation["context_after"] = content[:50]
-
-                chunks.append(chunk)
-                chunk_index += 1
-                paragraph_index += 1
-                prev_content = content
-
-        return chunks
-
-    def _generate_normalized_markdown(self, elements: list[Any]) -> str:
-        """Generate clean markdown from extracted elements.
-
-        Args:
-            elements: List of unstructured elements.
-
-        Returns:
-            Normalized markdown string.
-        """
-        from unstructured.documents.elements import (
-            ListItem,
-            NarrativeText,
-            Table,
-            Title,
-        )
-
-        lines: list[str] = []
-        current_list: list[str] = []
-
-        for element in elements:
-            if isinstance(element, Title):
-                # Flush any pending list
-                if current_list:
-                    lines.extend(current_list)
-                    current_list = []
-                    lines.append("")
-
-                title_text = str(element).strip()
-                level = self._detect_heading_level(element, title_text)
-                lines.append(f"{'#' * level} {title_text}")
-                lines.append("")
-
-            elif isinstance(element, NarrativeText):
-                # Flush any pending list
-                if current_list:
-                    lines.extend(current_list)
-                    current_list = []
-                    lines.append("")
-
-                lines.append(str(element).strip())
-                lines.append("")
-
-            elif isinstance(element, ListItem):
-                current_list.append(f"- {str(element).strip()}")
-
-            elif isinstance(element, Table):
-                # Flush any pending list
-                if current_list:
-                    lines.extend(current_list)
-                    current_list = []
-                    lines.append("")
-
-                # Try to convert table to markdown
-                table_html = getattr(element, "metadata", {})
-                if hasattr(table_html, "text_as_html"):
-                    md_table = markdownify(table_html.text_as_html)
-                    lines.append(md_table)
-                else:
-                    lines.append(str(element).strip())
-                lines.append("")
-
-        # Flush remaining list
-        if current_list:
-            lines.extend(current_list)
-
-        # Join and clean up
-        markdown = "\n".join(lines)
-
-        # Remove excessive blank lines
-        markdown = re.sub(r"\n{3,}", "\n\n", markdown)
-
-        return markdown.strip()
-
-    def _calculate_extraction_quality(
-        self,
-        elements: list[Any],
-        sections: list[SectionData],
-    ) -> float:
-        """Calculate extraction quality score.
-
-        Args:
-            elements: List of unstructured elements.
-            sections: List of extracted sections.
-
-        Returns:
-            Quality score from 0.0 to 1.0.
-        """
-        if not elements:
-            return 0.0
-
-        # Factors affecting quality
-        factors: list[float] = []
-
-        # 1. Section detection (0-1)
-        section_ratio = len(sections) / max(len(elements) * 0.1, 1)
-        factors.append(min(section_ratio, 1.0))
-
-        # 2. Content coverage (0-1)
-        total_content = sum(len(str(e)) for e in elements)
-        if total_content > 100:
-            factors.append(1.0)
-        elif total_content > 0:
-            factors.append(total_content / 100)
-        else:
-            factors.append(0.0)
-
-        # 3. Page number detection (0-1)
-        pages_detected = sum(
-            1 for e in elements if self._get_element_page(e) is not None
-        )
-        factors.append(pages_detected / max(len(elements), 1))
-
-        # 4. Hierarchy depth (0-1)
-        max_level = max((s.level for s in sections), default=0)
-        factors.append(min(max_level / 3, 1.0))
-
-        return sum(factors) / len(factors) if factors else 0.0
-
-    def _get_page_count(self, elements: list[Any]) -> int:
-        """Get total page count from elements."""
-        max_page = 0
-        for element in elements:
-            page = self._get_element_page(element)
-            if page and page > max_page:
-                max_page = page
-        return max_page
-
     def _generate_content_hash(self, content: str) -> str:
         """Generate SHA-256 hash for content verification."""
         return hashlib.sha256(content.encode()).hexdigest()
@@ -567,3 +404,5 @@ def verify_content_hash(content: str, stored_hash: str) -> bool:
         True if hashes match.
     """
     return generate_content_hash(content) == stored_hash
+
+

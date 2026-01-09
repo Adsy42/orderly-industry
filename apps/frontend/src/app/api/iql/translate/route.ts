@@ -162,6 +162,9 @@ Response Format (JSON):
       throw new Error("Translation result missing required 'iql' field");
     }
 
+    // Normalize quotes: IQL requires double quotes, but LLM sometimes returns single quotes
+    translationResult.iql = translationResult.iql.replace(/'/g, '"');
+
     console.log("[IQL Translate] Translation successful:", {
       iql: translationResult.iql,
       templatesUsed: translationResult.templates_used?.length || 0,

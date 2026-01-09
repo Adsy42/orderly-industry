@@ -255,7 +255,7 @@ export function DocumentSearch({
               {results.map((result) => (
                 <div
                   key={result.id}
-                  className="group bg-card hover:border-primary/50 cursor-pointer rounded-lg border p-4 transition-all hover:shadow-sm"
+                  className="group bg-card cursor-pointer rounded-lg border p-4 transition-all hover:border-stone-400 hover:shadow-sm dark:hover:border-stone-500"
                   onClick={() => onResultClick?.(result)}
                 >
                   <div className="mb-2 flex items-center justify-between">
@@ -269,7 +269,7 @@ export function DocumentSearch({
                           "rounded px-2 py-0.5 text-xs font-medium",
                           result.rerank_score !== undefined
                             ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400"
-                            : "bg-primary/10 text-primary",
+                            : "bg-stone-200 text-stone-700 dark:bg-stone-700 dark:text-stone-300",
                         )}
                       >
                         {Math.round(getDisplayScore(result) * 100)}% match

@@ -45,7 +45,7 @@ export function CitationLink({
   const linkContent = (
     <Link
       href={citation.link}
-      className={`text-sm font-medium text-blue-600 underline decoration-dotted underline-offset-2 transition-colors hover:text-blue-800 hover:decoration-solid dark:text-blue-400 dark:hover:text-blue-300 ${inline ? "inline" : "block"} ${className} `}
+      className={`text-sm font-medium text-stone-700 underline decoration-dotted underline-offset-2 transition-colors hover:text-stone-900 hover:decoration-solid dark:text-stone-400 dark:hover:text-stone-200 ${inline ? "inline" : "block"} ${className} `}
     >
       [{citation.short}]
     </Link>

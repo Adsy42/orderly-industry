@@ -3,7 +3,7 @@
 import * as React from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ArrowLeft, FileText, Loader2 } from "lucide-react";
+import { ArrowLeft, FileText } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { IQLQueryBuilder } from "@/components/documents/iql-query-builder";
 import type { IQLQueryResult } from "@/types/iql";

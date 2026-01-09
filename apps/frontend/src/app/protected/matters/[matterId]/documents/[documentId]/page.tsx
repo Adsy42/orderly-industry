@@ -321,7 +321,7 @@ export default function DocumentViewerPage() {
             <span className="text-gray-700">{document.filename}</span>
           </div>
           <h1 className="flex items-center gap-2 text-2xl font-bold">
-            <FileText className="h-6 w-6 text-blue-600" />
+            <FileText className="h-6 w-6 text-stone-600 dark:text-stone-400" />
             {document.filename}
           </h1>
           <div className="flex items-center gap-3 text-sm text-gray-500">
@@ -416,8 +416,8 @@ export default function DocumentViewerPage() {
                   className={cn(
                     "rounded-lg border p-4 transition-all",
                     isHighlighted
-                      ? "border-blue-500 bg-blue-50 ring-2 ring-blue-200"
-                      : "border-gray-200 bg-white hover:border-gray-300",
+                      ? "border-stone-500 bg-stone-100 ring-2 ring-stone-300 dark:border-stone-400 dark:bg-stone-800 dark:ring-stone-500"
+                      : "border-gray-200 bg-white hover:border-gray-300 dark:border-gray-700 dark:bg-gray-800 dark:hover:border-gray-500",
                   )}
                 >
                   {/* Citation header */}
@@ -461,7 +461,7 @@ export default function DocumentViewerPage() {
                   <div className="mt-2 flex items-center justify-between text-xs text-gray-400">
                     <span>Chunk {chunk.chunk_index + 1}</span>
                     {isHighlighted && (
-                      <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                      <span className="rounded-full bg-stone-200 px-2 py-0.5 text-xs font-medium text-stone-700 dark:bg-stone-700 dark:text-stone-300">
                         {highlightStart !== null
                           ? "Exact match highlighted"
                           : "Highlighted from citation"}

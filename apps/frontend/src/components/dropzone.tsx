@@ -138,7 +138,9 @@ export function Dropzone({
   const getFileIcon = (status: DropzoneFile["status"]) => {
     switch (status) {
       case "uploading":
-        return <Loader2 className="h-4 w-4 animate-spin text-blue-500" />;
+        return (
+          <Loader2 className="h-4 w-4 animate-spin text-stone-700 dark:text-stone-300" />
+        );
       case "success":
         return <CheckCircle className="h-4 w-4 text-green-500" />;
       case "error":
@@ -172,8 +174,8 @@ export function Dropzone({
         className={cn(
           "relative flex min-h-[150px] cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed p-6 transition-colors",
           isDragActive
-            ? "border-primary bg-primary/5"
-            : "border-muted-foreground/25 hover:border-primary/50",
+            ? "border-stone-800 bg-stone-100 dark:border-stone-300 dark:bg-stone-800"
+            : "border-muted-foreground/25 hover:border-stone-500",
           disabled && "cursor-not-allowed opacity-50",
         )}
       >
@@ -189,12 +191,16 @@ export function Dropzone({
         <Upload
           className={cn(
             "mb-2 h-10 w-10",
-            isDragActive ? "text-primary" : "text-muted-foreground",
+            isDragActive
+              ? "text-stone-800 dark:text-stone-300"
+              : "text-muted-foreground",
           )}
         />
         <p className="text-muted-foreground text-sm">
           {isDragActive ? (
-            <span className="text-primary">Drop files here</span>
+            <span className="text-stone-800 dark:text-stone-300">
+              Drop files here
+            </span>
           ) : (
             <>
               <span className="text-foreground font-medium">
@@ -225,7 +231,7 @@ export function Dropzone({
                     {formatFileSize(file.file.size)}
                   </span>
                   {file.status === "uploading" && (
-                    <span className="text-xs text-blue-500">
+                    <span className="text-xs text-stone-700 dark:text-stone-300">
                       {file.progress}%
                     </span>
                   )}
@@ -236,7 +242,7 @@ export function Dropzone({
                 {file.status === "uploading" && (
                   <div className="bg-muted mt-1 h-1 w-full overflow-hidden rounded-full">
                     <div
-                      className="bg-primary h-full transition-all"
+                      className="h-full bg-stone-800 transition-all dark:bg-stone-300"
                       style={{ width: `${file.progress}%` }}
                     />
                   </div>

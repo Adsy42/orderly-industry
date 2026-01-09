@@ -13,7 +13,6 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import type { MatterWithDocumentCount } from "@/hooks/use-matters";
 
 interface MatterCardProps {
@@ -25,9 +24,11 @@ interface MatterCardProps {
 }
 
 const statusColors: Record<string, string> = {
-  active: "bg-emerald-500/10 text-emerald-500 border-emerald-500/20",
-  closed: "bg-slate-500/10 text-slate-400 border-slate-500/20",
-  archived: "bg-amber-500/10 text-amber-500 border-amber-500/20",
+  active:
+    "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400",
+  closed: "bg-zinc-100 text-zinc-500 dark:bg-slate-700 dark:text-slate-400",
+  archived:
+    "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400",
 };
 
 export function MatterCard({
@@ -60,55 +61,62 @@ export function MatterCard({
   }, []);
 
   return (
-    <Card
+    <div
       className={cn(
-        "group hover:border-primary/50 relative transition-all hover:shadow-md",
+        "group relative rounded-2xl border border-stone-200 bg-white",
+        "transition-all duration-300",
+        "hover:border-stone-400 hover:shadow-xl hover:shadow-stone-200/50",
+        "dark:border-stone-700 dark:bg-stone-800/50 dark:hover:border-stone-500 dark:hover:shadow-stone-900/50",
         className,
       )}
     >
       <Link
         href={`/protected/matters/${matter.id}`}
-        className="block p-5"
+        className="block p-6"
       >
         {/* Header */}
-        <div className="mb-3 flex items-start justify-between gap-3">
+        <div className="mb-4 flex items-start justify-between gap-3">
           <div className="min-w-0 flex-1">
-            <p className="text-muted-foreground mb-1 text-xs font-medium">
+            <p className="text-muted-foreground mb-1 text-xs font-medium tracking-wide uppercase">
               {matter.matter_number}
             </p>
-            <h3 className="text-foreground group-hover:text-primary truncate pr-8 text-lg font-semibold">
+            <h3
+              className={cn(
+                "text-xl font-semibold tracking-tight text-zinc-900",
+                "transition-colors duration-200 group-hover:text-stone-700",
+                "dark:text-white dark:group-hover:text-stone-300",
+              )}
+            >
               {matter.title}
             </h3>
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <span
               className={cn(
-                "rounded-full border px-2.5 py-0.5 text-xs font-medium capitalize",
+                "rounded-full px-3 py-1 text-xs font-medium capitalize",
                 statusColors[matter.status],
               )}
             >
               {matter.status}
             </span>
-            {/* Spacer for actions button */}
-            <div className="w-8" />
           </div>
         </div>
 
         {/* Description */}
         {matter.description && (
-          <p className="text-muted-foreground mb-4 line-clamp-2 text-sm">
+          <p className="mb-5 line-clamp-2 text-sm leading-relaxed text-zinc-600 dark:text-slate-400">
             {matter.description}
           </p>
         )}
 
         {/* Footer */}
-        <div className="text-muted-foreground flex items-center gap-4 text-xs">
-          <span className="flex items-center gap-1.5">
-            <FileText className="h-3.5 w-3.5" />
-            {documentCount} {documentCount === 1 ? "document" : "documents"}
+        <div className="flex items-center gap-6 border-t border-zinc-100 pt-4 dark:border-slate-700/50">
+          <span className="text-muted-foreground flex items-center gap-2 text-sm">
+            <FileText className="h-4 w-4" />
+            {documentCount} {documentCount === 1 ? "doc" : "docs"}
           </span>
-          <span className="flex items-center gap-1.5">
-            <Clock className="h-3.5 w-3.5" />
+          <span className="text-muted-foreground flex items-center gap-2 text-sm">
+            <Clock className="h-4 w-4" />
             {updatedAgo}
           </span>
         </div>
@@ -122,7 +130,10 @@ export function MatterCard({
         <Button
           variant="ghost"
           size="icon"
-          className="h-8 w-8 opacity-0 group-hover:opacity-100"
+          className={cn(
+            "h-8 w-8 rounded-lg",
+            "opacity-0 transition-opacity duration-200 group-hover:opacity-100",
+          )}
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
@@ -134,10 +145,20 @@ export function MatterCard({
         </Button>
 
         {showActions && (
-          <div className="bg-popover absolute top-full right-0 z-50 mt-1 min-w-[140px] rounded-md border p-1 shadow-lg">
+          <div
+            className={cn(
+              "absolute top-full right-0 z-50 mt-2 w-48",
+              "rounded-xl border border-zinc-200 bg-white p-2 shadow-xl",
+              "dark:border-slate-700 dark:bg-slate-800",
+            )}
+          >
             {onEdit && (
               <button
-                className="hover:bg-accent flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm"
+                className={cn(
+                  "flex w-full items-center gap-3 rounded-lg px-3 py-2",
+                  "text-sm font-medium transition-colors",
+                  "hover:bg-zinc-100 dark:hover:bg-slate-700",
+                )}
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -151,7 +172,11 @@ export function MatterCard({
             )}
             {onArchive && matter.status !== "archived" && (
               <button
-                className="hover:bg-accent flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm"
+                className={cn(
+                  "flex w-full items-center gap-3 rounded-lg px-3 py-2",
+                  "text-sm font-medium transition-colors",
+                  "hover:bg-zinc-100 dark:hover:bg-slate-700",
+                )}
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -165,7 +190,11 @@ export function MatterCard({
             )}
             {onDelete && (
               <button
-                className="text-destructive hover:bg-destructive/10 flex w-full items-center gap-2 rounded-sm px-2 py-1.5 text-sm"
+                className={cn(
+                  "flex w-full items-center gap-3 rounded-lg px-3 py-2",
+                  "text-destructive text-sm font-medium transition-colors",
+                  "hover:bg-destructive/10",
+                )}
                 onClick={(e) => {
                   e.preventDefault();
                   e.stopPropagation();
@@ -180,7 +209,7 @@ export function MatterCard({
           </div>
         )}
       </div>
-    </Card>
+    </div>
   );
 }
 
