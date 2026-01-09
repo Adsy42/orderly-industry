@@ -17,7 +17,7 @@ function OperatorCard({ op }: { op: OperatorInfo }) {
   return (
     <div className="space-y-2 rounded-lg border bg-white p-3">
       <div className="flex items-center gap-2">
-        <code className="rounded bg-blue-100 px-2 py-0.5 font-mono text-sm font-bold text-blue-800">
+        <code className="rounded bg-stone-200 px-2 py-0.5 font-mono text-sm font-bold text-stone-800 dark:bg-stone-700 dark:text-stone-200">
           {op.operator}
         </code>
         <span className="text-sm font-medium text-gray-900">{op.name}</span>

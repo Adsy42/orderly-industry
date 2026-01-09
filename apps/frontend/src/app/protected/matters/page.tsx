@@ -1,16 +1,29 @@
 "use client";
 
 import * as React from "react";
-import { Plus, Search, X, Loader2 } from "lucide-react";
+import { Plus, Search, X, Loader2, Briefcase } from "lucide-react";
 import {
   useMatters,
   type MatterWithDocumentCount,
   type CreateMatterInput,
   type UpdateMatterInput,
 } from "@/hooks/use-matters";
-import { MatterList, MatterForm } from "@/components/matters";
+import { MatterList } from "@/components/matters/matter-list";
+import { MatterForm } from "@/components/matters/matter-form";
+import { PageHeader } from "@/components/shared/page-header";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
+
+type FilterTab = "all" | "active" | "archived";
 
 export default function MattersPage() {
   const {
@@ -28,17 +41,16 @@ export default function MattersPage() {
   const [deletingMatter, setDeletingMatter] =
     React.useState<MatterWithDocumentCount | null>(null);
   const [searchQuery, setSearchQuery] = React.useState("");
+  const [activeFilter, setActiveFilter] = React.useState<FilterTab>("active");
   const searchInputRef = React.useRef<HTMLInputElement>(null);
 
   // Keyboard shortcuts
   React.useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore if user is typing in an input
       if (
         e.target instanceof HTMLInputElement ||
         e.target instanceof HTMLTextAreaElement
       ) {
-        // Allow Escape to close dialogs even when in input
         if (e.key === "Escape") {
           if (isCreateDialogOpen) setIsCreateDialogOpen(false);
           if (editingMatter) setEditingMatter(null);
@@ -49,19 +61,16 @@ export default function MattersPage() {
 
       const isMod = e.metaKey || e.ctrlKey;
 
-      // Cmd/Ctrl + N: New Matter
       if (isMod && e.key === "n") {
         e.preventDefault();
         setIsCreateDialogOpen(true);
       }
 
-      // Cmd/Ctrl + K or /: Focus search
       if ((isMod && e.key === "k") || e.key === "/") {
         e.preventDefault();
         searchInputRef.current?.focus();
       }
 
-      // Escape: Close dialogs
       if (e.key === "Escape") {
         if (isCreateDialogOpen) setIsCreateDialogOpen(false);
         if (editingMatter) setEditingMatter(null);
@@ -73,24 +82,38 @@ export default function MattersPage() {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [isCreateDialogOpen, editingMatter, deletingMatter]);
 
-  // Filter matters by search query
+  // Filter matters by search query and status
   const filteredMatters = React.useMemo(() => {
-    if (!searchQuery.trim()) return matters;
-    const query = searchQuery.toLowerCase();
-    return matters.filter(
-      (m) =>
-        m.title.toLowerCase().includes(query) ||
-        m.matter_number.toLowerCase().includes(query) ||
-        m.description?.toLowerCase().includes(query),
-    );
-  }, [matters, searchQuery]);
+    let filtered = matters;
+
+    // Filter by status
+    if (activeFilter === "active") {
+      filtered = filtered.filter((m) => m.status === "active");
+    } else if (activeFilter === "archived") {
+      filtered = filtered.filter(
+        (m) => m.status === "archived" || m.status === "closed",
+      );
+    }
+
+    // Filter by search query
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (m) =>
+          m.title.toLowerCase().includes(query) ||
+          m.matter_number.toLowerCase().includes(query) ||
+          m.description?.toLowerCase().includes(query),
+      );
+    }
+
+    return filtered;
+  }, [matters, searchQuery, activeFilter]);
 
   const handleCreateMatter = async (
     input: CreateMatterInput | UpdateMatterInput,
   ) => {
     setIsSubmitting(true);
     try {
-      // Type guard: CreateMatterInput requires title to be defined
       const createInput = input as CreateMatterInput;
       if (!createInput.title) return;
       const result = await createMatter(createInput);
@@ -137,47 +160,78 @@ export default function MattersPage() {
     await updateMatter(matter.id, { status: "archived" });
   };
 
-  return (
-    <div className="container mx-auto max-w-7xl px-4 py-8">
-      {/* Header */}
-      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight">Matters</h1>
-          <p className="text-muted-foreground mt-1">
-            Organize your legal cases and projects
-          </p>
-        </div>
-        <Button onClick={() => setIsCreateDialogOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          New Matter
-        </Button>
-      </div>
+  const filterTabs: { value: FilterTab; label: string }[] = [
+    { value: "active", label: "Active" },
+    { value: "all", label: "All" },
+    { value: "archived", label: "Archived" },
+  ];
 
-      {/* Search */}
-      <div className="mb-6 flex items-center gap-2">
+  return (
+    <div>
+      {/* Page Header */}
+      <PageHeader
+        title="Matters"
+        subtitle="Manage your legal matters and documents"
+        icon={Briefcase}
+        actions={
+          <Button
+            onClick={() => setIsCreateDialogOpen(true)}
+            className="shadow-primary/25 hover:shadow-primary/30 rounded-xl shadow-lg transition-all duration-200 hover:shadow-xl"
+          >
+            <Plus className="mr-2 h-4 w-4" />
+            New Matter
+          </Button>
+        }
+      />
+
+      {/* Search & Filters */}
+      <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        {/* Search Input */}
         <div className="relative max-w-md flex-1">
-          <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
+          <Search className="text-muted-foreground absolute top-1/2 left-4 h-4 w-4 -translate-y-1/2" />
           <Input
             ref={searchInputRef}
-            placeholder="Search matters... (/ or ⌘K)"
+            placeholder="Search matters..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-9"
+            className="rounded-xl border-zinc-200 bg-white pr-20 pl-10 dark:border-slate-700 dark:bg-slate-800"
           />
-          {searchQuery && (
+          {searchQuery ? (
             <button
               onClick={() => setSearchQuery("")}
-              className="text-muted-foreground hover:text-foreground absolute top-1/2 right-3 -translate-y-1/2"
+              className="text-muted-foreground hover:text-foreground absolute top-1/2 right-4 -translate-y-1/2 transition-colors"
             >
               <X className="h-4 w-4" />
             </button>
+          ) : (
+            <div className="absolute top-1/2 right-3 hidden -translate-y-1/2 items-center gap-1 rounded-md border border-zinc-200 bg-zinc-50 px-1.5 py-0.5 text-xs text-zinc-400 sm:flex dark:border-slate-600 dark:bg-slate-700">
+              <kbd>/</kbd>
+            </div>
           )}
+        </div>
+
+        {/* Filter Tabs */}
+        <div className="flex items-center gap-1 rounded-xl border border-zinc-200 bg-zinc-50 p-1 dark:border-slate-700 dark:bg-slate-800">
+          {filterTabs.map((tab) => (
+            <button
+              key={tab.value}
+              onClick={() => setActiveFilter(tab.value)}
+              className={cn(
+                "rounded-lg px-4 py-2 text-sm font-medium transition-all duration-200",
+                activeFilter === tab.value
+                  ? "text-foreground bg-white shadow-sm dark:bg-slate-700"
+                  : "text-muted-foreground hover:text-foreground",
+              )}
+            >
+              {tab.label}
+            </button>
+          ))}
         </div>
       </div>
 
       {/* Error State */}
       {error && (
-        <div className="border-destructive/50 bg-destructive/10 text-destructive mb-6 rounded-lg border p-4">
+        <div className="border-destructive/50 bg-destructive/10 text-destructive mb-6 rounded-2xl border p-4">
           {error.message}
         </div>
       )}
@@ -193,66 +247,87 @@ export default function MattersPage() {
       />
 
       {/* Create Dialog */}
-      {isCreateDialogOpen && (
-        <div className="bg-background/80 fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm">
-          <div className="bg-card relative w-full max-w-lg rounded-lg border p-6 shadow-lg">
-            <h2 className="mb-6 text-xl font-semibold">Create New Matter</h2>
-            <MatterForm
-              onSubmit={handleCreateMatter}
-              onCancel={() => setIsCreateDialogOpen(false)}
-              isSubmitting={isSubmitting}
-            />
-          </div>
-        </div>
-      )}
+      <Dialog
+        open={isCreateDialogOpen}
+        onOpenChange={setIsCreateDialogOpen}
+      >
+        <DialogContent className="rounded-2xl sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-xl">Create New Matter</DialogTitle>
+            <DialogDescription>
+              Add a new matter to organize your documents and legal work.
+            </DialogDescription>
+          </DialogHeader>
+          <MatterForm
+            onSubmit={handleCreateMatter}
+            onCancel={() => setIsCreateDialogOpen(false)}
+            isSubmitting={isSubmitting}
+          />
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Dialog */}
-      {editingMatter && (
-        <div className="bg-background/80 fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm">
-          <div className="bg-card relative w-full max-w-lg rounded-lg border p-6 shadow-lg">
-            <h2 className="mb-6 text-xl font-semibold">Edit Matter</h2>
+      <Dialog
+        open={!!editingMatter}
+        onOpenChange={(open) => !open && setEditingMatter(null)}
+      >
+        <DialogContent className="rounded-2xl sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-xl">Edit Matter</DialogTitle>
+            <DialogDescription>
+              Update the details for this matter.
+            </DialogDescription>
+          </DialogHeader>
+          {editingMatter && (
             <MatterForm
               matter={editingMatter}
               onSubmit={handleEditMatter}
               onCancel={() => setEditingMatter(null)}
               isSubmitting={isSubmitting}
             />
-          </div>
-        </div>
-      )}
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Delete Confirmation Dialog */}
-      {deletingMatter && (
-        <div className="bg-background/80 fixed inset-0 z-50 flex items-center justify-center backdrop-blur-sm">
-          <div className="bg-card relative w-full max-w-md rounded-lg border p-6 shadow-lg">
-            <h2 className="mb-4 text-xl font-semibold">Delete Matter</h2>
-            <p className="text-muted-foreground mb-6">
+      <Dialog
+        open={!!deletingMatter}
+        onOpenChange={(open) => !open && setDeletingMatter(null)}
+      >
+        <DialogContent className="rounded-2xl sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl">Delete Matter</DialogTitle>
+            <DialogDescription>
               Are you sure you want to delete{" "}
-              <strong>{deletingMatter.title}</strong>? This will permanently
-              remove all documents and cannot be undone.
-            </p>
-            <div className="flex justify-end gap-3">
-              <Button
-                variant="outline"
-                onClick={() => setDeletingMatter(null)}
-                disabled={isSubmitting}
-              >
-                Cancel
-              </Button>
-              <Button
-                variant="destructive"
-                onClick={handleDeleteMatter}
-                disabled={isSubmitting}
-              >
-                {isSubmitting && (
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                )}
-                Delete
-              </Button>
-            </div>
-          </div>
-        </div>
-      )}
+              <strong className="text-foreground">
+                {deletingMatter?.title}
+              </strong>
+              ? This will permanently remove all documents and cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-3 sm:gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setDeletingMatter(null)}
+              disabled={isSubmitting}
+              className="rounded-xl"
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteMatter}
+              disabled={isSubmitting}
+              className="rounded-xl"
+            >
+              {isSubmitting && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              Delete
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

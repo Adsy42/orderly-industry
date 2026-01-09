@@ -29,7 +29,7 @@ interface DocumentCardProps {
 
 const fileTypeIcons: Record<string, React.ReactNode> = {
   pdf: <FileText className="h-5 w-5 text-red-500" />,
-  docx: <FileCode className="h-5 w-5 text-blue-500" />,
+  docx: <FileCode className="h-5 w-5 text-stone-600 dark:text-stone-400" />,
   txt: <File className="h-5 w-5 text-gray-500" />,
 };
 
@@ -45,7 +45,7 @@ const statusConfig: Record<
   extracting: {
     icon: <Loader2 className="h-4 w-4 animate-spin" />,
     label: "Extracting text...",
-    color: "text-blue-500",
+    color: "text-stone-700 dark:text-stone-300",
   },
   embedding: {
     icon: <Loader2 className="h-4 w-4 animate-spin" />,

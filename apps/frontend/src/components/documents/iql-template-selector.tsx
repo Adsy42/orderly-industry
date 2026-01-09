@@ -145,9 +145,9 @@ export function IQLTemplateSelector({
                     key={template.name}
                     className={cn(
                       "group cursor-pointer p-3 transition-colors",
-                      "hover:bg-primary hover:text-primary-foreground",
+                      "hover:bg-stone-800 hover:text-white dark:hover:bg-stone-200 dark:hover:text-stone-900",
                       selectedTemplate?.name === template.name &&
-                        "border-primary bg-primary text-primary-foreground",
+                        "border-stone-800 bg-stone-800 text-white dark:border-stone-200 dark:bg-stone-200 dark:text-stone-900",
                     )}
                     onClick={() => handleTemplateSelect(template)}
                   >
@@ -160,9 +160,9 @@ export function IQLTemplateSelector({
                           className={cn(
                             "mt-1 line-clamp-2 text-xs transition-colors",
                             "text-muted-foreground",
-                            "group-hover:text-primary-foreground/80",
+                            "group-hover:text-white/80 dark:group-hover:text-stone-900/80",
                             selectedTemplate?.name === template.name &&
-                              "text-primary-foreground/80",
+                              "text-white/80 dark:text-stone-900/80",
                           )}
                         >
                           {template.description}
@@ -172,9 +172,9 @@ export function IQLTemplateSelector({
                             className={cn(
                               "mt-1 text-xs transition-colors",
                               "text-muted-foreground",
-                              "group-hover:text-primary-foreground/70",
+                              "group-hover:text-white/70 dark:group-hover:text-stone-900/70",
                               selectedTemplate?.name === template.name &&
-                                "text-primary-foreground/70",
+                                "text-white/70 dark:text-stone-900/70",
                             )}
                           >
                             ⚙️ Requires: {template.parameterName}

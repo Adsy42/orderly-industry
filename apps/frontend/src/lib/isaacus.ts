@@ -114,42 +114,77 @@ export async function embed(
     throw new Error("ISAACUS_API_KEY environment variable is not configured");
   }
 
-  try {
-    // Direct HTTP call since TypeScript SDK v0.1.3 doesn't support embeddings yet
-    // SDK only has classifications.universal.create
-    const response = await fetch("https://api.isaacus.com/v1/embeddings", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${ISAACUS_API_KEY}`,
-      },
-      body: JSON.stringify({
-        model,
-        texts,
-        task,
-      }),
-    });
+  // Batch size limit - Isaacus API may have limits on texts per request
+  const BATCH_SIZE = 50;
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(
-        `Isaacus API error (${response.status}): ${errorData.message || response.statusText}`,
+  try {
+    // If small enough, do single request
+    if (texts.length <= BATCH_SIZE) {
+      return await embedBatch(texts, task, model);
+    }
+
+    // Otherwise, batch the requests
+    console.log(
+      `[Isaacus] Embedding ${texts.length} texts in batches of ${BATCH_SIZE}`,
+    );
+    const allEmbeddings: number[][] = [];
+
+    for (let i = 0; i < texts.length; i += BATCH_SIZE) {
+      const batch = texts.slice(i, i + BATCH_SIZE);
+      const batchEmbeddings = await embedBatch(batch, task, model);
+      allEmbeddings.push(...batchEmbeddings);
+      console.log(
+        `[Isaacus] Embedded batch ${Math.floor(i / BATCH_SIZE) + 1}/${Math.ceil(texts.length / BATCH_SIZE)}`,
       );
     }
 
-    const data = await response.json();
-
-    if (!data.embeddings || data.embeddings.length === 0) {
-      throw new Error("No embeddings returned from Isaacus API");
-    }
-
-    return data.embeddings.map((e: any) => e.embedding);
+    return allEmbeddings;
   } catch (error) {
     if (error instanceof Error) {
       throw error;
     }
     throw new Error(`Isaacus embedding error: ${error}`);
   }
+}
+
+/**
+ * Embed a single batch of texts (internal helper).
+ */
+async function embedBatch(
+  texts: string[],
+  task: EmbeddingTask,
+  model: EmbeddingModel,
+): Promise<number[][]> {
+  // Filter out empty texts which cause API errors
+  const nonEmptyTexts = texts.map((t) => (t?.trim() ? t : " "));
+
+  const response = await fetch("https://api.isaacus.com/v1/embeddings", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${ISAACUS_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model,
+      texts: nonEmptyTexts,
+      task,
+    }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(
+      `Isaacus API error (${response.status}): ${errorData.message || response.statusText}`,
+    );
+  }
+
+  const data = await response.json();
+
+  if (!data.embeddings || data.embeddings.length === 0) {
+    throw new Error("No embeddings returned from Isaacus API");
+  }
+
+  return data.embeddings.map((e: any) => e.embedding);
 }
 
 /**

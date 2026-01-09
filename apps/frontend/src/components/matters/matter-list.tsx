@@ -3,7 +3,7 @@
 import * as React from "react";
 import { FolderOpen, Plus } from "lucide-react";
 import { MatterCard } from "./matter-card";
-import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/shared/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { MatterWithDocumentCount } from "@/hooks/use-matters";
 
@@ -26,11 +26,11 @@ export function MatterList({
 }: MatterListProps) {
   if (isLoading) {
     return (
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {Array.from({ length: 6 }).map((_, i) => (
           <Skeleton
             key={i}
-            className="h-[180px] rounded-lg"
+            className="h-[200px] rounded-2xl"
           />
         ))}
       </div>
@@ -39,25 +39,25 @@ export function MatterList({
 
   if (matters.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center rounded-lg border border-dashed py-16">
-        <FolderOpen className="text-muted-foreground/50 mb-4 h-12 w-12" />
-        <h3 className="mb-2 text-lg font-medium">No matters yet</h3>
-        <p className="text-muted-foreground mb-6 max-w-sm text-center text-sm">
-          Create your first matter to start organizing documents and work for
-          your legal cases.
-        </p>
-        {onCreateNew && (
-          <Button onClick={onCreateNew}>
-            <Plus className="mr-2 h-4 w-4" />
-            Create Matter
-          </Button>
-        )}
-      </div>
+      <EmptyState
+        icon={FolderOpen}
+        title="No matters yet"
+        description="Create your first matter to start organizing documents and work for your legal cases."
+        action={
+          onCreateNew
+            ? {
+                label: "Create Matter",
+                onClick: onCreateNew,
+                icon: Plus,
+              }
+            : undefined
+        }
+      />
     );
   }
 
   return (
-    <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
       {matters.map((matter) => (
         <MatterCard
           key={matter.id}

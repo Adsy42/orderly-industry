@@ -104,8 +104,8 @@ export function DocumentSelector({
         className={cn(
           "h-8 gap-1.5 text-xs font-normal",
           selectedDocumentIds.length > 0
-            ? "border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100"
-            : "text-gray-600",
+            ? "border-stone-300 bg-stone-100 text-stone-700 hover:bg-stone-200 dark:border-stone-600 dark:bg-stone-800 dark:text-stone-300 dark:hover:bg-stone-700"
+            : "text-stone-600 dark:text-stone-400",
         )}
       >
         <FileText className="size-3.5" />
@@ -129,7 +129,7 @@ export function DocumentSelector({
             {selectedDocuments.slice(0, 3).map((doc) => (
               <span
                 key={doc.id}
-                className="inline-flex items-center gap-1 rounded-md bg-blue-100 px-2 py-0.5 text-xs text-blue-700"
+                className="inline-flex items-center gap-1 rounded-md bg-stone-100 px-2 py-0.5 text-xs text-stone-700 dark:bg-stone-800 dark:text-stone-300"
               >
                 <FileText className="size-3" />
                 <span className="max-w-[120px] truncate">{doc.filename}</span>
@@ -139,7 +139,7 @@ export function DocumentSelector({
                     e.stopPropagation();
                     toggleDocument(doc.id);
                   }}
-                  className="rounded-full p-0.5 hover:bg-blue-200"
+                  className="rounded-full p-0.5 hover:bg-stone-200 dark:hover:bg-stone-700"
                 >
                   <X className="size-2.5" />
                 </button>
@@ -166,7 +166,7 @@ export function DocumentSelector({
                 placeholder="Search documents..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-md border bg-gray-50 py-1.5 pr-3 pl-8 text-sm outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-200"
+                className="w-full rounded-md border bg-stone-50 py-1.5 pr-3 pl-8 text-sm outline-none focus:border-stone-400 focus:ring-1 focus:ring-stone-200 dark:border-stone-600 dark:bg-stone-800 dark:focus:border-stone-500 dark:focus:ring-stone-700"
               />
             </div>
           </div>
@@ -176,7 +176,7 @@ export function DocumentSelector({
             <button
               type="button"
               onClick={selectAll}
-              className="text-xs text-blue-600 hover:underline"
+              className="text-xs text-stone-600 hover:underline dark:text-stone-400"
             >
               Select all
             </button>
@@ -215,16 +215,16 @@ export function DocumentSelector({
                     className={cn(
                       "flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-sm transition-colors",
                       isSelected
-                        ? "bg-blue-50 text-blue-700"
-                        : "text-gray-700 hover:bg-gray-100",
+                        ? "bg-stone-100 text-stone-800 dark:bg-stone-800 dark:text-stone-200"
+                        : "text-stone-700 hover:bg-stone-100 dark:text-stone-300 dark:hover:bg-stone-800",
                     )}
                   >
                     <div
                       className={cn(
                         "flex size-4 shrink-0 items-center justify-center rounded border",
                         isSelected
-                          ? "border-blue-500 bg-blue-500"
-                          : "border-gray-300",
+                          ? "border-stone-700 bg-stone-700 dark:border-stone-400 dark:bg-stone-400"
+                          : "border-stone-300 dark:border-stone-600",
                       )}
                     >
                       {isSelected && <Check className="size-3 text-white" />}

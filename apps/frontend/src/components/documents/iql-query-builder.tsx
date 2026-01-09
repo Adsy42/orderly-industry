@@ -341,31 +341,31 @@ export function IQLQueryBuilder({
   return (
     <div className={cn("space-y-4", className)}>
       {/* Instructions Info Box - Always visible */}
-      <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+      <div className="rounded-lg border border-stone-200 bg-stone-50 p-4 dark:border-stone-700 dark:bg-stone-800/50">
         <div className="flex gap-3">
-          <Info className="mt-0.5 h-5 w-5 shrink-0 text-blue-600" />
+          <Info className="mt-0.5 h-5 w-5 shrink-0 text-stone-600 dark:text-stone-400" />
           <div className="flex-1 space-y-1">
-            <h4 className="text-sm font-medium text-blue-900">
+            <h4 className="text-sm font-medium text-stone-900 dark:text-stone-100">
               How to find clauses
             </h4>
-            <p className="text-sm text-blue-800">
+            <p className="text-sm text-stone-700 dark:text-stone-300">
               In <strong>Natural Language</strong> mode, describe what you're
               looking for in plain English (e.g., "one-sided confidentiality
               clauses"). In <strong>IQL</strong> mode, use built-in clause types
               like{" "}
-              <code className="rounded bg-blue-100 px-1.5 py-0.5 font-mono text-xs">
+              <code className="rounded bg-stone-200 px-1.5 py-0.5 font-mono text-xs dark:bg-stone-700">
                 {"{IS confidentiality clause}"}
               </code>{" "}
               or combine searches with{" "}
-              <code className="rounded bg-blue-100 px-1.5 py-0.5 font-mono text-xs">
+              <code className="rounded bg-stone-200 px-1.5 py-0.5 font-mono text-xs dark:bg-stone-700">
                 AND
               </code>
               ,{" "}
-              <code className="rounded bg-blue-100 px-1.5 py-0.5 font-mono text-xs">
+              <code className="rounded bg-stone-200 px-1.5 py-0.5 font-mono text-xs dark:bg-stone-700">
                 OR
               </code>
               , and{" "}
-              <code className="rounded bg-blue-100 px-1.5 py-0.5 font-mono text-xs">
+              <code className="rounded bg-stone-200 px-1.5 py-0.5 font-mono text-xs dark:bg-stone-700">
                 NOT
               </code>
               . Use the buttons above for example queries, operator guide, and
@@ -384,15 +384,15 @@ export function IQLQueryBuilder({
             Clause Finder
           </label>
           {/* Mode Toggle */}
-          <div className="flex items-center gap-2 rounded-md border p-1">
+          <div className="flex items-center gap-2 rounded-md border border-stone-200 p-1 dark:border-stone-700">
             <button
               type="button"
               onClick={() => setMode("natural-language")}
               className={cn(
                 "rounded px-3 py-1 text-sm font-medium transition-colors",
                 mode === "natural-language"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-muted",
+                  ? "bg-stone-800 text-white dark:bg-stone-200 dark:text-stone-900"
+                  : "text-muted-foreground hover:bg-stone-100 dark:hover:bg-stone-700",
               )}
             >
               Natural Language
@@ -403,8 +403,8 @@ export function IQLQueryBuilder({
               className={cn(
                 "rounded px-3 py-1 text-sm font-medium transition-colors",
                 mode === "iql"
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-muted",
+                  ? "bg-stone-800 text-white dark:bg-stone-200 dark:text-stone-900"
+                  : "text-muted-foreground hover:bg-stone-100 dark:hover:bg-stone-700",
               )}
             >
               IQL
@@ -476,17 +476,17 @@ export function IQLQueryBuilder({
 
       {/* Translation Preview (NL mode only) */}
       {mode === "natural-language" && translatedQuery && (
-        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-950/30">
+        <div className="rounded-lg border border-stone-200 bg-stone-50 p-4 dark:border-stone-700 dark:bg-stone-800/50">
           <div className="space-y-3">
             <div>
-              <p className="text-sm font-medium text-blue-900 dark:text-blue-100">
+              <p className="text-sm font-medium text-stone-900 dark:text-stone-100">
                 Translated to IQL:
               </p>
-              <code className="mt-1 block rounded bg-blue-100 px-3 py-2 font-mono text-sm text-blue-900 dark:bg-blue-900/50 dark:text-blue-100">
+              <code className="mt-1 block rounded bg-stone-200 px-3 py-2 font-mono text-sm text-stone-900 dark:bg-stone-700 dark:text-stone-100">
                 {translatedQuery}
               </code>
               {translationExplanation && (
-                <p className="mt-2 text-xs text-blue-700 dark:text-blue-300">
+                <p className="mt-2 text-xs text-stone-600 dark:text-stone-400">
                   {translationExplanation}
                 </p>
               )}

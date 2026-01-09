@@ -161,11 +161,11 @@ const InlineCitation: FC<InlineCitationProps> = ({
             onMouseEnter={fetchChunkPreview}
             className={cn(
               "inline-flex items-center gap-1",
-              "text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300",
+              "text-stone-700 hover:text-stone-900 dark:text-stone-300 dark:hover:text-stone-100",
               "text-sm font-medium",
               "underline decoration-dotted underline-offset-2 hover:decoration-solid",
               "-mx-0.5 rounded px-0.5 transition-colors",
-              "hover:bg-blue-50 dark:hover:bg-blue-950/30",
+              "hover:bg-stone-100 dark:hover:bg-stone-800/50",
             )}
           >
             <FileText className="h-3 w-3 shrink-0" />

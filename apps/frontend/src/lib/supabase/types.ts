@@ -222,6 +222,30 @@ export type Database = {
         };
         Relationships: [];
       };
+      waitlist_signups: {
+        Row: {
+          id: string;
+          email: string;
+          practice_type: string;
+          created_at: string;
+          source: string | null;
+        };
+        Insert: {
+          id?: string;
+          email: string;
+          practice_type: string;
+          created_at?: string;
+          source?: string | null;
+        };
+        Update: {
+          id?: string;
+          email?: string;
+          practice_type?: string;
+          created_at?: string;
+          source?: string | null;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       [_ in never]: never;
