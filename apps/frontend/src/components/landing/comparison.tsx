@@ -19,7 +19,7 @@ const comparisonData = [
     id: "general-ai",
     heading: "General AI",
     description:
-      "General-purpose AI tools are fast for drafting and summarising text, but they are not trained on Australian law, do not provide reliable legal citations, and require full manual verification.",
+      "Fast and free, but not built for legal work. No Australian-law grounding, no verified citations, and your data may train future models.",
     logos: [
       { name: "ChatGPT", component: ChatGPTLogo },
       { name: "Claude", component: ClaudeLogo },
@@ -27,10 +27,10 @@ const comparisonData = [
     ],
   },
   {
-    id: "global-legal",
-    heading: "Global legal AI platforms",
+    id: "enterprise-legal",
+    heading: "Enterprise Legal AI",
     description:
-      "Broad legal AI systems are designed for research, drafting, and large enterprise workflows across multiple jurisdictions. They are powerful, but often global or US-centric and typically require enterprise onboarding to try.",
+      "Powerful platforms for global firms. But US-centric training, enterprise pricing, and lengthy onboarding put them out of reach for most Australian practices.",
     logos: [
       { name: "Harvey AI", component: HarveyLogo },
       { name: "LexisNexis", component: LexisNexisLogo },
@@ -38,10 +38,10 @@ const comparisonData = [
     ],
   },
   {
-    id: "contract-drafting",
-    heading: "Contract drafting assistants",
+    id: "point-solutions",
+    heading: "Legal AI point solutions",
     description:
-      "These tools focus on inline drafting and clause suggestions, often inside Word. They are helpful for writing contracts, but are not designed for fast, verified Australian contract risk review.",
+      "Helpful for specific tasks, but fragmented. Multiple subscriptions that don't integrate—and still not built for Australian law.",
     logos: [
       { name: "Spellbook", component: SpellbookLogo },
       { name: "Luminance", component: LuminanceLogo },
@@ -54,44 +54,65 @@ const comparisonTable: Array<{
   feature: string;
   orderly: boolean | "partial";
   generalAi: boolean | "partial";
-  globalLegal: boolean | "partial";
-  contractDrafting: boolean | "partial";
+  enterpriseLegal: boolean | "partial";
+  pointSolutions: boolean | "partial";
 }> = [
   {
     feature: "Australian law focus",
     orderly: true,
     generalAi: false,
-    globalLegal: "partial",
-    contractDrafting: false,
+    enterpriseLegal: "partial",
+    pointSolutions: false,
   },
   {
     feature: "Verified legal citations",
     orderly: true,
     generalAi: false,
-    globalLegal: true,
-    contractDrafting: "partial",
+    enterpriseLegal: true,
+    pointSolutions: "partial",
   },
   {
-    feature: "Contract risk review",
+    feature: "Full platform (research, review, draft)",
     orderly: true,
     generalAi: false,
-    globalLegal: "partial",
-    contractDrafting: true,
+    enterpriseLegal: true,
+    pointSolutions: false,
+  },
+  {
+    feature: "No training on your data",
+    orderly: true,
+    generalAi: false,
+    enterpriseLegal: true,
+    pointSolutions: "partial",
+  },
+  {
+    feature: "Australian data residency",
+    orderly: true,
+    generalAi: false,
+    enterpriseLegal: false,
+    pointSolutions: false,
   },
   {
     feature: "No enterprise onboarding",
     orderly: true,
     generalAi: true,
-    globalLegal: false,
-    contractDrafting: "partial",
+    enterpriseLegal: false,
+    pointSolutions: true,
   },
   {
-    feature: "Try free instantly",
+    feature: "Accessible pricing",
     orderly: true,
     generalAi: true,
-    globalLegal: false,
-    contractDrafting: false,
+    enterpriseLegal: false,
+    pointSolutions: "partial",
   },
+];
+
+const columnLabels = [
+  { key: "orderly", label: "Orderly", highlight: true },
+  { key: "generalAi", label: "General AI", highlight: false },
+  { key: "enterpriseLegal", label: "Enterprise", highlight: false },
+  { key: "pointSolutions", label: "Point Solutions", highlight: false },
 ];
 
 interface LogoItem {
@@ -111,24 +132,79 @@ function CompanyLogo({ logo }: { logo: LogoItem }) {
   );
 }
 
-function StatusIcon({ status }: { status: boolean | "partial" }) {
+function StatusIcon({
+  status,
+  size = "normal",
+}: {
+  status: boolean | "partial";
+  size?: "normal" | "small";
+}) {
+  const sizeClasses = size === "small" ? "h-5 w-5" : "h-6 w-6";
+  const iconClasses = size === "small" ? "h-3 w-3" : "h-4 w-4";
+
   if (status === true) {
     return (
-      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30">
-        <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+      <div
+        className={`flex items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-900/30 ${sizeClasses}`}
+      >
+        <Check
+          className={`text-emerald-600 dark:text-emerald-400 ${iconClasses}`}
+        />
       </div>
     );
   }
   if (status === "partial") {
     return (
-      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30">
-        <Minus className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+      <div
+        className={`flex items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900/30 ${sizeClasses}`}
+      >
+        <Minus
+          className={`text-amber-600 dark:text-amber-400 ${iconClasses}`}
+        />
       </div>
     );
   }
   return (
-    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-zinc-100 dark:bg-slate-800">
-      <X className="h-4 w-4 text-zinc-400 dark:text-slate-500" />
+    <div
+      className={`flex items-center justify-center rounded-full bg-zinc-100 dark:bg-slate-800 ${sizeClasses}`}
+    >
+      <X className={`text-zinc-400 dark:text-slate-500 ${iconClasses}`} />
+    </div>
+  );
+}
+
+function MobileComparisonCard({
+  row,
+}: {
+  row: (typeof comparisonTable)[number];
+}) {
+  return (
+    <div className="rounded-xl border border-zinc-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-800/50">
+      <p className="mb-3 text-sm font-medium text-zinc-900 dark:text-white">
+        {row.feature}
+      </p>
+      <div className="grid grid-cols-2 gap-3">
+        {columnLabels.map((col) => (
+          <div
+            key={col.key}
+            className="flex items-center gap-2"
+          >
+            <StatusIcon
+              status={row[col.key as keyof typeof row] as boolean | "partial"}
+              size="small"
+            />
+            <span
+              className={`text-sm ${
+                col.highlight
+                  ? "font-medium text-zinc-900 dark:text-white"
+                  : "text-zinc-500 dark:text-slate-400"
+              }`}
+            >
+              {col.label}
+            </span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -143,7 +219,7 @@ export function Comparison() {
             Why Orderly
           </h2>
           <p className="font-serif text-3xl leading-tight text-zinc-900 md:text-4xl dark:text-white">
-            Built specifically for Australian contract review.
+            Built specifically for Australian legal practice.
           </p>
         </div>
 
@@ -172,10 +248,46 @@ export function Comparison() {
           ))}
         </div>
 
-        {/* Comparison Table */}
-        <div className="overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:border-slate-700 dark:bg-slate-800/50">
+        {/* Mobile Comparison Cards */}
+        <div className="space-y-3 md:hidden">
+          {/* Mobile Header */}
+          <div className="mb-4 rounded-xl bg-zinc-50 p-4 dark:bg-slate-800">
+            <div className="grid grid-cols-2 gap-3">
+              {columnLabels.map((col) => (
+                <div
+                  key={col.key}
+                  className="flex items-center gap-2"
+                >
+                  <span
+                    className={`text-sm ${
+                      col.highlight
+                        ? "font-semibold text-zinc-900 dark:text-white"
+                        : "font-medium text-zinc-500 dark:text-slate-400"
+                    }`}
+                  >
+                    {col.label}
+                  </span>
+                  {col.highlight && (
+                    <span className="rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
+                      Coming soon
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+          {comparisonTable.map((row) => (
+            <MobileComparisonCard
+              key={row.feature}
+              row={row}
+            />
+          ))}
+        </div>
+
+        {/* Desktop Comparison Table */}
+        <div className="hidden overflow-hidden rounded-2xl border border-zinc-200 bg-white md:block dark:border-slate-700 dark:bg-slate-800/50">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[640px]">
+            <table className="w-full">
               <thead>
                 <tr className="border-b border-zinc-200 bg-zinc-50 dark:border-slate-700 dark:bg-slate-800">
                   <th className="px-6 py-4 text-left text-sm font-semibold text-zinc-900 dark:text-white">
@@ -187,7 +299,7 @@ export function Comparison() {
                         Orderly
                       </span>
                       <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-medium text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400">
-                        You are here
+                        Coming soon
                       </span>
                     </div>
                   </th>
@@ -195,10 +307,10 @@ export function Comparison() {
                     General AI
                   </th>
                   <th className="px-6 py-4 text-center text-sm font-medium text-zinc-500 dark:text-slate-400">
-                    Global Legal AI
+                    Enterprise Legal AI
                   </th>
                   <th className="px-6 py-4 text-center text-sm font-medium text-zinc-500 dark:text-slate-400">
-                    Contract Drafting
+                    Point Solutions
                   </th>
                 </tr>
               </thead>
@@ -227,12 +339,12 @@ export function Comparison() {
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex justify-center">
-                        <StatusIcon status={row.globalLegal} />
+                        <StatusIcon status={row.enterpriseLegal} />
                       </div>
                     </td>
                     <td className="px-6 py-4">
                       <div className="flex justify-center">
-                        <StatusIcon status={row.contractDrafting} />
+                        <StatusIcon status={row.pointSolutions} />
                       </div>
                     </td>
                   </tr>
@@ -245,8 +357,8 @@ export function Comparison() {
         {/* Bottom CTA */}
         <div className="mt-12 text-center">
           <p className="text-sm text-zinc-500 dark:text-slate-400">
-            Orderly is purpose-built for Australian lawyers who need fast,
-            reliable contract risk review.
+            Orderly: Enterprise-grade legal AI. Australian-first. Private by
+            design. Accessible to every firm.
           </p>
         </div>
       </div>

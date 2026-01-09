@@ -11,11 +11,11 @@ import {
 
 export function HeroAnimation() {
   return (
-    <div className="group dark:bg-midnight relative w-full overflow-hidden bg-[#EAE4D3] transition-colors duration-500">
+    <div className="group dark:bg-midnight relative w-full overflow-hidden bg-[#EAE4D3] pb-8 transition-colors duration-500 md:pb-0">
       {/* Layout Container - Overlapping on mobile, side-by-side on desktop */}
       <div className="relative md:flex md:min-h-[85vh] md:flex-row md:items-stretch">
         {/* Image Container - Full width on mobile, left side on desktop */}
-        <div className="relative h-[650px] w-full overflow-hidden md:h-auto md:w-1/2">
+        <div className="relative h-[350px] w-full overflow-hidden md:h-auto md:w-1/2">
           <Image
             src="https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?q=80&w=2576&auto=format&fit=crop"
             alt="Legal Professional"
@@ -26,8 +26,8 @@ export function HeroAnimation() {
           <div className="dark:to-midnight/40 pointer-events-none absolute inset-0 bg-gradient-to-t from-transparent via-transparent to-transparent"></div>
         </div>
 
-        {/* Floating AI Interface - Overlapping on mobile, right side on desktop */}
-        <div className="absolute right-4 -bottom-4 left-4 z-20 md:relative md:right-auto md:bottom-auto md:left-auto md:flex md:w-1/2 md:items-center md:justify-center md:px-8 md:py-0">
+        {/* Floating AI Interface - Stacked on mobile, right side on desktop */}
+        <div className="relative z-20 -mt-8 px-4 md:relative md:mt-0 md:flex md:w-1/2 md:items-center md:justify-center md:px-8 md:py-0">
           {/* Card Container */}
           <div className="dark:bg-navy w-full max-w-xl overflow-hidden rounded-xl border border-zinc-200 bg-white shadow-[0_30px_60px_-15px_rgba(0,0,0,0.25)] ring-1 ring-black/5 dark:border-slate-700/50 dark:shadow-[0_30px_60px_-15px_rgba(0,0,0,0.6)] dark:ring-white/5">
             {/* Window Header */}
@@ -44,11 +44,11 @@ export function HeroAnimation() {
             </div>
 
             {/* Main Document View */}
-            <div className="relative flex h-[380px] flex-col md:h-[450px]">
+            <div className="relative flex h-[280px] flex-col md:h-[450px]">
               {/* Document Text */}
-              <div className="hide-scrollbar dark:bg-navy relative flex-1 overflow-hidden bg-white p-6 pb-20 font-serif text-sm leading-relaxed text-zinc-800 md:overflow-y-auto md:p-8 md:pb-24 md:text-base dark:text-slate-300">
-                {/* Bottom gradient fade to hide text behind prompt */}
-                <div className="dark:from-navy pointer-events-none absolute inset-x-0 bottom-0 z-10 h-24 bg-gradient-to-t from-white via-white/90 to-transparent md:h-28 dark:via-[#0f172a]/90"></div>
+              <div className="hide-scrollbar dark:bg-navy relative flex flex-1 flex-col justify-end overflow-hidden bg-white p-4 pb-16 font-serif text-xs leading-relaxed text-zinc-800 md:p-8 md:pb-24 md:text-base dark:text-slate-300">
+                {/* Top gradient fade to hide overflow text */}
+                <div className="dark:from-navy pointer-events-none absolute inset-x-0 top-0 z-10 h-24 bg-gradient-to-b from-white via-white/90 to-transparent md:h-28 dark:via-[#0f172a]/90"></div>
                 <div className="pointer-events-none space-y-6 opacity-40 transition-opacity duration-700 select-none">
                   <p className="text-zinc-600 dark:text-slate-500">
                     1.1 This Agreement is subject to the Retail Leases Act 1994
@@ -64,7 +64,7 @@ export function HeroAnimation() {
                   {/* Cycle 1: ACL Exclusion Clause */}
                   <div className="group relative">
                     <div className="animate-cycle-1 absolute -inset-2 rounded-lg bg-red-50 opacity-0 transition-opacity dark:bg-red-900/20"></div>
-                    <div className="animate-pop-1 pointer-events-none absolute -top-16 right-0 z-20 w-56 opacity-0 md:-right-4 md:w-64">
+                    <div className="animate-pop-1 pointer-events-none absolute -top-16 right-0 z-20 w-44 opacity-0 md:-right-4 md:w-64">
                       <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-white p-3 shadow-xl dark:border-red-800/50 dark:bg-slate-800">
                         <div className="mt-0.5 shrink-0 rounded-full bg-red-100 p-1 dark:bg-red-900/30">
                           <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
@@ -95,7 +95,7 @@ export function HeroAnimation() {
                   {/* Cycle 2: Retail Leases Act Compliance */}
                   <div className="group relative">
                     <div className="animate-cycle-2 absolute -inset-2 rounded-lg bg-blue-50 opacity-0 transition-opacity dark:bg-blue-900/20"></div>
-                    <div className="animate-pop-2 pointer-events-none absolute -top-16 right-0 z-20 w-56 opacity-0 md:-right-4 md:w-64">
+                    <div className="animate-pop-2 pointer-events-none absolute -top-16 right-0 z-20 w-44 opacity-0 md:-right-4 md:w-64">
                       <div className="flex items-start gap-3 rounded-lg border border-blue-200 bg-white p-3 shadow-xl dark:border-blue-800/50 dark:bg-slate-800">
                         <div className="mt-0.5 shrink-0 rounded-full bg-blue-100 p-1 dark:bg-blue-900/30">
                           <CheckCircle className="h-4 w-4 text-blue-600 dark:text-blue-400" />
@@ -121,7 +121,7 @@ export function HeroAnimation() {
                   {/* Cycle 3: PPSA Registration */}
                   <div className="group relative">
                     <div className="animate-cycle-3 absolute -inset-2 rounded-lg bg-amber-50 opacity-0 transition-opacity dark:bg-amber-900/20"></div>
-                    <div className="animate-pop-3 pointer-events-none absolute -top-16 right-0 z-20 w-56 opacity-0 md:-right-4 md:w-64">
+                    <div className="animate-pop-3 pointer-events-none absolute -top-16 right-0 z-20 w-44 opacity-0 md:-right-4 md:w-64">
                       <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-white p-3 shadow-xl dark:border-amber-800/50 dark:bg-slate-800">
                         <div className="mt-0.5 shrink-0 rounded-full bg-amber-100 p-1 dark:bg-amber-900/30">
                           <Clock className="h-4 w-4 text-amber-600 dark:text-amber-400" />
