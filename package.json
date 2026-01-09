@@ -3,7 +3,7 @@
   "private": true,
   "scripts": {
     "dev": "pnpm --filter frontend dev",
-    "dev:agent": "cd apps/agent && langgraph dev",
+    "dev:agent": "cd apps/agent && . .venv/bin/activate && langgraph dev",
     "dev:all": "concurrently \"pnpm dev\" \"pnpm dev:agent\"",
     "build": "pnpm --filter frontend build",
     "lint": "pnpm --filter frontend lint",
