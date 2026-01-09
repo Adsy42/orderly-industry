@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import type { NlToIqlTranslation } from "@/types/playbook";
+import type { NlToIqlTranslation } from "@/types/iql";
 
 interface UseIqlTranslateOptions {
   onSuccess?: (result: NlToIqlTranslation) => void;

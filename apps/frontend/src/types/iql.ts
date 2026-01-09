@@ -73,3 +73,10 @@ export interface IQLValidationResult {
   suggestions?: string[];
   warnings?: string[];
 }
+
+export interface NlToIqlTranslation {
+  iql: string;
+  explanation: string;
+  templatesUsed: string[];
+  confidence: number;
+}
