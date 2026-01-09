@@ -7,13 +7,18 @@ import { embed } from "@/lib/isaacus";
  *
  * Triggers asynchronous document processing pipeline:
  * 1. Downloads file from Supabase Storage
- * 2. Calls LangGraph agent for structure extraction
+ * 2. Calls LangGraph agent for structure extraction (Azure Document Intelligence)
  * 3. Generates embeddings for chunks
  * 4. Stores sections, chunks, and embeddings in database
+ *
+ * Supports: PDF, DOCX, DOC files only (requires Azure Document Intelligence)
  *
  * POST /api/documents/process
  * Body: { document_id: string }
  */
+
+// Timeout for LangGraph agent calls (ms)
+const LANGGRAPH_TIMEOUT_MS = 120000;
 
 interface ProcessRequest {
   document_id: string;
@@ -49,11 +54,10 @@ interface AgentStructureResponse {
   error?: string;
 }
 
-import { getLangGraphApiUrl, getLangSmithApiKey } from "@/lib/env";
+import { getLangGraphApiUrl } from "@/lib/env";
 
 // Get LangGraph agent URL from environment at request time (not module load time)
 // In production, LANGGRAPH_API_URL must be set to your LangSmith deployment URL
-// LANGSMITH_API_KEY is also required
 
 export async function POST(request: NextRequest) {
   let supabase: Awaited<ReturnType<typeof createClient>> | null = null;
@@ -73,7 +77,7 @@ export async function POST(request: NextRequest) {
     // Create Supabase client
     supabase = await createClient();
 
-    // Get authenticated user
+    // Get authenticated user and session
     const {
       data: { user },
       error: authError,
@@ -81,6 +85,12 @@ export async function POST(request: NextRequest) {
     if (authError || !user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
+
+    // Get session for the access token
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const accessToken = session?.access_token;
 
     // Fetch document details
     const { data: document, error: docError } = await supabase
@@ -135,50 +145,130 @@ export async function POST(request: NextRequest) {
       .update({ processing_status: "structuring" })
       .eq("id", document_id);
 
+    // Validate file type - only PDF, DOCX, DOC supported
+    const supportedTypes = ["pdf", "docx", "doc"];
+    if (!supportedTypes.includes(document.file_type?.toLowerCase())) {
+      await supabase
+        .from("documents")
+        .update({
+          processing_status: "error",
+          error_message: `Unsupported file type: ${document.file_type}. Supported: ${supportedTypes.join(", ")}`,
+        })
+        .eq("id", document_id);
+
+      return NextResponse.json(
+        {
+          error: `Unsupported file type: ${document.file_type}`,
+          supported: supportedTypes,
+        },
+        { status: 400 },
+      );
+    }
+
     // Get environment variables at request time (not module load time)
     const LANGGRAPH_URL = getLangGraphApiUrl();
-    const LANGSMITH_API_KEY = getLangSmithApiKey();
 
     // Call LangGraph agent for structure extraction
     let structureResult: AgentStructureResponse;
     try {
-      const agentResponse = await fetch(
-        `${LANGGRAPH_URL}/invoke/extract_structure`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${LANGSMITH_API_KEY}`,
-          },
-          body: JSON.stringify({
-            document_id,
-            file_content: fileContent,
-            file_type: document.file_type,
-            use_hi_res: true,
-          }),
-        },
-      );
-
-      if (!agentResponse.ok) {
-        throw new Error(`Agent returned ${agentResponse.status}`);
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      // Pass user's Supabase JWT for authentication
+      if (accessToken) {
+        headers["Authorization"] = `Bearer ${accessToken}`;
+      } else {
+        console.warn(
+          "[Document Process] No access token available - LangGraph auth will fail",
+        );
       }
 
-      structureResult = await agentResponse.json();
+      console.log("[Document Process] Calling LangGraph agent:", {
+        url: `${LANGGRAPH_URL}/invoke/extract_structure`,
+        hasAuthHeader: !!accessToken,
+        documentId: document_id,
+        fileType: document.file_type,
+      });
+
+      // Create abort controller for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(
+        () => controller.abort(),
+        LANGGRAPH_TIMEOUT_MS,
+      );
+
+      try {
+        const agentResponse = await fetch(
+          `${LANGGRAPH_URL}/invoke/extract_structure`,
+          {
+            method: "POST",
+            headers,
+            signal: controller.signal,
+            body: JSON.stringify({
+              document_id,
+              file_content: fileContent,
+              file_type: document.file_type,
+              use_hi_res: true,
+            }),
+          },
+        );
+
+        clearTimeout(timeoutId);
+
+        if (!agentResponse.ok) {
+          const errorText = await agentResponse.text();
+          console.error("[Document Process] LangGraph agent error:", {
+            status: agentResponse.status,
+            statusText: agentResponse.statusText,
+            body: errorText,
+          });
+          throw new Error(
+            `Agent returned ${agentResponse.status}: ${errorText}`,
+          );
+        }
+
+        structureResult = await agentResponse.json();
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        if (fetchError instanceof Error && fetchError.name === "AbortError") {
+          throw new Error(
+            `LangGraph agent timed out after ${LANGGRAPH_TIMEOUT_MS / 1000} seconds`,
+          );
+        }
+        throw fetchError;
+      }
+
+      console.log("[Document Process] LangGraph extraction successful:", {
+        sections: structureResult.sections?.length || 0,
+        chunks: structureResult.chunks?.length || 0,
+        textLength: structureResult.normalized_markdown?.length || 0,
+      });
     } catch (agentError) {
-      console.error("Agent structure extraction failed:", agentError);
+      console.error(
+        "[Document Process] Agent structure extraction failed:",
+        agentError,
+      );
 
-      // Fallback: simple text extraction without structure
-      const text = await extractBasicText(fileData, document.file_type);
+      const errorMsg =
+        agentError instanceof Error
+          ? agentError.message
+          : "LangGraph agent unavailable";
+      await supabase
+        .from("documents")
+        .update({
+          processing_status: "error",
+          error_message: `Text extraction failed: ${errorMsg}. Ensure LangGraph agent is running.`,
+        })
+        .eq("id", document_id);
 
-      structureResult = {
-        success: true,
-        document_id,
-        sections: [],
-        chunks: createBasicChunks(text, document_id),
-        normalized_markdown: text,
-        extraction_quality: 0.3,
-        page_count: 1,
-      };
+      return NextResponse.json(
+        {
+          error: `Text extraction failed for ${document.file_type.toUpperCase()}`,
+          details: errorMsg,
+          hint: "Ensure LangGraph agent is running with: cd apps/agent && langgraph dev",
+        },
+        { status: 500 },
+      );
     }
 
     if (!structureResult.success) {
@@ -196,23 +286,52 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Store sections in database
+    // Idempotency: Delete existing sections and chunks for this document
+    // This allows re-processing documents without duplicates
+    console.log("[Document Process] Clearing existing sections and chunks");
+    await supabase.from("document_chunks").delete().eq("document_id", document_id);
+    await supabase
+      .from("document_sections")
+      .delete()
+      .eq("document_id", document_id);
+
+    // Store sections in database (batch insert)
     if (structureResult.sections && structureResult.sections.length > 0) {
-      // Insert sections with parent mapping
-      for (const section of structureResult.sections) {
-        await supabase.from("document_sections").insert({
-          id: section.id,
-          document_id,
-          parent_section_id: section.parent_id,
-          section_number: section.section_number,
-          title: section.title,
-          level: section.level,
-          sequence: section.sequence,
-          path: section.path,
-          start_page: section.start_page,
-          end_page: section.end_page,
-        });
+      const sectionsToInsert = structureResult.sections.map((section) => ({
+        id: section.id,
+        document_id,
+        parent_section_id: section.parent_id,
+        section_number: section.section_number,
+        title: section.title,
+        level: section.level,
+        sequence: section.sequence,
+        path: section.path,
+        start_page: section.start_page,
+        end_page: section.end_page,
+      }));
+
+      const { error: sectionsError } = await supabase
+        .from("document_sections")
+        .insert(sectionsToInsert);
+
+      if (sectionsError) {
+        console.error("Failed to store sections:", sectionsError);
+        await supabase
+          .from("documents")
+          .update({
+            processing_status: "error",
+            error_message: `Failed to store sections: ${sectionsError.message}`,
+          })
+          .eq("id", document_id);
+        return NextResponse.json(
+          { error: `Failed to store sections: ${sectionsError.message}` },
+          { status: 500 },
+        );
       }
+
+      console.log(
+        `[Document Process] Stored ${sectionsToInsert.length} sections`,
+      );
     }
 
     // Update status to embedding
@@ -248,17 +367,14 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Store chunks with embeddings
+      // Store chunks with embeddings (batch insert)
       try {
-        for (let i = 0; i < structureResult.chunks.length; i++) {
-          const chunk = structureResult.chunks[i];
+        const chunksToInsert = structureResult.chunks.map((chunk, i) => {
           const embedding = embeddings[i];
-
           if (!embedding) {
             throw new Error(`Missing embedding for chunk ${i}`);
           }
-
-          await supabase.from("document_chunks").insert({
+          return {
             id: chunk.id,
             document_id,
             section_id: chunk.section_id,
@@ -270,8 +386,20 @@ export async function POST(request: NextRequest) {
             citation: chunk.citation,
             embedding,
             embedding_model: "kanon-2",
-          });
+          };
+        });
+
+        const { error: chunksError } = await supabase
+          .from("document_chunks")
+          .insert(chunksToInsert);
+
+        if (chunksError) {
+          throw chunksError;
         }
+
+        console.log(
+          `[Document Process] Stored ${chunksToInsert.length} chunks with embeddings`,
+        );
       } catch (storageError) {
         console.error("Failed to store chunks:", storageError);
         const errorMsg =
@@ -334,80 +462,4 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ error: errorMessage }, { status: 500 });
   }
-}
-
-/**
- * Fallback basic text extraction for when agent is unavailable.
- */
-async function extractBasicText(
-  fileData: Blob,
-  fileType: string,
-): Promise<string> {
-  const arrayBuffer = await fileData.arrayBuffer();
-
-  if (fileType === "txt") {
-    return new TextDecoder().decode(arrayBuffer);
-  }
-
-  // For other types, return empty string (real extraction needs agent)
-  return "";
-}
-
-/**
- * Create basic chunks without structure for fallback.
- */
-function createBasicChunks(
-  text: string,
-  documentId: string,
-): AgentStructureResponse["chunks"] {
-  const CHUNK_SIZE = 2000;
-  const CHUNK_OVERLAP = 200;
-  const chunks: NonNullable<AgentStructureResponse["chunks"]> = [];
-
-  if (!text) return chunks;
-
-  let start = 0;
-  let index = 0;
-
-  while (start < text.length) {
-    const end = Math.min(start + CHUNK_SIZE, text.length);
-    const content = text.slice(start, end);
-
-    chunks.push({
-      id: crypto.randomUUID(),
-      section_id: null,
-      parent_chunk_id: null,
-      chunk_level: "paragraph",
-      chunk_index: index,
-      content,
-      content_hash: hashContent(content),
-      citation: {
-        page: null,
-        section_path: [],
-        paragraph_index: index,
-        heading: null,
-        context_before: null,
-        context_after: null,
-      },
-    });
-
-    start += CHUNK_SIZE - CHUNK_OVERLAP;
-    index++;
-  }
-
-  return chunks;
-}
-
-/**
- * Simple content hash using Web Crypto API.
- */
-function hashContent(content: string): string {
-  // Use simple hash for fallback (real hash computed by agent)
-  let hash = 0;
-  for (let i = 0; i < content.length; i++) {
-    const char = content.charCodeAt(i);
-    hash = (hash << 5) - hash + char;
-    hash = hash & hash;
-  }
-  return hash.toString(16);
 }

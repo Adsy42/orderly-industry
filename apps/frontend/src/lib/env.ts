@@ -64,10 +64,16 @@ export function getLangGraphApiUrl(): string {
 /**
  * LangSmith API Key for authenticated requests
  *
- * REQUIRED: LANGSMITH_API_KEY must be set for LangSmith deployments
+ * Required for LangSmith cloud deployments, optional for local development.
+ * Returns empty string if not set (local dev mode).
  */
 export function getLangSmithApiKey(): string {
-  return getRequiredEnv("LANGSMITH_API_KEY");
+  const value = process.env.LANGSMITH_API_KEY;
+  // Return empty string for local dev (placeholder or missing)
+  if (!value || value === "your_langsmith_api_key_here") {
+    return "";
+  }
+  return value.trim();
 }
 
 /**
