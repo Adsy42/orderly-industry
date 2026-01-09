@@ -192,5 +192,3 @@ async def _get_document_text_async(
 
 # Export the tool function
 GET_DOCUMENT_TEXT_TOOL = get_document_text
-
-
