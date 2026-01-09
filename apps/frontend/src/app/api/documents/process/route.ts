@@ -289,7 +289,10 @@ export async function POST(request: NextRequest) {
     // Idempotency: Delete existing sections and chunks for this document
     // This allows re-processing documents without duplicates
     console.log("[Document Process] Clearing existing sections and chunks");
-    await supabase.from("document_chunks").delete().eq("document_id", document_id);
+    await supabase
+      .from("document_chunks")
+      .delete()
+      .eq("document_id", document_id);
     await supabase
       .from("document_sections")
       .delete()
