@@ -129,7 +129,9 @@ class StructureExtractor:
                 error="Azure Document Intelligence not configured. Set AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT and AZURE_DOCUMENT_INTELLIGENCE_KEY environment variables.",
             )
 
-        return await self._extract_with_azure(document_id, file_content, file_type, azure_endpoint, azure_key)
+        return await self._extract_with_azure(
+            document_id, file_content, file_type, azure_endpoint, azure_key
+        )
 
     async def _extract_with_azure(
         self,
@@ -235,23 +237,25 @@ class StructureExtractor:
                     section_stack.append(section)
 
                     # Add section chunk
-                    chunks.append(ChunkData(
-                        id=str(uuid.uuid4()),
-                        section_id=section.id,
-                        parent_chunk_id=None,
-                        chunk_level="section",
-                        chunk_index=chunk_index,
-                        content=content,
-                        content_hash=self._generate_content_hash(content),
-                        citation={
-                            "page": page,
-                            "section_path": path,
-                            "paragraph_index": None,
-                            "heading": content,
-                            "context_before": None,
-                            "context_after": None,
-                        },
-                    ))
+                    chunks.append(
+                        ChunkData(
+                            id=str(uuid.uuid4()),
+                            section_id=section.id,
+                            parent_chunk_id=None,
+                            chunk_level="section",
+                            chunk_index=chunk_index,
+                            content=content,
+                            content_hash=self._generate_content_hash(content),
+                            citation={
+                                "page": page,
+                                "section_path": path,
+                                "paragraph_index": None,
+                                "heading": content,
+                                "context_before": None,
+                                "context_after": None,
+                            },
+                        )
+                    )
                     chunk_index += 1
 
                     markdown_lines.append(f"{'#' * level} {content}")
@@ -261,23 +265,27 @@ class StructureExtractor:
                     current_section = section_stack[-1] if section_stack else None
                     section_path = [s.title or "" for s in section_stack]
 
-                    chunks.append(ChunkData(
-                        id=str(uuid.uuid4()),
-                        section_id=current_section.id if current_section else None,
-                        parent_chunk_id=None,
-                        chunk_level="paragraph",
-                        chunk_index=chunk_index,
-                        content=content,
-                        content_hash=self._generate_content_hash(content),
-                        citation={
-                            "page": page,
-                            "section_path": section_path,
-                            "paragraph_index": paragraph_index,
-                            "heading": current_section.title if current_section else None,
-                            "context_before": None,
-                            "context_after": None,
-                        },
-                    ))
+                    chunks.append(
+                        ChunkData(
+                            id=str(uuid.uuid4()),
+                            section_id=current_section.id if current_section else None,
+                            parent_chunk_id=None,
+                            chunk_level="paragraph",
+                            chunk_index=chunk_index,
+                            content=content,
+                            content_hash=self._generate_content_hash(content),
+                            citation={
+                                "page": page,
+                                "section_path": section_path,
+                                "paragraph_index": paragraph_index,
+                                "heading": current_section.title
+                                if current_section
+                                else None,
+                                "context_before": None,
+                                "context_after": None,
+                            },
+                        )
+                    )
                     chunk_index += 1
                     paragraph_index += 1
 
@@ -297,7 +305,9 @@ class StructureExtractor:
         # Calculate quality (Azure generally produces high-quality results)
         quality = 0.9 if sections else 0.7
 
-        print(f"[StructureExtractor] Azure extracted {len(sections)} sections, {len(chunks)} chunks")
+        print(
+            f"[StructureExtractor] Azure extracted {len(sections)} sections, {len(chunks)} chunks"
+        )
 
         return ExtractionResult(
             document_id=document_id,
@@ -404,5 +414,3 @@ def verify_content_hash(content: str, stored_hash: str) -> bool:
         True if hashes match.
     """
     return generate_content_hash(content) == stored_hash
-
-

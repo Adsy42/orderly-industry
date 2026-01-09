@@ -4,7 +4,7 @@ import * as React from "react";
 import { FileText, X, ChevronDown, Check, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { useDocuments, Document } from "@/hooks/use-documents";
+import { useDocuments } from "@/hooks/use-documents";
 
 interface DocumentSelectorProps {
   matterId: string;

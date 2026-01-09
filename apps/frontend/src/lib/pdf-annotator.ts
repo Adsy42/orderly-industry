@@ -4,16 +4,8 @@
  * Uses pdf-lib to add highlight annotations to PDFs based on detected flags.
  */
 
-import { PDFDocument, rgb, PDFPage } from "pdf-lib";
+import { PDFDocument, rgb } from "pdf-lib";
 import type { DetectedFlag, Severity } from "@/types/contract-analysis";
-
-interface TextPosition {
-  pageIndex: number;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-}
 
 interface HighlightAnnotation {
   pageIndex: number;
@@ -39,6 +31,8 @@ function getSeverityColor(severity: Severity): {
       return { r: 1, g: 0.75, b: 0.2 }; // Amber
     case "LOW":
       return { r: 1, g: 0.9, b: 0.2 }; // Yellow
+    default:
+      return { r: 1, g: 0.9, b: 0.2 }; // Default to yellow
   }
 }
 
@@ -97,7 +91,6 @@ async function extractTextPositions(pdfBytes: ArrayBuffer): Promise<{
   for (let pageNum = 1; pageNum <= doc.numPages; pageNum++) {
     const page = await doc.getPage(pageNum);
     const textContent = await page.getTextContent();
-    const viewport = page.getViewport({ scale: 1 });
 
     const pageItems: Array<{
       text: string;

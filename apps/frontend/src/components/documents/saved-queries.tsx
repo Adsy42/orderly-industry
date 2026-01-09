@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { FileText, Trash2, Pencil, Loader2, X } from "lucide-react";
+import { FileText, Trash2, Pencil, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";

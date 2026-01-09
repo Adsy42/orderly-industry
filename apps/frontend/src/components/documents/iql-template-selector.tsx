@@ -1,13 +1,12 @@
 "use client";
 
 import * as React from "react";
-import { Search, Loader2, FileText } from "lucide-react";
+import { Search, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card } from "@/components/ui/card";
 import {
   IQL_TEMPLATES,
-  getTemplatesByCategory,
   type IQLTemplate,
   generateIQLQuery,
 } from "@/lib/iql-templates";
@@ -26,7 +25,6 @@ export function IQLTemplateSelector({
   const [selectedTemplate, setSelectedTemplate] =
     React.useState<IQLTemplate | null>(null);
   const [parameterValue, setParameterValue] = React.useState("");
-  const [isLoading, setIsLoading] = React.useState(false);
 
   // Filter templates by search query
   const filteredTemplates = React.useMemo(() => {

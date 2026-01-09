@@ -106,7 +106,7 @@ export function Thread() {
     "matterId",
     parseAsString.withDefault(""),
   );
-  const [selectedDocumentId, setSelectedDocumentId] = useQueryState(
+  const [_selectedDocumentId, _setSelectedDocumentId] = useQueryState(
     "documentId",
     parseAsString.withDefault(""),
   );
@@ -117,7 +117,7 @@ export function Thread() {
   const {
     contentBlocks,
     setContentBlocks,
-    handleFileUpload,
+    handleFileUpload: _handleFileUpload,
     dropRef,
     removeBlock,
     resetBlocks: _resetBlocks,
@@ -186,7 +186,7 @@ export function Thread() {
   // Fetch document name when documentId is available
   useEffect(() => {
     async function fetchDocumentName() {
-      if (!selectedDocumentId) {
+      if (!_selectedDocumentId) {
         setDocumentName(null);
         return;
       }
@@ -196,7 +196,7 @@ export function Thread() {
         const { data, error } = await supabase
           .from("documents")
           .select("filename")
-          .eq("id", selectedDocumentId)
+          .eq("id", _selectedDocumentId)
           .single();
 
         if (error || !data) {
@@ -212,7 +212,7 @@ export function Thread() {
     }
 
     fetchDocumentName();
-  }, [selectedDocumentId]);
+  }, [_selectedDocumentId]);
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -247,8 +247,8 @@ export function Thread() {
       let contextContent = `[CONTEXT] The user has selected matter "${selectedMatter.title}" (matter_id: ${selectedMatter.id}).`;
 
       // Add document context if viewing a specific document
-      if (selectedDocumentId && documentName) {
-        contextContent += `\nThe user is currently viewing document "${documentName}" (document_id: ${selectedDocumentId}).`;
+      if (_selectedDocumentId && documentName) {
+        contextContent += `\nThe user is currently viewing document "${documentName}" (document_id: ${_selectedDocumentId}).`;
       }
 
       // Add selected documents filter if any documents are specifically selected

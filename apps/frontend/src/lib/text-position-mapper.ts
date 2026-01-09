@@ -189,7 +189,7 @@ export function mergePositions(positions: TextPosition[]): TextPosition[] {
 
   const merged: TextPosition[] = [];
 
-  for (const [pageNumber, pagePositions] of byPage) {
+  for (const [_pageNumber, pagePositions] of byPage) {
     // Sort by y position (top to bottom), then x position (left to right)
     pagePositions.sort((a, b) => {
       if (Math.abs(a.y - b.y) < 5) {
