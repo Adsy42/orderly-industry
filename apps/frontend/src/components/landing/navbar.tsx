@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
+// Note: Link still used for logo
+
 export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
 
@@ -84,18 +86,16 @@ export function Navbar() {
 
         {/* Right side buttons */}
         <div className="flex items-center gap-3 md:flex-1 md:justify-end md:gap-6">
-          <Link
-            href="/auth/login"
-            className="hidden text-base text-zinc-600 transition-colors hover:text-zinc-900 sm:block dark:text-slate-300 dark:hover:text-white"
-          >
-            Log in
-          </Link>
-          <Link
-            href="/auth/sign-up"
+          <button
+            onClick={() => {
+              document
+                .getElementById("waitlist-form")
+                ?.scrollIntoView({ behavior: "smooth" });
+            }}
             className="dark:text-midnight rounded-full bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800 md:px-4 md:py-2 md:text-base dark:bg-white dark:hover:bg-blue-50"
           >
-            Get Started
-          </Link>
+            Join Waitlist
+          </button>
         </div>
       </div>
     </nav>
