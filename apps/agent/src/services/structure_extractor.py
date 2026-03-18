@@ -1,26 +1,26 @@
 """Document structure extraction service.
 
-Extracts hierarchical structure from legal documents using PyMuPDF (primary)
-or Azure Document Intelligence (optional, if configured). Detects sections,
-headings, paragraphs, and generates structural citations for precise legal
-grounding.
+Extracts hierarchical structure from legal documents using Google Cloud
+Vision OCR (primary) with PyMuPDF fallback. Detects sections, headings,
+paragraphs, and generates structural citations for precise legal grounding.
 
-Optional environment variables (for Azure upgrade):
-- AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT
-- AZURE_DOCUMENT_INTELLIGENCE_KEY
+Environment variables:
+- GOOGLE_APPLICATION_CREDENTIALS_JSON: Google service account JSON string
+  (for cloud deployments)
+- GOOGLE_APPLICATION_CREDENTIALS: Path to service account JSON file
+  (for local dev)
 """
 
 import asyncio
 import hashlib
 import io
+import json
 import os
 import re
 import uuid
+from collections import Counter
 from dataclasses import dataclass, field
 from typing import Any
-
-# Timeout for Azure Document Intelligence API calls (seconds)
-AZURE_TIMEOUT_SECONDS = 120
 
 
 @dataclass
@@ -69,29 +69,22 @@ class ExtractionResult:
 class StructureExtractor:
     """Extracts hierarchical structure from documents.
 
-    Uses PyMuPDF for fast, reliable extraction from PDF and DOCX files.
-    Falls back to Azure Document Intelligence if configured and requested.
+    Priority: Google Cloud Vision OCR > PyMuPDF text extraction > python-docx.
     """
 
-    # Regex patterns for section numbering
     SECTION_PATTERNS = [
-        r"^(\d+\.)+\s*",  # 1.2.3 style
-        r"^(\d+)\s+",  # 1 style
-        r"^§\s*\d+",  # § 512 style
-        r"^[IVXLCDM]+\.\s*",  # Roman numerals (I. II. III.)
-        r"^[A-Z]\.\s*",  # Letter sections (A. B. C.)
-        r"^Part\s+[IVXLCDM]+",  # Part I, Part II
-        r"^Article\s+\d+",  # Article 1, Article 2
-        r"^Section\s+\d+",  # Section 1, Section 2
-        r"^Clause\s+\d+",  # Clause 1, Clause 2
+        r"^(\d+\.)+\s*",
+        r"^(\d+)\s+",
+        r"^§\s*\d+",
+        r"^[IVXLCDM]+\.\s*",
+        r"^[A-Z]\.\s*",
+        r"^Part\s+[IVXLCDM]+",
+        r"^Article\s+\d+",
+        r"^Section\s+\d+",
+        r"^Clause\s+\d+",
     ]
 
     def __init__(self, use_hi_res: bool = True):
-        """Initialize the structure extractor.
-
-        Args:
-            use_hi_res: Whether to prefer Azure Document Intelligence when available.
-        """
         self.use_hi_res = use_hi_res
 
     async def extract(
@@ -102,18 +95,8 @@ class StructureExtractor:
     ) -> ExtractionResult:
         """Extract structure from a document.
 
-        Uses Azure Document Intelligence if configured, otherwise falls back
-        to PyMuPDF for PDFs and python-docx/mammoth for DOCX.
-
-        Args:
-            document_id: UUID of the document.
-            file_content: Raw bytes of the document.
-            file_type: File extension (pdf, docx, doc).
-
-        Returns:
-            ExtractionResult with sections, chunks, and normalized markdown.
+        Tries Google Cloud Vision OCR first, falls back to PyMuPDF/python-docx.
         """
-        # Validate file type
         supported_types = ("pdf", "docx", "doc")
         if file_type.lower() not in supported_types:
             return ExtractionResult(
@@ -121,51 +104,160 @@ class StructureExtractor:
                 error=f"Unsupported file type: {file_type}. Supported: {', '.join(supported_types)}",
             )
 
-        # Try Azure if configured and hi-res requested
-        azure_endpoint = os.environ.get("AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT")
-        azure_key = os.environ.get("AZURE_DOCUMENT_INTELLIGENCE_KEY")
-
-        if self.use_hi_res and azure_endpoint and azure_key:
+        # Try Google Cloud Vision OCR if credentials are available
+        if self._has_google_credentials() and file_type.lower() == "pdf":
             try:
-                result = await self._extract_with_azure(
-                    document_id, file_content, file_type, azure_endpoint, azure_key
+                result = await self._extract_with_google_vision(
+                    document_id, file_content
                 )
                 if not result.error:
                     return result
                 print(
-                    f"[StructureExtractor] Azure failed, falling back to PyMuPDF: {result.error}"
+                    f"[StructureExtractor] Google Vision failed, falling back: {result.error}"
                 )
             except Exception as e:
                 print(
-                    f"[StructureExtractor] Azure exception, falling back to PyMuPDF: {e}"
+                    f"[StructureExtractor] Google Vision exception, falling back: {e}"
                 )
 
-        # Primary extraction: PyMuPDF for PDFs, python-docx for DOCX
+        # Fallback: PyMuPDF for PDFs, python-docx for DOCX
         if file_type.lower() == "pdf":
             return await self._extract_with_pymupdf(document_id, file_content)
         else:
             return await self._extract_with_docx(document_id, file_content, file_type)
 
-    # ── PyMuPDF extraction (primary for PDFs) ────────────────────────────
+    # ── Google Cloud Vision OCR ──────────────────────────────────────────
+
+    def _has_google_credentials(self) -> bool:
+        """Check if Google Cloud credentials are available."""
+        return bool(
+            os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
+            or os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
+        )
+
+    def _get_google_vision_client(self):
+        """Create a Google Cloud Vision client, handling JSON env var."""
+        from google.cloud import vision
+
+        creds_json = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
+        if creds_json:
+            from google.oauth2 import service_account
+
+            info = json.loads(creds_json)
+            credentials = service_account.Credentials.from_service_account_info(info)
+            return vision.ImageAnnotatorClient(credentials=credentials)
+
+        # Fall back to GOOGLE_APPLICATION_CREDENTIALS file path
+        return vision.ImageAnnotatorClient()
+
+    async def _extract_with_google_vision(
+        self,
+        document_id: str,
+        file_content: bytes,
+    ) -> ExtractionResult:
+        """Extract text from PDF using Google Cloud Vision OCR."""
+
+        def _do_extract():
+            import fitz  # PyMuPDF - used to render PDF pages to images
+            from google.cloud import vision
+
+            client = self._get_google_vision_client()
+            doc = fitz.open(stream=file_content, filetype="pdf")
+
+            all_blocks: list[dict[str, Any]] = []
+            page_count = len(doc)
+
+            for page_num in range(page_count):
+                page = doc[page_num]
+
+                # Render page to image at 300 DPI for good OCR quality
+                mat = fitz.Matrix(300 / 72, 300 / 72)
+                pix = page.get_pixmap(matrix=mat)
+                img_bytes = pix.tobytes("png")
+
+                # Send to Google Vision
+                image = vision.Image(content=img_bytes)
+                response = client.document_text_detection(image=image)
+
+                if response.error.message:
+                    return ExtractionResult(
+                        document_id=document_id,
+                        error=f"Google Vision error on page {page_num + 1}: {response.error.message}",
+                    )
+
+                if not response.full_text_annotation:
+                    continue
+
+                # Process blocks from the full text annotation
+                for gpage in response.full_text_annotation.pages:
+                    for block in gpage.blocks:
+                        block_text_parts = []
+                        for paragraph in block.paragraphs:
+                            para_words = []
+                            for word in paragraph.words:
+                                word_text = "".join(
+                                    symbol.text for symbol in word.symbols
+                                )
+                                para_words.append(word_text)
+                            block_text_parts.append(" ".join(para_words))
+
+                        block_text = "\n".join(block_text_parts).strip()
+                        if not block_text:
+                            continue
+
+                        # Detect font size from bounding box height (approximate)
+                        vertices = block.bounding_box.vertices
+                        if len(vertices) >= 4:
+                            height = abs(vertices[2].y - vertices[0].y)
+                            # Normalize to approximate font size (at 300 DPI)
+                            approx_size = (
+                                height / (300 / 72) / max(1, block_text.count("\n") + 1)
+                            )
+                        else:
+                            approx_size = 12.0
+
+                        all_blocks.append(
+                            {
+                                "text": block_text,
+                                "page": page_num + 1,
+                                "size": approx_size,
+                                "bold": False,  # Vision API doesn't reliably detect bold
+                            }
+                        )
+
+            if not all_blocks:
+                return ExtractionResult(
+                    document_id=document_id,
+                    extraction_quality=0.0,
+                    page_count=page_count,
+                )
+
+            return self._blocks_to_result(
+                document_id, all_blocks, page_count, "Google Vision"
+            )
+
+        try:
+            return await asyncio.to_thread(_do_extract)
+        except Exception as e:
+            return ExtractionResult(
+                document_id=document_id,
+                error=f"Google Vision OCR failed: {e}",
+            )
+
+    # ── PyMuPDF extraction (fallback for PDFs) ───────────────────────────
 
     async def _extract_with_pymupdf(
         self,
         document_id: str,
         file_content: bytes,
     ) -> ExtractionResult:
-        """Extract structure from a PDF using PyMuPDF.
-
-        Uses font size analysis to detect headings and builds a section hierarchy.
-        """
+        """Extract structure from a PDF using PyMuPDF text extraction."""
 
         def _do_extract():
-            import fitz  # PyMuPDF
+            import fitz
 
             doc = fitz.open(stream=file_content, filetype="pdf")
-
-            # First pass: collect all text blocks with font info to determine heading thresholds
             all_blocks: list[dict[str, Any]] = []
-            font_sizes: list[float] = []
 
             for page_num in range(len(doc)):
                 page = doc[page_num]
@@ -174,7 +266,7 @@ class StructureExtractor:
                 ]
 
                 for block in blocks:
-                    if block.get("type") != 0:  # text blocks only
+                    if block.get("type") != 0:
                         continue
 
                     for line in block.get("lines", []):
@@ -207,165 +299,15 @@ class StructureExtractor:
                                 "bold": is_bold,
                             }
                         )
-                        font_sizes.append(avg_size)
 
             if not all_blocks:
                 return ExtractionResult(
                     document_id=document_id,
-                    normalized_markdown="",
                     extraction_quality=0.0,
                     page_count=len(doc),
                 )
 
-            # Determine heading thresholds from font size distribution
-            font_sizes.sort()
-            if len(font_sizes) > 0:
-                # Body text is the most common font size
-                from collections import Counter
-
-                size_counts = Counter(round(s, 1) for s in font_sizes)
-                body_size = size_counts.most_common(1)[0][0]
-            else:
-                body_size = 12.0
-
-            # Build sections and chunks
-            sections: list[SectionData] = []
-            chunks: list[ChunkData] = []
-            markdown_lines: list[str] = []
-            section_stack: list[SectionData] = []
-            chunk_index = 0
-            paragraph_index = 0
-
-            for block in all_blocks:
-                text = block["text"]
-                page = block["page"]
-                size = block["size"]
-                bold = block["bold"]
-
-                # Detect if this is a heading
-                is_heading = False
-                level = 1
-
-                # Significantly larger than body = heading
-                size_ratio = size / body_size if body_size > 0 else 1.0
-
-                if size_ratio >= 1.5:
-                    is_heading = True
-                    level = 1
-                elif size_ratio >= 1.25:
-                    is_heading = True
-                    level = 2
-                elif size_ratio >= 1.1 and bold:
-                    is_heading = True
-                    level = 2
-                elif bold and len(text) < 120:
-                    # Bold short lines are likely headings
-                    is_heading = True
-                    level = 3
-
-                # Section number patterns override font-based detection
-                if self._extract_section_number(text) and len(text) < 200:
-                    is_heading = True
-                    level = self._detect_heading_level(None, text)
-
-                if is_heading:
-                    # Pop sections at same or higher level
-                    while section_stack and section_stack[-1].level >= level:
-                        section_stack.pop()
-
-                    parent_id = section_stack[-1].id if section_stack else None
-                    path = [s.title or "" for s in section_stack] + [text]
-
-                    section = SectionData(
-                        id=str(uuid.uuid4()),
-                        parent_id=parent_id,
-                        section_number=self._extract_section_number(text),
-                        title=text,
-                        level=level,
-                        sequence=len(sections),
-                        path=path,
-                        start_page=page,
-                        end_page=page,
-                        content="",
-                    )
-                    sections.append(section)
-                    section_stack.append(section)
-
-                    chunks.append(
-                        ChunkData(
-                            id=str(uuid.uuid4()),
-                            section_id=section.id,
-                            parent_chunk_id=None,
-                            chunk_level="section",
-                            chunk_index=chunk_index,
-                            content=text,
-                            content_hash=self._generate_content_hash(text),
-                            citation={
-                                "page": page,
-                                "section_path": path,
-                                "paragraph_index": None,
-                                "heading": text,
-                                "context_before": None,
-                                "context_after": None,
-                            },
-                        )
-                    )
-                    chunk_index += 1
-
-                    markdown_lines.append(f"{'#' * level} {text}")
-                    markdown_lines.append("")
-                else:
-                    # Regular paragraph
-                    current_section = section_stack[-1] if section_stack else None
-                    section_path = [s.title or "" for s in section_stack]
-
-                    chunks.append(
-                        ChunkData(
-                            id=str(uuid.uuid4()),
-                            section_id=current_section.id if current_section else None,
-                            parent_chunk_id=None,
-                            chunk_level="paragraph",
-                            chunk_index=chunk_index,
-                            content=text,
-                            content_hash=self._generate_content_hash(text),
-                            citation={
-                                "page": page,
-                                "section_path": section_path,
-                                "paragraph_index": paragraph_index,
-                                "heading": current_section.title
-                                if current_section
-                                else None,
-                                "context_before": None,
-                                "context_after": None,
-                            },
-                        )
-                    )
-                    chunk_index += 1
-                    paragraph_index += 1
-
-                    markdown_lines.append(text)
-                    markdown_lines.append("")
-
-            normalized_markdown = "\n".join(markdown_lines).strip()
-            page_count = len(doc)
-
-            # Quality: sections detected = higher quality
-            quality = 0.85 if sections else 0.65
-
-            print(
-                f"[StructureExtractor] PyMuPDF extracted {len(sections)} sections, "
-                f"{len(chunks)} chunks from {page_count} pages"
-            )
-
-            return ExtractionResult(
-                document_id=document_id,
-                sections=sections,
-                chunks=chunks,
-                normalized_markdown=normalized_markdown,
-                extraction_quality=quality,
-                page_count=page_count,
-                error=None,
-            )
+            return self._blocks_to_result(document_id, all_blocks, len(doc), "PyMuPDF")
 
         try:
             return await asyncio.to_thread(_do_extract)
@@ -404,20 +346,17 @@ class StructureExtractor:
 
                 style_name = (para.style.name or "").lower() if para.style else ""
 
-                # Detect headings from style
                 is_heading = False
                 level = 1
 
                 if "heading" in style_name:
                     is_heading = True
-                    # Extract level from style name (e.g., "Heading 2")
                     match = re.search(r"(\d+)", style_name)
                     level = int(match.group(1)) if match else 1
                 elif "title" in style_name:
                     is_heading = True
                     level = 1
                 elif self._extract_section_number(text) and len(text) < 200:
-                    # Detect by section number pattern
                     is_heading = True
                     level = self._detect_heading_level(None, text)
 
@@ -497,7 +436,6 @@ class StructureExtractor:
                     markdown_lines.append(text)
                     markdown_lines.append("")
 
-            # Handle tables
             for table in doc.tables:
                 table_md = self._docx_table_to_markdown(table)
                 if table_md:
@@ -530,182 +468,138 @@ class StructureExtractor:
                 error=f"DOCX extraction failed: {e}",
             )
 
-    # ── Azure Document Intelligence (optional) ───────────────────────────
+    # ── Shared: Convert text blocks to ExtractionResult ──────────────────
 
-    async def _extract_with_azure(
+    def _blocks_to_result(
         self,
         document_id: str,
-        file_content: bytes,
-        file_type: str,
-        azure_endpoint: str,
-        azure_key: str,
+        all_blocks: list[dict[str, Any]],
+        page_count: int,
+        source: str,
     ) -> ExtractionResult:
-        """Extract using Azure Document Intelligence.
+        """Convert a list of text blocks (with size/page/bold) into sections and chunks."""
+        font_sizes = [b["size"] for b in all_blocks]
+        size_counts = Counter(round(s, 1) for s in font_sizes)
+        body_size = size_counts.most_common(1)[0][0] if size_counts else 12.0
 
-        Args:
-            document_id: UUID of the document.
-            file_content: Raw bytes of the document.
-            file_type: File extension.
-            azure_endpoint: Azure Document Intelligence endpoint URL.
-            azure_key: Azure Document Intelligence API key.
-
-        Returns:
-            ExtractionResult with sections, chunks, and normalized markdown.
-        """
-        from azure.ai.documentintelligence import DocumentIntelligenceClient
-        from azure.ai.documentintelligence.models import AnalyzeDocumentRequest
-        from azure.core.credentials import AzureKeyCredential
-
-        print(f"[StructureExtractor] Using Azure Document Intelligence for {file_type}")
-
-        client = DocumentIntelligenceClient(
-            endpoint=azure_endpoint,
-            credential=AzureKeyCredential(azure_key),
-        )
-
-        # Analyze document with prebuilt-layout model (best for structure)
-        # Run in thread to avoid blocking the event loop
-        def _analyze():
-            poller = client.begin_analyze_document(
-                "prebuilt-layout",
-                AnalyzeDocumentRequest(bytes_source=file_content),
-            )
-            return poller.result()
-
-        try:
-            result = await asyncio.wait_for(
-                asyncio.to_thread(_analyze),
-                timeout=AZURE_TIMEOUT_SECONDS,
-            )
-        except asyncio.TimeoutError:
-            return ExtractionResult(
-                document_id=document_id,
-                error=f"Azure Document Intelligence timed out after {AZURE_TIMEOUT_SECONDS} seconds",
-            )
-
-        # Extract sections from paragraphs with roles
         sections: list[SectionData] = []
         chunks: list[ChunkData] = []
         markdown_lines: list[str] = []
-
         section_stack: list[SectionData] = []
         chunk_index = 0
         paragraph_index = 0
 
-        # Process paragraphs
-        if result.paragraphs:
-            for para in result.paragraphs:
-                role = para.role if hasattr(para, "role") else None
-                content = para.content.strip() if para.content else ""
+        for block in all_blocks:
+            text = block["text"]
+            page = block["page"]
+            size = block["size"]
+            bold = block["bold"]
 
-                if not content:
-                    continue
+            is_heading = False
+            level = 1
+            size_ratio = size / body_size if body_size > 0 else 1.0
 
-                # Get page number
-                page = None
-                if para.bounding_regions and len(para.bounding_regions) > 0:
-                    page = para.bounding_regions[0].page_number
+            if size_ratio >= 1.5:
+                is_heading = True
+                level = 1
+            elif size_ratio >= 1.25:
+                is_heading = True
+                level = 2
+            elif size_ratio >= 1.1 and bold:
+                is_heading = True
+                level = 2
+            elif bold and len(text) < 120:
+                is_heading = True
+                level = 3
 
-                # Check if this is a heading/title
-                if role in ("title", "sectionHeading", "heading"):
-                    # Determine level
-                    level = 1
-                    if role == "sectionHeading":
-                        level = self._detect_heading_level(None, content)
+            if self._extract_section_number(text) and len(text) < 200:
+                is_heading = True
+                level = self._detect_heading_level(None, text)
 
-                    # Pop sections at same or higher level
-                    while section_stack and section_stack[-1].level >= level:
-                        section_stack.pop()
+            if is_heading:
+                while section_stack and section_stack[-1].level >= level:
+                    section_stack.pop()
 
-                    parent_id = section_stack[-1].id if section_stack else None
-                    path = [s.title or "" for s in section_stack] + [content]
+                parent_id = section_stack[-1].id if section_stack else None
+                path = [s.title or "" for s in section_stack] + [text]
 
-                    section = SectionData(
+                section = SectionData(
+                    id=str(uuid.uuid4()),
+                    parent_id=parent_id,
+                    section_number=self._extract_section_number(text),
+                    title=text,
+                    level=level,
+                    sequence=len(sections),
+                    path=path,
+                    start_page=page,
+                    end_page=page,
+                    content="",
+                )
+                sections.append(section)
+                section_stack.append(section)
+
+                chunks.append(
+                    ChunkData(
                         id=str(uuid.uuid4()),
-                        parent_id=parent_id,
-                        section_number=self._extract_section_number(content),
-                        title=content,
-                        level=level,
-                        sequence=len(sections),
-                        path=path,
-                        start_page=page,
-                        end_page=page,
-                        content="",
+                        section_id=section.id,
+                        parent_chunk_id=None,
+                        chunk_level="section",
+                        chunk_index=chunk_index,
+                        content=text,
+                        content_hash=self._generate_content_hash(text),
+                        citation={
+                            "page": page,
+                            "section_path": path,
+                            "paragraph_index": None,
+                            "heading": text,
+                            "context_before": None,
+                            "context_after": None,
+                        },
                     )
-                    sections.append(section)
-                    section_stack.append(section)
+                )
+                chunk_index += 1
+                markdown_lines.append(f"{'#' * level} {text}")
+                markdown_lines.append("")
+            else:
+                current_section = section_stack[-1] if section_stack else None
+                section_path = [s.title or "" for s in section_stack]
 
-                    # Add section chunk
-                    chunks.append(
-                        ChunkData(
-                            id=str(uuid.uuid4()),
-                            section_id=section.id,
-                            parent_chunk_id=None,
-                            chunk_level="section",
-                            chunk_index=chunk_index,
-                            content=content,
-                            content_hash=self._generate_content_hash(content),
-                            citation={
-                                "page": page,
-                                "section_path": path,
-                                "paragraph_index": None,
-                                "heading": content,
-                                "context_before": None,
-                                "context_after": None,
-                            },
-                        )
+                chunks.append(
+                    ChunkData(
+                        id=str(uuid.uuid4()),
+                        section_id=current_section.id if current_section else None,
+                        parent_chunk_id=None,
+                        chunk_level="paragraph",
+                        chunk_index=chunk_index,
+                        content=text,
+                        content_hash=self._generate_content_hash(text),
+                        citation={
+                            "page": page,
+                            "section_path": section_path,
+                            "paragraph_index": paragraph_index,
+                            "heading": current_section.title
+                            if current_section
+                            else None,
+                            "context_before": None,
+                            "context_after": None,
+                        },
                     )
-                    chunk_index += 1
-
-                    markdown_lines.append(f"{'#' * level} {content}")
-                    markdown_lines.append("")
-                else:
-                    # Regular paragraph
-                    current_section = section_stack[-1] if section_stack else None
-                    section_path = [s.title or "" for s in section_stack]
-
-                    chunks.append(
-                        ChunkData(
-                            id=str(uuid.uuid4()),
-                            section_id=current_section.id if current_section else None,
-                            parent_chunk_id=None,
-                            chunk_level="paragraph",
-                            chunk_index=chunk_index,
-                            content=content,
-                            content_hash=self._generate_content_hash(content),
-                            citation={
-                                "page": page,
-                                "section_path": section_path,
-                                "paragraph_index": paragraph_index,
-                                "heading": current_section.title
-                                if current_section
-                                else None,
-                                "context_before": None,
-                                "context_after": None,
-                            },
-                        )
-                    )
-                    chunk_index += 1
-                    paragraph_index += 1
-
-                    markdown_lines.append(content)
-                    markdown_lines.append("")
-
-        # Process tables
-        if result.tables:
-            for table in result.tables:
-                table_md = self._azure_table_to_markdown(table)
-                markdown_lines.append(table_md)
+                )
+                chunk_index += 1
+                paragraph_index += 1
+                markdown_lines.append(text)
                 markdown_lines.append("")
 
         normalized_markdown = "\n".join(markdown_lines).strip()
-        page_count = result.pages[-1].page_number if result.pages else 0
-
-        # Calculate quality (Azure generally produces high-quality results)
-        quality = 0.9 if sections else 0.7
+        quality = (
+            0.9
+            if (source == "Google Vision" and sections)
+            else (0.85 if sections else 0.65)
+        )
 
         print(
-            f"[StructureExtractor] Azure extracted {len(sections)} sections, {len(chunks)} chunks"
+            f"[StructureExtractor] {source} extracted {len(sections)} sections, "
+            f"{len(chunks)} chunks from {page_count} pages"
         )
 
         return ExtractionResult(
@@ -720,35 +614,10 @@ class StructureExtractor:
 
     # ── Helpers ───────────────────────────────────────────────────────────
 
-    def _azure_table_to_markdown(self, table: Any) -> str:
-        """Convert Azure table to markdown format."""
-        if not table.cells:
-            return ""
-
-        max_row = max(cell.row_index for cell in table.cells) + 1
-        max_col = max(cell.column_index for cell in table.cells) + 1
-
-        grid = [["" for _ in range(max_col)] for _ in range(max_row)]
-
-        for cell in table.cells:
-            content = cell.content.strip() if cell.content else ""
-            grid[cell.row_index][cell.column_index] = content
-
-        lines = []
-        for i, row in enumerate(grid):
-            line = "| " + " | ".join(row) + " |"
-            lines.append(line)
-            if i == 0:
-                lines.append("| " + " | ".join(["---"] * max_col) + " |")
-
-        return "\n".join(lines)
-
     def _docx_table_to_markdown(self, table: Any) -> str:
-        """Convert a python-docx table to markdown format."""
         rows = table.rows
         if not rows:
             return ""
-
         lines = []
         for i, row in enumerate(rows):
             cells = [cell.text.strip() for cell in row.cells]
@@ -756,19 +625,9 @@ class StructureExtractor:
             lines.append(line)
             if i == 0:
                 lines.append("| " + " | ".join(["---"] * len(cells)) + " |")
-
         return "\n".join(lines)
 
     def _detect_heading_level(self, element: Any, title_text: str) -> int:
-        """Detect heading level from content patterns.
-
-        Args:
-            element: Element (unused, kept for API compatibility).
-            title_text: The heading text.
-
-        Returns:
-            Heading level (1-6).
-        """
         if re.match(r"^\d+\.\d+\.\d+", title_text):
             return 3
         elif re.match(r"^\d+\.\d+", title_text):
@@ -779,11 +638,9 @@ class StructureExtractor:
             return 2
         elif re.match(r"^[ivxIVX]+\.", title_text):
             return 3
-
         return 1
 
     def _extract_section_number(self, title_text: str) -> str | None:
-        """Extract section number from heading text."""
         for pattern in self.SECTION_PATTERNS:
             match = re.match(pattern, title_text)
             if match:
@@ -791,15 +648,12 @@ class StructureExtractor:
         return None
 
     def _generate_content_hash(self, content: str) -> str:
-        """Generate SHA-256 hash for content verification."""
         return hashlib.sha256(content.encode()).hexdigest()
 
 
 def generate_content_hash(content: str) -> str:
-    """Generate SHA-256 hash for content verification."""
     return hashlib.sha256(content.encode()).hexdigest()
 
 
 def verify_content_hash(content: str, stored_hash: str) -> bool:
-    """Verify content matches stored hash."""
     return generate_content_hash(content) == stored_hash
