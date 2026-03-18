@@ -2,8 +2,8 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { HeroAnimation } from "./hero-animation";
-import { WaitlistForm } from "./waitlist-form";
-import { Shield } from "lucide-react";
+import { ArrowRight, Shield } from "lucide-react";
+import Link from "next/link";
 
 const ANIMATED_PHRASES = [
   "Research Case Law",
@@ -95,7 +95,13 @@ export function Hero() {
           of every size.
         </p>
         <div className="flex flex-col items-center gap-4">
-          <WaitlistForm variant="hero" />
+          <Link
+            href="/auth/sign-up"
+            className="inline-flex items-center gap-2 rounded-full bg-zinc-900 px-6 py-3 text-base font-medium text-white transition-colors hover:bg-zinc-800 md:px-8 md:py-4 md:text-lg dark:bg-white dark:text-zinc-900 dark:hover:bg-blue-50"
+          >
+            Get started free
+            <ArrowRight className="h-4 w-4 md:h-5 md:w-5" />
+          </Link>
           <div className="mt-2 flex items-center gap-2 text-sm text-zinc-500 dark:text-slate-500">
             <Shield className="h-4 w-4" />
             <span>Your data never leaves Australia. Never trains AI.</span>

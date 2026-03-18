@@ -86,16 +86,18 @@ export function Navbar() {
 
         {/* Right side buttons */}
         <div className="flex items-center gap-3 md:flex-1 md:justify-end md:gap-6">
-          <button
-            onClick={() => {
-              document
-                .getElementById("waitlist-form")
-                ?.scrollIntoView({ behavior: "smooth" });
-            }}
+          <Link
+            href="/auth/login"
+            className="text-sm font-medium text-zinc-600 transition-colors hover:text-zinc-900 md:text-base dark:text-slate-400 dark:hover:text-white"
+          >
+            Log in
+          </Link>
+          <Link
+            href="/auth/sign-up"
             className="dark:text-midnight rounded-full bg-zinc-900 px-3 py-1.5 text-sm font-medium text-white transition-colors hover:bg-zinc-800 md:px-4 md:py-2 md:text-base dark:bg-white dark:hover:bg-blue-50"
           >
-            Join Waitlist
-          </button>
+            Sign up free
+          </Link>
         </div>
       </div>
     </nav>
