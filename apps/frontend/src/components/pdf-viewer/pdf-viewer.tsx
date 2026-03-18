@@ -6,8 +6,7 @@ import { Loader2, AlertCircle, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePdfDocument } from "./use-pdf-document";
 import { PDFToolbar } from "./pdf-toolbar";
-import { PDFHighlightLayer } from "./pdf-highlight-layer";
-import type { PDFViewerProps, HighlightRect } from "./types";
+import type { PDFViewerProps } from "./types";
 
 // Dynamically import react-pdf to avoid SSR issues
 const Document = dynamic(
@@ -22,6 +21,98 @@ const Page = dynamic(() => import("react-pdf").then((mod) => mod.Page), {
 // Import styles
 import "react-pdf/dist/Page/AnnotationLayer.css";
 import "react-pdf/dist/Page/TextLayer.css";
+
+/**
+ * Normalize text for fuzzy matching: collapse whitespace, lowercase.
+ */
+function normalizeText(text: string): string {
+  return text.replace(/\s+/g, " ").toLowerCase();
+}
+
+/**
+ * Search through the text layer DOM of a page container and apply
+ * yellow highlight styles to spans that overlap with the search text.
+ * Returns the first highlighted element for scrolling, or null.
+ */
+function highlightTextInTextLayer(
+  pageContainer: HTMLElement,
+  searchText: string,
+): HTMLElement | null {
+  const textLayer = pageContainer.querySelector(
+    ".react-pdf__Page__textContent",
+  );
+  if (!textLayer) return null;
+
+  const spans = Array.from(textLayer.querySelectorAll("span"));
+  if (spans.length === 0) return null;
+
+  // Build a map of concatenated text -> span positions
+  let fullText = "";
+  const spanMap: { el: HTMLElement; start: number; end: number }[] = [];
+
+  for (const span of spans) {
+    const text = span.textContent || "";
+    const start = fullText.length;
+    fullText += text;
+    spanMap.push({ el: span as HTMLElement, start, end: fullText.length });
+  }
+
+  const normalizedFull = normalizeText(fullText);
+  const normalizedSearch = normalizeText(searchText);
+
+  // Try matching with progressively shorter substrings for robustness
+  let matchIdx = -1;
+  let matchLen = 0;
+  const searchLengths = [
+    normalizedSearch.length,
+    Math.min(150, normalizedSearch.length),
+    Math.min(80, normalizedSearch.length),
+  ];
+
+  for (const len of searchLengths) {
+    if (len <= 10) continue;
+    const sub = normalizedSearch.substring(0, len);
+    matchIdx = normalizedFull.indexOf(sub);
+    if (matchIdx !== -1) {
+      matchLen = len;
+      break;
+    }
+  }
+
+  if (matchIdx === -1) return null;
+
+  // Map normalized match positions back to original text positions.
+  // Build a mapping from normalized index -> original index.
+  const normToOrig: number[] = [];
+  for (let oi = 0; oi < fullText.length; oi++) {
+    const ch = fullText[oi];
+    const isWs = /\s/.test(ch);
+    if (isWs) {
+      // In normalized text, consecutive whitespace collapses to one space
+      if (oi === 0 || !/\s/.test(fullText[oi - 1])) {
+        normToOrig.push(oi);
+      }
+    } else {
+      normToOrig.push(oi);
+    }
+  }
+
+  const origStart = normToOrig[matchIdx] ?? matchIdx;
+  const origEnd = normToOrig[matchIdx + matchLen] ?? fullText.length;
+
+  // Highlight matching spans
+  let firstHighlighted: HTMLElement | null = null;
+  for (const { el, start, end } of spanMap) {
+    if (end > origStart && start < origEnd) {
+      el.style.backgroundColor = "rgba(250, 204, 21, 0.4)";
+      el.style.borderBottom = "2px solid rgb(250, 204, 21)";
+      el.style.borderRadius = "2px";
+      if (!firstHighlighted) firstHighlighted = el;
+    }
+  }
+
+  return firstHighlighted;
+}
 
 /**
  * Main PDF Viewer component with highlighting support.
@@ -43,10 +134,8 @@ export function PDFViewer({
   const [numPages, setNumPages] = React.useState<number>(0);
   const [currentPage, setCurrentPage] = React.useState<number>(initialPage);
   const [scale, setScale] = React.useState<number>(1);
-  const [pageWidth, setPageWidth] = React.useState<number>(0);
-  const [pageHeight, setPageHeight] = React.useState<number>(0);
-  const [highlights, _setHighlights] = React.useState<HighlightRect[]>([]);
   const [highlightPage, setHighlightPage] = React.useState<number | null>(null);
+  const highlightApplied = React.useRef(false);
 
   const { pdfUrl, isLoading, error, source, originalType } = usePdfDocument({
     documentId,
@@ -66,7 +155,6 @@ export function PDFViewer({
   const onDocumentLoadSuccess = React.useCallback(
     ({ numPages }: { numPages: number }) => {
       setNumPages(numPages);
-      // Go to initial page or highlight page
       const targetPage = highlightPage || initialPage;
       if (targetPage > 0 && targetPage <= numPages) {
         setCurrentPage(targetPage);
@@ -75,15 +163,12 @@ export function PDFViewer({
     [initialPage, highlightPage],
   );
 
-  // Handle page load success - get dimensions
+  // Handle page load success
   const onPageLoadSuccess = React.useCallback(
-    (page: { width: number; height: number; pageNumber: number }) => {
-      if (page.pageNumber === currentPage) {
-        setPageWidth(page.width);
-        setPageHeight(page.height);
-      }
+    (_page: { width: number; height: number; pageNumber: number }) => {
+      // Page dimensions available if needed in the future
     },
-    [currentPage],
+    [],
   );
 
   // Scroll to page when it changes
@@ -94,17 +179,73 @@ export function PDFViewer({
     }
   }, [currentPage]);
 
-  // Find highlights based on text search (fallback when positions aren't exact)
+  // After the PDF loads, scan pages with pdfjs to find which page contains the highlight text
   React.useEffect(() => {
-    if (!highlightText || !pdfUrl) return;
+    if (!highlightText || !pdfUrl || !numPages || !workerReady) return;
 
-    // This is a simplified approach - the text position mapper will provide
-    // more accurate positioning based on character offsets
-    // For now, we set the highlight page based on initialPage parameter
-    if (initialPage && initialPage > 0) {
-      setHighlightPage(initialPage);
-    }
-  }, [highlightText, pdfUrl, initialPage]);
+    let cancelled = false;
+    const searchText = normalizeText(highlightText.substring(0, 150));
+    if (searchText.length <= 10) return;
+
+    const findPage = async () => {
+      try {
+        const pdfjs = await import("pdfjs-dist");
+        const doc = await pdfjs.getDocument(pdfUrl).promise;
+
+        for (let i = 1; i <= doc.numPages; i++) {
+          if (cancelled) return;
+          const page = await doc.getPage(i);
+          const textContent = await page.getTextContent();
+          const pageText = normalizeText(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            textContent.items.map((item: any) => item.str).join(""),
+          );
+
+          if (pageText.includes(searchText)) {
+            if (!cancelled) {
+              setHighlightPage(i);
+              setCurrentPage(i);
+            }
+            return;
+          }
+        }
+      } catch (err) {
+        console.error("[PDFViewer] Failed to search pages for highlight:", err);
+      }
+    };
+
+    findPage();
+    return () => {
+      cancelled = true;
+    };
+  }, [highlightText, pdfUrl, numPages, workerReady]);
+
+  // After pages render their text layers, apply DOM-based highlighting
+  const tryApplyHighlight = React.useCallback(
+    (pageNumber: number) => {
+      if (!highlightText || highlightApplied.current) return;
+
+      const pageEl = pageRefs.current.get(pageNumber);
+      if (!pageEl) return;
+
+      // Retry a few times waiting for the text layer to render
+      let attempts = 0;
+      const tryHighlight = () => {
+        attempts++;
+        const firstMatch = highlightTextInTextLayer(pageEl, highlightText);
+        if (firstMatch) {
+          highlightApplied.current = true;
+          setTimeout(() => {
+            firstMatch.scrollIntoView({ behavior: "smooth", block: "center" });
+          }, 200);
+        } else if (attempts < 10) {
+          requestAnimationFrame(tryHighlight);
+        }
+      };
+      requestAnimationFrame(tryHighlight);
+    },
+    [highlightText],
+  );
 
   // Handle page navigation
   const handlePageChange = React.useCallback(
@@ -248,29 +389,22 @@ export function PDFViewer({
                 <Page
                   pageNumber={pageNumber}
                   scale={scale}
-                  onLoadSuccess={(page) =>
+                  onLoadSuccess={(page) => {
                     onPageLoadSuccess({
                       width: page.width,
                       height: page.height,
                       pageNumber,
-                    })
-                  }
+                    });
+                  }}
+                  onRenderSuccess={() => {
+                    if (isHighlightPage) {
+                      tryApplyHighlight(pageNumber);
+                    }
+                  }}
                   renderTextLayer={true}
                   renderAnnotationLayer={true}
                   className="bg-white"
                 />
-
-                {/* Highlight overlay for the current highlight page */}
-                {isHighlightPage && highlights.length > 0 && (
-                  <PDFHighlightLayer
-                    highlights={highlights.filter(
-                      (h) => h.pageNumber === pageNumber,
-                    )}
-                    scale={scale}
-                    containerWidth={pageWidth * scale}
-                    containerHeight={pageHeight * scale}
-                  />
-                )}
 
                 {/* Page number indicator */}
                 <div className="absolute bottom-2 left-1/2 -translate-x-1/2 rounded bg-black/60 px-2 py-0.5 text-xs text-white">
