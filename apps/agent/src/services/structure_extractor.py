@@ -124,14 +124,227 @@ class StructureExtractor:
         azure_key = os.environ.get("AZURE_DOCUMENT_INTELLIGENCE_KEY")
 
         if not azure_endpoint or not azure_key:
-            return ExtractionResult(
-                document_id=document_id,
-                error="Azure Document Intelligence not configured. Set AZURE_DOCUMENT_INTELLIGENCE_ENDPOINT and AZURE_DOCUMENT_INTELLIGENCE_KEY environment variables.",
-            )
+            print("[StructureExtractor] Azure not configured, using local extraction")
+            return await self._extract_local(document_id, file_content, file_type)
 
         return await self._extract_with_azure(
             document_id, file_content, file_type, azure_endpoint, azure_key
         )
+
+    async def _extract_local(
+        self,
+        document_id: str,
+        file_content: bytes,
+        file_type: str,
+    ) -> ExtractionResult:
+        """Extract structure locally using PyMuPDF (PDF) or python-docx (DOCX).
+
+        Fallback when Azure Document Intelligence is not configured.
+        """
+        import io
+
+        try:
+            paragraphs: list[dict[str, Any]] = []
+
+            if file_type.lower() == "pdf":
+                import fitz  # PyMuPDF
+
+                doc = fitz.open(stream=file_content, filetype="pdf")
+                page_count = len(doc)
+                for page_num, page in enumerate(doc, 1):
+                    blocks = page.get_text("dict", flags=fitz.TEXT_PRESERVE_WHITESPACE)[
+                        "blocks"
+                    ]
+                    for block in blocks:
+                        if block.get("type") != 0:  # text blocks only
+                            continue
+                        for line_group in block.get("lines", []):
+                            text = ""
+                            max_size = 0.0
+                            is_bold = False
+                            for span in line_group.get("spans", []):
+                                text += span.get("text", "")
+                                size = span.get("size", 0)
+                                if size > max_size:
+                                    max_size = size
+                                if "bold" in span.get("font", "").lower():
+                                    is_bold = True
+                            text = text.strip()
+                            if not text:
+                                continue
+                            # Heuristic: large/bold text = heading
+                            is_heading = (max_size >= 13 and is_bold) or (
+                                max_size >= 16
+                            )
+                            # Also detect numbered headings like "1. DEFINITIONS"
+                            if (
+                                not is_heading
+                                and is_bold
+                                and re.match(r"^\d+[\.\s]", text)
+                            ):
+                                is_heading = True
+                            paragraphs.append(
+                                {
+                                    "content": text,
+                                    "page": page_num,
+                                    "is_heading": is_heading,
+                                    "font_size": max_size,
+                                }
+                            )
+                doc.close()
+
+            elif file_type.lower() in ("docx", "doc"):
+                from docx import Document
+
+                doc = Document(io.BytesIO(file_content))
+                page_count = max(1, len(doc.paragraphs) // 40)  # rough estimate
+                for i, para in enumerate(doc.paragraphs):
+                    text = para.text.strip()
+                    if not text:
+                        continue
+                    style = para.style.name.lower() if para.style else ""
+                    is_heading = "heading" in style
+                    # Detect numbered headings in normal style
+                    if not is_heading and para.runs:
+                        if para.runs[0].bold and re.match(r"^\d+[\.\s]", text):
+                            is_heading = True
+                    paragraphs.append(
+                        {
+                            "content": text,
+                            "page": (i // 40) + 1,
+                            "is_heading": is_heading,
+                            "font_size": 14 if is_heading else 11,
+                        }
+                    )
+            else:
+                # Plain text fallback
+                text_content = file_content.decode("utf-8", errors="replace")
+                page_count = 1
+                for i, line in enumerate(text_content.split("\n")):
+                    line = line.strip()
+                    if line:
+                        paragraphs.append(
+                            {
+                                "content": line,
+                                "page": 1,
+                                "is_heading": bool(
+                                    re.match(r"^\d+[\.\s]", line) and len(line) < 80
+                                ),
+                                "font_size": 11,
+                            }
+                        )
+
+            # Build sections and chunks from paragraphs
+            sections: list[SectionData] = []
+            chunks: list[ChunkData] = []
+            markdown_lines: list[str] = []
+            section_stack: list[SectionData] = []
+            chunk_index = 0
+            paragraph_index = 0
+
+            for para in paragraphs:
+                content = para["content"]
+                page = para["page"]
+
+                if para["is_heading"]:
+                    level = self._detect_heading_level(None, content)
+
+                    while section_stack and section_stack[-1].level >= level:
+                        section_stack.pop()
+
+                    parent_id = section_stack[-1].id if section_stack else None
+                    path = [s.title or "" for s in section_stack] + [content]
+
+                    section = SectionData(
+                        id=str(uuid.uuid4()),
+                        parent_id=parent_id,
+                        section_number=self._extract_section_number(content),
+                        title=content,
+                        level=level,
+                        sequence=len(sections),
+                        path=path,
+                        start_page=page,
+                        end_page=page,
+                        content="",
+                    )
+                    sections.append(section)
+                    section_stack.append(section)
+
+                    chunks.append(
+                        ChunkData(
+                            id=str(uuid.uuid4()),
+                            section_id=section.id,
+                            parent_chunk_id=None,
+                            chunk_level="section",
+                            chunk_index=chunk_index,
+                            content=content,
+                            content_hash=self._generate_content_hash(content),
+                            citation={
+                                "page": page,
+                                "section_path": path,
+                                "paragraph_index": None,
+                                "heading": content,
+                                "context_before": None,
+                                "context_after": None,
+                            },
+                        )
+                    )
+                    chunk_index += 1
+                    markdown_lines.append(f"{'#' * level} {content}")
+                    markdown_lines.append("")
+                else:
+                    current_section = section_stack[-1] if section_stack else None
+                    section_path = [s.title or "" for s in section_stack]
+
+                    chunks.append(
+                        ChunkData(
+                            id=str(uuid.uuid4()),
+                            section_id=current_section.id if current_section else None,
+                            parent_chunk_id=None,
+                            chunk_level="paragraph",
+                            chunk_index=chunk_index,
+                            content=content,
+                            content_hash=self._generate_content_hash(content),
+                            citation={
+                                "page": page,
+                                "section_path": section_path,
+                                "paragraph_index": paragraph_index,
+                                "heading": current_section.title
+                                if current_section
+                                else None,
+                                "context_before": None,
+                                "context_after": None,
+                            },
+                        )
+                    )
+                    chunk_index += 1
+                    paragraph_index += 1
+                    markdown_lines.append(content)
+                    markdown_lines.append("")
+
+            normalized_markdown = "\n".join(markdown_lines).strip()
+            quality = 0.8 if sections else 0.6
+
+            print(
+                f"[StructureExtractor] Local extracted {len(sections)} sections, "
+                f"{len(chunks)} chunks from {page_count} pages"
+            )
+
+            return ExtractionResult(
+                document_id=document_id,
+                sections=sections,
+                chunks=chunks,
+                normalized_markdown=normalized_markdown,
+                extraction_quality=quality,
+                page_count=page_count,
+                error=None,
+            )
+        except Exception as e:
+            print(f"[StructureExtractor] Local extraction error: {e}")
+            return ExtractionResult(
+                document_id=document_id,
+                error=f"Local extraction failed: {str(e)}",
+            )
 
     async def _extract_with_azure(
         self,

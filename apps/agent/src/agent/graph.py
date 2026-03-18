@@ -66,10 +66,10 @@ If no [CONTEXT] message exists, ask the user which matter they want to search.""
 # Model options - uncomment the one you want to use:
 
 # OpenAI GPT-4o
-model = init_chat_model(model="openai:gpt-4o", temperature=0.0)
+# model = init_chat_model(model="openai:gpt-4o", temperature=0.0)
 
 # Anthropic Claude Sonnet
-# model = init_chat_model(model="anthropic:claude-sonnet-4-5-20250929", temperature=0.0)
+model = init_chat_model(model="anthropic:claude-sonnet-4-5-20250929", temperature=0.0)
 
 # Google Gemini
 # model = ChatGoogleGenerativeAI(model="gemini-3-pro-preview", temperature=0.0)
