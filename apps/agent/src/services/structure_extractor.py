@@ -4,11 +4,10 @@ Extracts hierarchical structure from legal documents using Google Cloud
 Vision OCR (primary) with PyMuPDF fallback. Detects sections, headings,
 paragraphs, and generates structural citations for precise legal grounding.
 
-Environment variables:
-- GOOGLE_APPLICATION_CREDENTIALS_JSON: Google service account JSON string
-  (for cloud deployments)
+Environment variables (pick one):
+- GOOGLE_VISION_API_KEY: Simple API key (easiest)
+- GOOGLE_APPLICATION_CREDENTIALS_JSON: Service account JSON string
 - GOOGLE_APPLICATION_CREDENTIALS: Path to service account JSON file
-  (for local dev)
 """
 
 import asyncio
@@ -131,14 +130,27 @@ class StructureExtractor:
     def _has_google_credentials(self) -> bool:
         """Check if Google Cloud credentials are available."""
         return bool(
-            os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
+            os.environ.get("GOOGLE_VISION_API_KEY")
+            or os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
             or os.environ.get("GOOGLE_APPLICATION_CREDENTIALS")
         )
 
     def _get_google_vision_client(self):
-        """Create a Google Cloud Vision client, handling JSON env var."""
+        """Create a Google Cloud Vision client.
+
+        Supports three auth methods (checked in order):
+        1. GOOGLE_VISION_API_KEY - simple API key
+        2. GOOGLE_APPLICATION_CREDENTIALS_JSON - service account JSON string
+        3. GOOGLE_APPLICATION_CREDENTIALS - service account JSON file path
+        """
         from google.cloud import vision
 
+        # 1. Simple API key
+        api_key = os.environ.get("GOOGLE_VISION_API_KEY")
+        if api_key:
+            return vision.ImageAnnotatorClient(client_options={"api_key": api_key})
+
+        # 2. Service account JSON string (for cloud deployments)
         creds_json = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS_JSON")
         if creds_json:
             from google.oauth2 import service_account
@@ -147,7 +159,7 @@ class StructureExtractor:
             credentials = service_account.Credentials.from_service_account_info(info)
             return vision.ImageAnnotatorClient(credentials=credentials)
 
-        # Fall back to GOOGLE_APPLICATION_CREDENTIALS file path
+        # 3. Fall back to GOOGLE_APPLICATION_CREDENTIALS file path
         return vision.ImageAnnotatorClient()
 
     async def _extract_with_google_vision(
