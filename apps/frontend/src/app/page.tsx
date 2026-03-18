@@ -1,3 +1,4 @@
+import { ClauseFinderCTA } from "@/components/landing/clause-finder-cta";
 import { Comparison } from "@/components/landing/comparison";
 import { FAQ } from "@/components/landing/faq";
 import { Features } from "@/components/landing/features";
@@ -17,6 +18,7 @@ export default function LandingPage() {
         <Pillars />
         <Comparison />
         <Features />
+        <ClauseFinderCTA />
         <SocialProof />
         <FAQ />
         {/* Final CTA Section */}
