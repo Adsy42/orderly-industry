@@ -1,9 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { useThreads } from "@/providers/Thread";
-import { Thread } from "@langchain/langgraph-sdk";
 import { useEffect } from "react";
-
-import { getContentString } from "../utils";
 import { useQueryState, parseAsBoolean } from "nuqs";
 import {
   Sheet,
@@ -15,11 +12,16 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { PanelRightOpen, PanelRightClose } from "lucide-react";
 import { useMediaQuery } from "@/hooks/useMediaQuery";
 
+interface ConversationThread {
+  thread_id: string;
+  title: string | null;
+}
+
 function ThreadList({
   threads,
   onThreadClick,
 }: {
-  threads: Thread[];
+  threads: ConversationThread[];
   onThreadClick?: (threadId: string) => void;
 }) {
   const [threadId, setThreadId] = useQueryState("threadId");
@@ -27,17 +29,7 @@ function ThreadList({
   return (
     <div className="flex h-full w-full flex-col items-start justify-start gap-2 overflow-y-scroll [&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-gray-300 [&::-webkit-scrollbar-track]:bg-transparent">
       {threads.map((t) => {
-        let itemText = t.thread_id;
-        if (
-          typeof t.values === "object" &&
-          t.values &&
-          "messages" in t.values &&
-          Array.isArray(t.values.messages) &&
-          t.values.messages?.length > 0
-        ) {
-          const firstMessage = t.values.messages[0];
-          itemText = getContentString(firstMessage.content);
-        }
+        const itemText = t.title || t.thread_id;
         return (
           <div
             key={t.thread_id}
@@ -99,6 +91,11 @@ export default function ThreadHistory() {
       .finally(() => setConversationsLoading(false));
   }, [getConversations, setConversations, setConversationsLoading]);
 
+  const threadList = conversations.map((conv) => ({
+    thread_id: conv.thread_id,
+    title: conv.title,
+  }));
+
   return (
     <>
       <div className="shadow-inner-right hidden h-[calc(100vh-3.5rem)] w-[300px] shrink-0 flex-col items-start justify-start gap-6 border-r-[1px] border-slate-300 lg:flex">
@@ -121,17 +118,7 @@ export default function ThreadHistory() {
         {conversationsLoading ? (
           <ThreadHistoryLoading />
         ) : (
-          <ThreadList
-            threads={conversations.map((conv) => ({
-              thread_id: conv.thread_id,
-              values: {},
-              created_at: conv.created_at,
-              updated_at: conv.updated_at,
-              metadata: {},
-              status: "idle" as const,
-              interrupts: {},
-            }))}
-          />
+          <ThreadList threads={threadList} />
         )}
       </div>
       <div className="lg:hidden">
@@ -150,15 +137,7 @@ export default function ThreadHistory() {
               <SheetTitle>Thread History</SheetTitle>
             </SheetHeader>
             <ThreadList
-              threads={conversations.map((conv) => ({
-                thread_id: conv.thread_id,
-                values: {},
-                created_at: conv.created_at,
-                updated_at: conv.updated_at,
-                metadata: {},
-                status: "idle" as const,
-                interrupts: {},
-              }))}
+              threads={threadList}
               onThreadClick={() => setChatHistoryOpen((o) => !o)}
             />
           </SheetContent>

@@ -1,5 +1,14 @@
-import { ContentBlock } from "@langchain/core/messages";
 import { toast } from "sonner";
+
+/**
+ * Multimodal content block for image data.
+ */
+export interface MultimodalDataBlock {
+  type: string;
+  mimeType?: string;
+  data?: string;
+  metadata?: Record<string, unknown>;
+}
 
 // Supported image types for chat (PDFs are NOT supported in OpenAI Chat Completions)
 // For PDFs, use Matters > Documents and the document agent tools
@@ -13,7 +22,7 @@ const SUPPORTED_IMAGE_TYPES = [
 // Returns a Promise of a typed multimodal block for images
 export async function fileToContentBlock(
   file: File,
-): Promise<ContentBlock.Multimodal.Data> {
+): Promise<MultimodalDataBlock> {
   if (!SUPPORTED_IMAGE_TYPES.includes(file.type)) {
     if (file.type === "application/pdf") {
       toast.error(
@@ -54,10 +63,9 @@ export async function fileToBase64(file: File): Promise<string> {
 // Type guard for Base64ContentBlock (images only)
 export function isBase64ContentBlock(
   block: unknown,
-): block is ContentBlock.Multimodal.Data {
+): block is MultimodalDataBlock {
   if (typeof block !== "object" || block === null || !("type" in block))
     return false;
-  // image type
   if (
     (block as { type: unknown }).type === "image" &&
     "mimeType" in block &&

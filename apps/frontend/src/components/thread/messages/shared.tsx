@@ -5,13 +5,10 @@ import {
   Pencil,
   Copy,
   CopyCheck,
-  ChevronLeft,
-  ChevronRight,
 } from "lucide-react";
 import { TooltipIconButton } from "../tooltip-icon-button";
 import { AnimatePresence, motion } from "framer-motion";
 import { useState } from "react";
-import { Button } from "@/components/ui/button";
 
 function ContentCopyable({
   content,
@@ -63,55 +60,6 @@ function ContentCopyable({
         )}
       </AnimatePresence>
     </TooltipIconButton>
-  );
-}
-
-export function BranchSwitcher({
-  branch,
-  branchOptions,
-  onSelect,
-  isLoading,
-}: {
-  branch: string | undefined;
-  branchOptions: string[] | undefined;
-  onSelect: (branch: string) => void;
-  isLoading: boolean;
-}) {
-  if (!branchOptions || !branch) return null;
-  const index = branchOptions.indexOf(branch);
-
-  return (
-    <div className="flex items-center gap-2">
-      <Button
-        variant="ghost"
-        size="icon"
-        className="size-6 p-1"
-        onClick={() => {
-          const prevBranch = branchOptions[index - 1];
-          if (!prevBranch) return;
-          onSelect(prevBranch);
-        }}
-        disabled={isLoading}
-      >
-        <ChevronLeft />
-      </Button>
-      <span className="text-sm">
-        {index + 1} / {branchOptions.length}
-      </span>
-      <Button
-        variant="ghost"
-        size="icon"
-        className="size-6 p-1"
-        onClick={() => {
-          const nextBranch = branchOptions[index + 1];
-          if (!nextBranch) return;
-          onSelect(nextBranch);
-        }}
-        disabled={isLoading}
-      >
-        <ChevronRight />
-      </Button>
-    </div>
   );
 }
 

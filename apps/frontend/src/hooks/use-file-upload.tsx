@@ -1,11 +1,13 @@
 import { useState, useRef, useEffect, ChangeEvent } from "react";
 import { toast } from "sonner";
-import { ContentBlock } from "@langchain/core/messages";
-import { fileToContentBlock } from "@/lib/multimodal-utils";
+import {
+  type MultimodalDataBlock,
+  fileToContentBlock,
+} from "@/lib/multimodal-utils";
 
 // Note: PDFs are NOT supported in chat because OpenAI's Chat Completions API
 // doesn't support file attachments. Use Matters > Documents for PDF uploads
-// and the document agent tools (isaacus_search, isaacus_extract) instead.
+// and the document agent tools (legal_answer, legal_classify) instead.
 export const SUPPORTED_FILE_TYPES = [
   "image/jpeg",
   "image/png",
@@ -14,19 +16,19 @@ export const SUPPORTED_FILE_TYPES = [
 ];
 
 interface UseFileUploadOptions {
-  initialBlocks?: ContentBlock.Multimodal.Data[];
+  initialBlocks?: MultimodalDataBlock[];
 }
 
 export function useFileUpload({
   initialBlocks = [],
 }: UseFileUploadOptions = {}) {
   const [contentBlocks, setContentBlocks] =
-    useState<ContentBlock.Multimodal.Data[]>(initialBlocks);
+    useState<MultimodalDataBlock[]>(initialBlocks);
   const dropRef = useRef<HTMLDivElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const dragCounter = useRef(0);
 
-  const isDuplicate = (file: File, blocks: ContentBlock.Multimodal.Data[]) => {
+  const isDuplicate = (file: File, blocks: MultimodalDataBlock[]) => {
     if (SUPPORTED_FILE_TYPES.includes(file.type)) {
       return blocks.some(
         (b) =>
@@ -84,7 +86,6 @@ export function useFileUpload({
   useEffect(() => {
     if (!dropRef.current) return;
 
-    // Global drag events with counter for robust dragOver state
     const handleWindowDragEnter = (e: DragEvent) => {
       if (e.dataTransfer?.types?.includes("Files")) {
         dragCounter.current += 1;
@@ -147,7 +148,7 @@ export function useFileUpload({
         : [];
       setContentBlocks((prev) => [...prev, ...newBlocks]);
     };
-    const handleWindowDragEnd = (e: DragEvent) => {
+    const handleWindowDragEnd = () => {
       dragCounter.current = 0;
       setDragOver(false);
     };
@@ -156,14 +157,12 @@ export function useFileUpload({
     window.addEventListener("drop", handleWindowDrop);
     window.addEventListener("dragend", handleWindowDragEnd);
 
-    // Prevent default browser behavior for dragover globally
     const handleWindowDragOver = (e: DragEvent) => {
       e.preventDefault();
       e.stopPropagation();
     };
     window.addEventListener("dragover", handleWindowDragOver);
 
-    // Remove element-specific drop event (handled globally)
     const handleDragOver = (e: DragEvent) => {
       e.preventDefault();
       e.stopPropagation();
@@ -203,10 +202,6 @@ export function useFileUpload({
 
   const resetBlocks = () => setContentBlocks([]);
 
-  /**
-   * Handle paste event for files (images, PDFs)
-   * Can be used as onPaste={handlePaste} on a textarea or input
-   */
   const handlePaste = async (
     e: React.ClipboardEvent<HTMLTextAreaElement | HTMLInputElement>,
   ) => {
@@ -220,9 +215,7 @@ export function useFileUpload({
         if (file) files.push(file);
       }
     }
-    if (files.length === 0) {
-      return;
-    }
+    if (files.length === 0) return;
     e.preventDefault();
     const validFiles = files.filter((file) =>
       SUPPORTED_FILE_TYPES.includes(file.type),
@@ -230,17 +223,7 @@ export function useFileUpload({
     const invalidFiles = files.filter(
       (file) => !SUPPORTED_FILE_TYPES.includes(file.type),
     );
-    const isDuplicateFile = (file: File) => {
-      if (SUPPORTED_FILE_TYPES.includes(file.type)) {
-        return contentBlocks.some(
-          (b) =>
-            b.type === "image" &&
-            b.metadata?.name === file.name &&
-            b.mimeType === file.type,
-        );
-      }
-      return false;
-    };
+    const isDuplicateFile = (file: File) => isDuplicate(file, contentBlocks);
     const duplicateFiles = validFiles.filter(isDuplicateFile);
     const uniqueFiles = validFiles.filter((file) => !isDuplicateFile(file));
     if (invalidFiles.length > 0) {
