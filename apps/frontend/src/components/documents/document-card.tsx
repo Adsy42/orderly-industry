@@ -47,6 +47,11 @@ const statusConfig: Record<
     label: "Extracting text...",
     color: "text-stone-700 dark:text-stone-300",
   },
+  structuring: {
+    icon: <Loader2 className="h-4 w-4 animate-spin" />,
+    label: "Analyzing structure...",
+    color: "text-stone-700 dark:text-stone-300",
+  },
   embedding: {
     icon: <Loader2 className="h-4 w-4 animate-spin" />,
     label: "Generating embeddings...",

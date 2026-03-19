@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { embed } from "@/lib/isaacus";
+import { extractText, chunkText } from "@/lib/document-extraction";
+import { createHash } from "crypto";
 
 /**
  * Document Processing API Route
@@ -140,12 +142,6 @@ export async function POST(request: NextRequest) {
     const fileBytes = await fileData.arrayBuffer();
     const fileContent = Buffer.from(fileBytes).toString("base64");
 
-    // Update status to structuring
-    await supabase
-      .from("documents")
-      .update({ processing_status: "structuring" })
-      .eq("id", document_id);
-
     // Validate file type - only PDF, DOCX, DOC supported
     const supportedTypes = ["pdf", "docx", "doc"];
     if (!supportedTypes.includes(document.file_type?.toLowerCase())) {
@@ -173,6 +169,12 @@ export async function POST(request: NextRequest) {
     let structureResult: AgentStructureResponse | null = null;
 
     if (STRUCTURE_URL) {
+      // Only set structuring status when actually calling the structure agent
+      await supabase
+        .from("documents")
+        .update({ processing_status: "structuring" })
+        .eq("id", document_id);
+
       try {
         const headers: Record<string, string> = {
           "Content-Type": "application/json",
@@ -237,12 +239,9 @@ export async function POST(request: NextRequest) {
       }
     } else {
       console.log(
-        "[Document Process] No STRUCTURE_AGENT_URL set, using basic processing via Supabase Edge Function",
+        "[Document Process] No STRUCTURE_AGENT_URL set, using basic inline processing",
       );
     }
-
-    // If structure extraction failed or was skipped, the process-document edge function
-    // handles basic text extraction + chunking + embedding via webhook
 
     if (structureResult && !structureResult.success) {
       await supabase
@@ -259,18 +258,144 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // If no structure result, the process-document edge function will handle
-    // basic processing (text extraction + chunking + embeddings) via webhook
+    // If no structure result, perform basic text extraction + chunking + embedding inline
     if (!structureResult) {
       console.log(
-        "[Document Process] No structure extraction - relying on process-document edge function",
+        "[Document Process] No structure extraction - performing basic processing inline",
       );
+
+      // Extract text from the already-downloaded file
+      const fileBuffer = Buffer.from(fileBytes);
+      const extractedText = await extractText(fileBuffer, document.file_type);
+
+      if (!extractedText || extractedText.trim().length < 10) {
+        await supabase
+          .from("documents")
+          .update({
+            processing_status: "error",
+            error_message: "No text could be extracted from document",
+          })
+          .eq("id", document_id);
+
+        return NextResponse.json(
+          { error: "No text could be extracted from document" },
+          { status: 500 },
+        );
+      }
+
+      console.log(
+        `[Document Process] Extracted ${extractedText.length} characters`,
+      );
+
+      // Update status to embedding + save extracted text
+      await supabase
+        .from("documents")
+        .update({
+          processing_status: "embedding",
+          extracted_text: extractedText,
+        })
+        .eq("id", document_id);
+
+      // Chunk the text
+      const chunks = chunkText(extractedText);
+      console.log(`[Document Process] Split into ${chunks.length} chunks`);
+
+      // Generate embeddings
+      let embeddings: number[][];
+      try {
+        embeddings = await embed(
+          chunks.map((c) => c),
+          "retrieval/document",
+        );
+      } catch (embedError) {
+        console.error("Embedding failed:", embedError);
+        const errorMsg =
+          embedError instanceof Error
+            ? embedError.message
+            : "Failed to generate embeddings";
+        await supabase
+          .from("documents")
+          .update({
+            processing_status: "error",
+            error_message: `Embedding failed: ${errorMsg}`,
+          })
+          .eq("id", document_id);
+        return NextResponse.json(
+          { error: `Embedding failed: ${errorMsg}` },
+          { status: 500 },
+        );
+      }
+
+      // Clear existing chunks for idempotency
+      await supabase
+        .from("document_chunks")
+        .delete()
+        .eq("document_id", document_id);
+
+      // Store chunks with embeddings
+      try {
+        const chunksToInsert = chunks.map((content, i) => {
+          const embedding = embeddings[i];
+          if (!embedding) {
+            throw new Error(`Missing embedding for chunk ${i}`);
+          }
+          return {
+            document_id,
+            chunk_index: i,
+            content,
+            content_hash: createHash("sha256").update(content).digest("hex"),
+            embedding,
+            embedding_model: "kanon-2",
+            chunk_level: "paragraph",
+            citation: {},
+          };
+        });
+
+        const { error: chunksError } = await supabase
+          .from("document_chunks")
+          .insert(chunksToInsert);
+
+        if (chunksError) {
+          throw chunksError;
+        }
+
+        console.log(
+          `[Document Process] Stored ${chunksToInsert.length} chunks with embeddings`,
+        );
+      } catch (storageError) {
+        console.error("Failed to store chunks:", storageError);
+        const errorMsg =
+          storageError instanceof Error
+            ? storageError.message
+            : "Failed to store chunks";
+        await supabase
+          .from("documents")
+          .update({
+            processing_status: "error",
+            error_message: `Failed to store chunks: ${errorMsg}`,
+          })
+          .eq("id", document_id);
+        return NextResponse.json(
+          { error: `Failed to store chunks: ${errorMsg}` },
+          { status: 500 },
+        );
+      }
+
+      // Mark document as ready
+      await supabase
+        .from("documents")
+        .update({
+          processing_status: "ready",
+          extracted_text: extractedText,
+          processed_at: new Date().toISOString(),
+        })
+        .eq("id", document_id);
+
       return NextResponse.json({
         success: true,
         document_id,
-        message: "Document queued for processing via edge function",
         sections_count: 0,
-        chunks_count: 0,
+        chunks_count: chunks.length,
       });
     }
 
