@@ -107,12 +107,28 @@ async function getAccessToken(): Promise<string> {
 
 /**
  * Build the Vision API URL and auth headers.
- * Supports either a simple API key or service account credentials.
+ * Prefers service account credentials over simple API key.
  */
 async function visionFetchParams(endpoint: string): Promise<{
   url: string;
   headers: Record<string, string>;
 }> {
+  // Prefer service account credentials (more secure, supports billing)
+  if (
+    process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON ||
+    process.env.GOOGLE_APPLICATION_CREDENTIALS
+  ) {
+    const accessToken = await getAccessToken();
+    return {
+      url: `https://vision.googleapis.com/v1/${endpoint}`,
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+    };
+  }
+
+  // Fall back to simple API key
   const apiKey = process.env.GOOGLE_VISION_API_KEY;
   if (apiKey) {
     return {
@@ -121,14 +137,9 @@ async function visionFetchParams(endpoint: string): Promise<{
     };
   }
 
-  const accessToken = await getAccessToken();
-  return {
-    url: `https://vision.googleapis.com/v1/${endpoint}`,
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${accessToken}`,
-    },
-  };
+  throw new Error(
+    "No Google Cloud Vision credentials configured. Set GOOGLE_APPLICATION_CREDENTIALS_JSON, GOOGLE_APPLICATION_CREDENTIALS, or GOOGLE_VISION_API_KEY.",
+  );
 }
 
 // --- Google Cloud Vision OCR ---
