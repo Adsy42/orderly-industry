@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import { useState } from "react";
-import Link from "next/link";
 import {
   CheckCircle,
   XCircle,
@@ -13,7 +12,6 @@ import {
   ChevronUp,
   Copy,
   Check,
-  ExternalLink,
   ArrowRight,
 } from "lucide-react";
 import { Card } from "@/components/ui/card";
@@ -264,10 +262,6 @@ function MatchCard({
       ? match.text
       : match.text.slice(0, MAX_EXCERPT_LENGTH) + "...";
 
-  // Link to PDF viewer with highlighting
-  // Note: Page number defaults to 1 - the PDF viewer will use text position mapping to find the correct location
-  const pdfViewerHref = `/protected/documents/view/${documentId}?start=${match.startIndex}&end=${match.endIndex}&page=1${matterId ? `&matterId=${matterId}` : ""}&text=${encodeURIComponent(match.text.substring(0, 200))}`;
-
   const citationMarkdown =
     match.citation?.markdown ??
     `[${documentName}](cite:${documentId}@${match.startIndex}-${match.endIndex})`;
@@ -347,15 +341,6 @@ function MatchCard({
               {match.endIndex.toLocaleString()}
             </p>
             <div className="flex items-center gap-2">
-              <Link
-                href={pdfViewerHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-muted-foreground inline-flex items-center gap-1 text-xs hover:underline"
-              >
-                <ExternalLink className="h-3 w-3" />
-                Open in document
-              </Link>
               <Button
                 type="button"
                 variant="ghost"
