@@ -1,140 +1,245 @@
 /**
- * Server-side document text extraction and chunking utilities.
+ * Server-side document text extraction using Google Cloud Vision OCR.
  *
- * Supports PDF (via pdfjs-dist), DOCX (via jszip), and TXT files.
- * Used by /api/documents/process when no structure extraction agent is available.
+ * PDF: Google Cloud Vision files:annotate (native PDF OCR)
+ * DOCX/DOC: Converted to PDF via LibreOffice headless, then OCR'd
+ * TXT: Simple text decode (no OCR needed)
  */
 
-import JSZip from "jszip";
+import { execFile } from "child_process";
+import { writeFile, readFile, unlink, mkdtemp, rmdir } from "fs/promises";
+import { createSign } from "crypto";
+import { tmpdir } from "os";
+import { join, resolve } from "path";
 
 const CHUNK_SIZE = 2000; // Characters (~500 tokens)
 const CHUNK_OVERLAP = 200;
+const VISION_PAGES_PER_BATCH = 5; // Google Vision API limit
 
-// --- PDF extraction via pdfjs-dist ---
+// --- Google Cloud Vision Auth ---
 
-async function extractTextFromPdf(buffer: Buffer): Promise<string> {
-  const pdfjs = await import("pdfjs-dist/legacy/build/pdf.mjs");
-  const doc = await pdfjs.getDocument({ data: new Uint8Array(buffer) }).promise;
+interface ServiceAccountKey {
+  client_email: string;
+  private_key: string;
+  token_uri?: string;
+}
 
-  const pages: string[] = [];
-  for (let i = 1; i <= doc.numPages; i++) {
-    const page = await doc.getPage(i);
-    const content = await page.getTextContent();
-    const pageText = content.items
-      .filter((item) => "str" in item)
-      .map((item) => (item as { str: string }).str)
-      .join(" ");
-    if (pageText.trim()) {
-      pages.push(pageText.trim());
+let cachedAccessToken: { token: string; expiresAt: number } | null = null;
+
+/**
+ * Load service account credentials from:
+ * 1. GOOGLE_APPLICATION_CREDENTIALS_JSON (inline JSON string)
+ * 2. GOOGLE_APPLICATION_CREDENTIALS (path to JSON file)
+ */
+async function loadServiceAccountKey(): Promise<ServiceAccountKey> {
+  const jsonStr = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
+  if (jsonStr) {
+    return JSON.parse(jsonStr);
+  }
+
+  const keyPath = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+  if (keyPath) {
+    const resolved = resolve(keyPath);
+    const content = await readFile(resolved, "utf-8");
+    return JSON.parse(content);
+  }
+
+  throw new Error(
+    "Set GOOGLE_APPLICATION_CREDENTIALS (path to JSON key file) or GOOGLE_APPLICATION_CREDENTIALS_JSON (inline JSON)",
+  );
+}
+
+/**
+ * Create a signed JWT and exchange it for an OAuth2 access token.
+ */
+async function getAccessToken(): Promise<string> {
+  // Return cached token if still valid (with 60s buffer)
+  if (cachedAccessToken && Date.now() < cachedAccessToken.expiresAt - 60000) {
+    return cachedAccessToken.token;
+  }
+
+  const sa = await loadServiceAccountKey();
+  const now = Math.floor(Date.now() / 1000);
+
+  const header = Buffer.from(
+    JSON.stringify({ alg: "RS256", typ: "JWT" }),
+  ).toString("base64url");
+
+  const payload = Buffer.from(
+    JSON.stringify({
+      iss: sa.client_email,
+      scope: "https://www.googleapis.com/auth/cloud-vision",
+      aud: sa.token_uri || "https://oauth2.googleapis.com/token",
+      iat: now,
+      exp: now + 3600,
+    }),
+  ).toString("base64url");
+
+  const sign = createSign("RSA-SHA256");
+  sign.update(`${header}.${payload}`);
+  const signature = sign.sign(sa.private_key, "base64url");
+
+  const jwt = `${header}.${payload}.${signature}`;
+
+  const tokenResponse = await fetch(
+    sa.token_uri || "https://oauth2.googleapis.com/token",
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`,
+    },
+  );
+
+  if (!tokenResponse.ok) {
+    const errText = await tokenResponse.text();
+    throw new Error(
+      `Failed to get access token: ${tokenResponse.status} ${errText}`,
+    );
+  }
+
+  const tokenData = await tokenResponse.json();
+  cachedAccessToken = {
+    token: tokenData.access_token,
+    expiresAt: Date.now() + tokenData.expires_in * 1000,
+  };
+  return cachedAccessToken.token;
+}
+
+/**
+ * Build the Vision API URL and auth headers.
+ * Supports either a simple API key or service account credentials.
+ */
+async function visionFetchParams(endpoint: string): Promise<{
+  url: string;
+  headers: Record<string, string>;
+}> {
+  const apiKey = process.env.GOOGLE_VISION_API_KEY;
+  if (apiKey) {
+    return {
+      url: `https://vision.googleapis.com/v1/${endpoint}?key=${apiKey}`,
+      headers: { "Content-Type": "application/json" },
+    };
+  }
+
+  const accessToken = await getAccessToken();
+  return {
+    url: `https://vision.googleapis.com/v1/${endpoint}`,
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${accessToken}`,
+    },
+  };
+}
+
+// --- Google Cloud Vision OCR ---
+
+/**
+ * OCR a PDF buffer using Google Cloud Vision files:annotate.
+ * Processes 5 pages per request (API limit), batching for longer documents.
+ */
+async function ocrPdf(buffer: Buffer): Promise<string> {
+  const base64Content = buffer.toString("base64");
+
+  const allText: string[] = [];
+  let pageOffset = 1;
+  let hasMorePages = true;
+
+  while (hasMorePages) {
+    const pages = Array.from(
+      { length: VISION_PAGES_PER_BATCH },
+      (_, i) => pageOffset + i,
+    );
+
+    const { url, headers } = await visionFetchParams("files:annotate");
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        requests: [
+          {
+            inputConfig: {
+              content: base64Content,
+              mimeType: "application/pdf",
+            },
+            features: [{ type: "DOCUMENT_TEXT_DETECTION" }],
+            pages,
+          },
+        ],
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `Google Cloud Vision API error: ${response.status} ${errorText}`,
+      );
+    }
+
+    const data = await response.json();
+    const pageResponses = data.responses?.[0]?.responses || [];
+
+    for (const pageResp of pageResponses) {
+      const text = pageResp.fullTextAnnotation?.text;
+      if (text?.trim()) {
+        allText.push(text.trim());
+      }
+    }
+
+    if (pageResponses.length < VISION_PAGES_PER_BATCH) {
+      hasMorePages = false;
+    } else {
+      pageOffset += VISION_PAGES_PER_BATCH;
     }
   }
 
-  const result = pages.join("\n\n");
+  const result = allText.join("\n\n");
   if (!result.trim()) {
-    return "[PDF requires OCR for text extraction - no native text found]";
+    throw new Error("Google Cloud Vision OCR returned no text from PDF");
   }
   return result;
 }
 
-// --- DOCX extraction via jszip (ported from edge function) ---
+// --- DOCX/DOC conversion via LibreOffice ---
 
-function extractTextFromXml(xml: string): string {
-  const parts: string[] = [];
+/**
+ * Convert a DOCX/DOC file to PDF using LibreOffice headless mode,
+ * then OCR the resulting PDF with Google Cloud Vision.
+ */
+async function ocrWord(buffer: Buffer, extension: string): Promise<string> {
+  const tempDir = await mkdtemp(join(tmpdir(), "ocr-"));
+  const inputPath = join(tempDir, `input.${extension}`);
+  const outputPath = join(tempDir, "input.pdf");
 
-  const paragraphRegex = /<w:p[^>]*>([\s\S]*?)<\/w:p>/g;
-  let paragraphMatch;
-
-  while ((paragraphMatch = paragraphRegex.exec(xml)) !== null) {
-    const paragraphContent = paragraphMatch[1];
-
-    const textRegex = /<w:t[^>]*>([^<]*)<\/w:t>/g;
-    let textMatch;
-    const texts: string[] = [];
-
-    while ((textMatch = textRegex.exec(paragraphContent)) !== null) {
-      texts.push(textMatch[1]);
-    }
-
-    const paragraphText = texts.join("");
-    if (paragraphText.trim()) {
-      parts.push(paragraphText);
-    }
-  }
-
-  let result = parts.join("\n\n");
-
-  // Decode XML entities
-  result = result
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&amp;/g, "&")
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
-    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)))
-    .replace(/&#x([0-9a-fA-F]+);/g, (_, code) =>
-      String.fromCharCode(parseInt(code, 16)),
-    );
-
-  // Clean up excessive whitespace
-  result = result
-    .split("\n")
-    .map((line) => line.trim())
-    .join("\n")
-    .replace(/\n{3,}/g, "\n\n");
-
-  return result.trim();
-}
-
-async function extractTextFromDocx(buffer: Buffer): Promise<string> {
   try {
-    const zip = await JSZip.loadAsync(buffer);
-    const parts: string[] = [];
+    await writeFile(inputPath, buffer);
 
-    // Extract main document content
-    const documentXml = zip.file("word/document.xml");
-    if (documentXml) {
-      const xmlContent = await documentXml.async("text");
-      const text = extractTextFromXml(xmlContent);
-      if (text.trim()) {
-        parts.push(text);
-      }
-    }
-
-    // Extract headers
-    for (const filename of Object.keys(zip.files)) {
-      if (filename.match(/^word\/header\d*\.xml$/)) {
-        const headerXml = zip.file(filename);
-        if (headerXml) {
-          const xmlContent = await headerXml.async("text");
-          const text = extractTextFromXml(xmlContent);
-          if (text.trim()) {
-            parts.unshift(text);
+    await new Promise<void>((resolve, reject) => {
+      execFile(
+        "soffice",
+        ["--headless", "--convert-to", "pdf", "--outdir", tempDir, inputPath],
+        { timeout: 60000 },
+        (error) => {
+          if (error) {
+            reject(
+              new Error(
+                `LibreOffice conversion failed: ${error.message}. ` +
+                  `Ensure LibreOffice is installed (apt install libreoffice-core) for DOCX/DOC support.`,
+              ),
+            );
+          } else {
+            resolve();
           }
-        }
-      }
-    }
+        },
+      );
+    });
 
-    // Extract footers
-    for (const filename of Object.keys(zip.files)) {
-      if (filename.match(/^word\/footer\d*\.xml$/)) {
-        const footerXml = zip.file(filename);
-        if (footerXml) {
-          const xmlContent = await footerXml.async("text");
-          const text = extractTextFromXml(xmlContent);
-          if (text.trim()) {
-            parts.push(text);
-          }
-        }
-      }
-    }
-
-    const result = parts.join("\n\n");
-    if (!result.trim()) {
-      throw new Error("No text content found in DOCX");
-    }
-    return result;
-  } catch (error) {
-    throw new Error(`Failed to extract text from DOCX: ${error}`);
+    const pdfBuffer = await readFile(outputPath);
+    return ocrPdf(pdfBuffer);
+  } finally {
+    await unlink(inputPath).catch(() => {});
+    await unlink(outputPath).catch(() => {});
+    await rmdir(tempDir).catch(() => {});
   }
 }
 
@@ -156,10 +261,11 @@ export async function extractText(
 ): Promise<string> {
   switch (fileType.toLowerCase()) {
     case "pdf":
-      return extractTextFromPdf(buffer);
+      return ocrPdf(buffer);
     case "docx":
+      return ocrWord(buffer, "docx");
     case "doc":
-      return extractTextFromDocx(buffer);
+      return ocrWord(buffer, "doc");
     case "txt":
       return extractTextFromTxt(buffer);
     default:

@@ -25,6 +25,10 @@ env/
 apps/agent/.env
 apps/frontend/.env.local
 
+# Google Cloud credentials
+**/google-credentials.json
+**/service-account*.json
+
 # Build outputs
 .next/
 out/

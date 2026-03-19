@@ -9,11 +9,12 @@ import { createHash } from "crypto";
  *
  * Triggers asynchronous document processing pipeline:
  * 1. Downloads file from Supabase Storage
- * 2. Calls LangGraph agent for structure extraction (Azure Document Intelligence)
- * 3. Generates embeddings for chunks
- * 4. Stores sections, chunks, and embeddings in database
+ * 2. Extracts text via Google Cloud Vision OCR (PDF native, DOCX/DOC via LibreOffice conversion)
+ * 3. Optionally calls structure extraction agent for hierarchical sections
+ * 4. Generates embeddings for chunks
+ * 5. Stores sections, chunks, and embeddings in database
  *
- * Supports: PDF, DOCX, DOC files only (requires Azure Document Intelligence)
+ * Supports: PDF, DOCX, DOC, TXT files (requires GOOGLE_VISION_API_KEY)
  *
  * POST /api/documents/process
  * Body: { document_id: string }
@@ -142,8 +143,8 @@ export async function POST(request: NextRequest) {
     const fileBytes = await fileData.arrayBuffer();
     const fileContent = Buffer.from(fileBytes).toString("base64");
 
-    // Validate file type - only PDF, DOCX, DOC supported
-    const supportedTypes = ["pdf", "docx", "doc"];
+    // Validate file type
+    const supportedTypes = ["pdf", "docx", "doc", "txt"];
     if (!supportedTypes.includes(document.file_type?.toLowerCase())) {
       await supabase
         .from("documents")

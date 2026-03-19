@@ -1,12 +1,11 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
-// Use JSZip for DOCX extraction (DOCX is a ZIP of XML files)
-import JSZip from "npm:jszip@3.10.1";
 
 // Document processing constants
 const CHUNK_SIZE = 2000; // Characters (~500 tokens)
 const CHUNK_OVERLAP = 200;
 const MAX_RETRIES = 3;
+const VISION_PAGES_PER_BATCH = 5; // Google Vision API limit
 
 interface DocumentRecord {
   id: string;
@@ -45,174 +44,86 @@ async function updateDocumentStatus(
   }
 }
 
-/**
- * Extract text from DOCX using JSZip.
- *
- * DOCX files are ZIP archives containing:
- * - word/document.xml: Main document content
- * - word/header*.xml: Headers
- * - word/footer*.xml: Footers
- */
-async function extractTextFromDocx(content: Uint8Array): Promise<string> {
-  try {
-    const zip = await JSZip.loadAsync(content);
-    const parts: string[] = [];
-
-    // Extract main document content
-    const documentXml = zip.file("word/document.xml");
-    if (documentXml) {
-      const xmlContent = await documentXml.async("text");
-      const text = extractTextFromXml(xmlContent);
-      if (text.trim()) {
-        parts.push(text);
-      }
-    }
-
-    // Extract headers (optional)
-    for (const filename of Object.keys(zip.files)) {
-      if (filename.match(/^word\/header\d*\.xml$/)) {
-        const headerXml = zip.file(filename);
-        if (headerXml) {
-          const xmlContent = await headerXml.async("text");
-          const text = extractTextFromXml(xmlContent);
-          if (text.trim()) {
-            parts.unshift(text); // Headers go first
-          }
-        }
-      }
-    }
-
-    // Extract footers (optional)
-    for (const filename of Object.keys(zip.files)) {
-      if (filename.match(/^word\/footer\d*\.xml$/)) {
-        const footerXml = zip.file(filename);
-        if (footerXml) {
-          const xmlContent = await footerXml.async("text");
-          const text = extractTextFromXml(xmlContent);
-          if (text.trim()) {
-            parts.push(text); // Footers go last
-          }
-        }
-      }
-    }
-
-    const result = parts.join("\n\n");
-
-    if (!result.trim()) {
-      throw new Error("No text content found in DOCX");
-    }
-
-    return result;
-  } catch (error) {
-    console.error(`DOCX extraction error: ${error}`);
-    throw new Error(`Failed to extract text from DOCX: ${error}`);
-  }
-}
+// --- Google Cloud Vision OCR ---
 
 /**
- * Extract plain text from Office Open XML content.
- * Handles paragraphs, tables, and preserves structure.
+ * OCR a PDF using Google Cloud Vision files:annotate.
+ * Processes 5 pages per request (API limit), batching for longer documents.
  */
-function extractTextFromXml(xml: string): string {
-  const parts: string[] = [];
+async function ocrPdf(
+  content: Uint8Array,
+  visionApiKey: string,
+): Promise<string> {
+  const base64Content = btoa(
+    Array.from(content)
+      .map((b) => String.fromCharCode(b))
+      .join(""),
+  );
 
-  // Extract text from <w:t> tags (text runs)
-  // Match paragraphs and extract their text content
-  const paragraphRegex = /<w:p[^>]*>([\s\S]*?)<\/w:p>/g;
-  let paragraphMatch;
+  const allText: string[] = [];
+  let pageOffset = 1;
+  let hasMorePages = true;
 
-  while ((paragraphMatch = paragraphRegex.exec(xml)) !== null) {
-    const paragraphContent = paragraphMatch[1];
-
-    // Check if this is a table cell (don't add extra line breaks)
-    const isTableCell =
-      xml.indexOf("<w:tc>") !== -1 &&
-      paragraphMatch.index > xml.lastIndexOf("<w:tc>", paragraphMatch.index);
-
-    // Extract all text runs within the paragraph
-    const textRegex = /<w:t[^>]*>([^<]*)<\/w:t>/g;
-    let textMatch;
-    const texts: string[] = [];
-
-    while ((textMatch = textRegex.exec(paragraphContent)) !== null) {
-      texts.push(textMatch[1]);
-    }
-
-    const paragraphText = texts.join("");
-    if (paragraphText.trim()) {
-      parts.push(paragraphText);
-    }
-  }
-
-  // Handle table rows - add separators between cells
-  let result = parts.join("\n\n");
-
-  // Decode XML entities
-  result = result
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&amp;/g, "&")
-    .replace(/&quot;/g, '"')
-    .replace(/&apos;/g, "'")
-    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(parseInt(code, 10)))
-    .replace(/&#x([0-9a-fA-F]+);/g, (_, code) =>
-      String.fromCharCode(parseInt(code, 16)),
+  while (hasMorePages) {
+    const pages = Array.from(
+      { length: VISION_PAGES_PER_BATCH },
+      (_, i) => pageOffset + i,
     );
 
-  // Clean up excessive whitespace while preserving paragraph structure
-  result = result
-    .split("\n")
-    .map((line) => line.trim())
-    .join("\n")
-    .replace(/\n{3,}/g, "\n\n");
+    const response = await fetch(
+      `https://vision.googleapis.com/v1/files:annotate?key=${visionApiKey}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          requests: [
+            {
+              inputConfig: {
+                content: base64Content,
+                mimeType: "application/pdf",
+              },
+              features: [{ type: "DOCUMENT_TEXT_DETECTION" }],
+              pages,
+            },
+          ],
+        }),
+      },
+    );
 
-  return result.trim();
-}
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(
+        `Google Cloud Vision API error: ${response.status} ${errorText}`,
+      );
+    }
 
-/**
- * Extract text from PDF.
- *
- * For native text extraction in Deno Edge Functions, we use a simple
- * stream-based approach. For scanned PDFs, the text will be minimal
- * and OCR should be used (via DeepSeek Vision in the Python agent).
- */
-function extractTextFromPdf(content: Uint8Array): string {
-  const decoder = new TextDecoder("latin1");
-  const text = decoder.decode(content);
+    const data = await response.json();
+    const pageResponses = data.responses?.[0]?.responses || [];
 
-  // Try to extract text between stream markers
-  const matches = text.match(/stream[\s\S]*?endstream/g) || [];
-  const extractedParts: string[] = [];
+    for (const pageResp of pageResponses) {
+      const text = pageResp.fullTextAnnotation?.text;
+      if (text?.trim()) {
+        allText.push(text.trim());
+      }
+    }
 
-  for (const match of matches) {
-    // Extract printable ASCII characters
-    const cleaned = match
-      .replace(/stream|endstream/g, "")
-      .replace(/[^\x20-\x7E\s]/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-    if (cleaned.length > 20) {
-      extractedParts.push(cleaned);
+    if (pageResponses.length < VISION_PAGES_PER_BATCH) {
+      hasMorePages = false;
+    } else {
+      pageOffset += VISION_PAGES_PER_BATCH;
     }
   }
 
-  // Also try to extract text from /Contents objects
-  const contentsRegex = /\/Contents\s*\[([^\]]+)\]/g;
-  // ... additional PDF parsing can be added
-
-  const result = extractedParts.join("\n\n").trim();
-
-  if (!result || result.length < 50) {
-    // Return indicator that OCR may be needed
-    return "[PDF requires OCR for text extraction - limited native text found]";
+  const result = allText.join("\n\n");
+  if (!result.trim()) {
+    throw new Error("Google Cloud Vision OCR returned no text from PDF");
   }
-
   return result;
 }
 
-// Extract text from TXT
+// --- TXT extraction ---
+
 function extractTextFromTxt(content: Uint8Array): string {
-  // Try UTF-8 first, fall back to latin1
   try {
     const decoder = new TextDecoder("utf-8", { fatal: true });
     return decoder.decode(content);
@@ -222,19 +133,23 @@ function extractTextFromTxt(content: Uint8Array): string {
   }
 }
 
-// Extract text based on file type
+// --- Text extraction dispatch ---
+
 async function extractText(
   content: Uint8Array,
   fileType: string,
+  visionApiKey: string,
 ): Promise<string> {
   switch (fileType.toLowerCase()) {
     case "pdf":
-      return extractTextFromPdf(content);
-    case "docx":
-    case "doc":
-      return await extractTextFromDocx(content);
+      return ocrPdf(content, visionApiKey);
     case "txt":
       return extractTextFromTxt(content);
+    case "docx":
+    case "doc":
+      throw new Error(
+        "DOCX/DOC files must be processed via the /api/documents/process route (requires LibreOffice for conversion to PDF before OCR)",
+      );
     default:
       throw new Error(`Unsupported file type: ${fileType}`);
   }
@@ -486,6 +401,7 @@ Deno.serve(async (req) => {
     const isaacusApiKey = Deno.env.get("ISAACUS_API_KEY");
     const isaacusBaseUrl =
       Deno.env.get("ISAACUS_BASE_URL") || "https://api.isaacus.com";
+    const visionApiKey = Deno.env.get("GOOGLE_VISION_API_KEY");
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -502,9 +418,19 @@ Deno.serve(async (req) => {
         throw new Error(`Failed to download file: ${downloadError?.message}`);
       }
 
-      // Step 3: Extract text
+      // Step 3: Extract text via Google Cloud Vision OCR
+      if (!visionApiKey) {
+        throw new Error(
+          "GOOGLE_VISION_API_KEY not set - required for document OCR",
+        );
+      }
+
       const fileContent = new Uint8Array(await fileData.arrayBuffer());
-      const extractedText = await extractText(fileContent, document.file_type);
+      const extractedText = await extractText(
+        fileContent,
+        document.file_type,
+        visionApiKey,
+      );
 
       if (!extractedText || extractedText.trim().length === 0) {
         throw new Error("No text could be extracted from document");
