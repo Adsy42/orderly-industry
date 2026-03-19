@@ -54,10 +54,11 @@ interface AgentStructureResponse {
   error?: string;
 }
 
-import { getLangGraphApiUrl } from "@/lib/env";
-
-// Get LangGraph agent URL from environment at request time (not module load time)
-// In production, LANGGRAPH_API_URL must be set to your LangSmith deployment URL
+// Structure extraction agent URL (optional - falls back to basic processing if not set)
+function getStructureAgentUrl(): string | null {
+  const value = process.env.STRUCTURE_AGENT_URL;
+  return value?.trim() || null;
+}
 
 export async function POST(request: NextRequest) {
   let supabase: Awaited<ReturnType<typeof createClient>> | null = null;
@@ -165,113 +166,85 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Get environment variables at request time (not module load time)
-    const LANGGRAPH_URL = getLangGraphApiUrl();
+    // Get structure extraction agent URL (optional)
+    const STRUCTURE_URL = getStructureAgentUrl();
 
-    // Call LangGraph agent for structure extraction
-    let structureResult: AgentStructureResponse;
-    try {
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-      };
-      // Pass user's Supabase JWT for authentication
-      if (accessToken) {
-        headers["Authorization"] = `Bearer ${accessToken}`;
-      } else {
-        console.warn(
-          "[Document Process] No access token available - LangGraph auth will fail",
-        );
-      }
+    // Call structure extraction agent if available (optional enhanced processing)
+    let structureResult: AgentStructureResponse | null = null;
 
-      console.log("[Document Process] Calling LangGraph agent:", {
-        url: `${LANGGRAPH_URL}/invoke/extract_structure`,
-        hasAuthHeader: !!accessToken,
-        documentId: document_id,
-        fileType: document.file_type,
-      });
-
-      // Create abort controller for timeout
-      const controller = new AbortController();
-      const timeoutId = setTimeout(
-        () => controller.abort(),
-        LANGGRAPH_TIMEOUT_MS,
-      );
-
+    if (STRUCTURE_URL) {
       try {
-        const agentResponse = await fetch(
-          `${LANGGRAPH_URL}/invoke/extract_structure`,
-          {
-            method: "POST",
-            headers,
-            signal: controller.signal,
-            body: JSON.stringify({
-              document_id,
-              file_content: fileContent,
-              file_type: document.file_type,
-              use_hi_res: true,
-            }),
-          },
+        const headers: Record<string, string> = {
+          "Content-Type": "application/json",
+        };
+        if (accessToken) {
+          headers["Authorization"] = `Bearer ${accessToken}`;
+        }
+
+        console.log("[Document Process] Calling structure extraction agent:", {
+          url: `${STRUCTURE_URL}/invoke/extract_structure`,
+          documentId: document_id,
+          fileType: document.file_type,
+        });
+
+        const controller = new AbortController();
+        const timeoutId = setTimeout(
+          () => controller.abort(),
+          LANGGRAPH_TIMEOUT_MS,
         );
 
-        clearTimeout(timeoutId);
+        try {
+          const agentResponse = await fetch(
+            `${STRUCTURE_URL}/invoke/extract_structure`,
+            {
+              method: "POST",
+              headers,
+              signal: controller.signal,
+              body: JSON.stringify({
+                document_id,
+                file_content: fileContent,
+                file_type: document.file_type,
+                use_hi_res: true,
+              }),
+            },
+          );
 
-        if (!agentResponse.ok) {
-          const errorText = await agentResponse.text();
-          console.error("[Document Process] LangGraph agent error:", {
-            status: agentResponse.status,
-            statusText: agentResponse.statusText,
-            body: errorText,
-          });
-          throw new Error(
-            `Agent returned ${agentResponse.status}: ${errorText}`,
+          clearTimeout(timeoutId);
+
+          if (agentResponse.ok) {
+            structureResult = await agentResponse.json();
+            console.log("[Document Process] Structure extraction successful:", {
+              sections: structureResult?.sections?.length || 0,
+              chunks: structureResult?.chunks?.length || 0,
+            });
+          } else {
+            console.warn(
+              "[Document Process] Structure agent returned error, falling back to basic processing",
+            );
+          }
+        } catch (fetchError) {
+          clearTimeout(timeoutId);
+          console.warn(
+            "[Document Process] Structure agent unavailable, falling back to basic processing:",
+            fetchError,
           );
         }
-
-        structureResult = await agentResponse.json();
-      } catch (fetchError) {
-        clearTimeout(timeoutId);
-        if (fetchError instanceof Error && fetchError.name === "AbortError") {
-          throw new Error(
-            `LangGraph agent timed out after ${LANGGRAPH_TIMEOUT_MS / 1000} seconds`,
-          );
-        }
-        throw fetchError;
+      } catch (agentError) {
+        console.warn(
+          "[Document Process] Structure extraction skipped:",
+          agentError,
+        );
       }
-
-      console.log("[Document Process] LangGraph extraction successful:", {
-        sections: structureResult.sections?.length || 0,
-        chunks: structureResult.chunks?.length || 0,
-        textLength: structureResult.normalized_markdown?.length || 0,
-      });
-    } catch (agentError) {
-      console.error(
-        "[Document Process] Agent structure extraction failed:",
-        agentError,
-      );
-
-      const errorMsg =
-        agentError instanceof Error
-          ? agentError.message
-          : "LangGraph agent unavailable";
-      await supabase
-        .from("documents")
-        .update({
-          processing_status: "error",
-          error_message: `Text extraction failed: ${errorMsg}. Ensure LangGraph agent is running.`,
-        })
-        .eq("id", document_id);
-
-      return NextResponse.json(
-        {
-          error: `Text extraction failed for ${document.file_type.toUpperCase()}`,
-          details: errorMsg,
-          hint: "Ensure LangGraph agent is running with: cd apps/agent && langgraph dev",
-        },
-        { status: 500 },
+    } else {
+      console.log(
+        "[Document Process] No STRUCTURE_AGENT_URL set, using basic processing via Supabase Edge Function",
       );
     }
 
-    if (!structureResult.success) {
+    // If structure extraction failed or was skipped, the process-document edge function
+    // handles basic text extraction + chunking + embedding via webhook
+
+    if (structureResult && !structureResult.success) {
       await supabase
         .from("documents")
         .update({
@@ -286,8 +259,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // If no structure result, the process-document edge function will handle
+    // basic processing (text extraction + chunking + embeddings) via webhook
+    if (!structureResult) {
+      console.log(
+        "[Document Process] No structure extraction - relying on process-document edge function",
+      );
+      return NextResponse.json({
+        success: true,
+        document_id,
+        message: "Document queued for processing via edge function",
+        sections_count: 0,
+        chunks_count: 0,
+      });
+    }
+
     // Idempotency: Delete existing sections and chunks for this document
-    // This allows re-processing documents without duplicates
     console.log("[Document Process] Clearing existing sections and chunks");
     await supabase
       .from("document_chunks")

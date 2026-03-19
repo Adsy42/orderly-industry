@@ -1,17 +1,16 @@
-import { v4 as uuidv4 } from "uuid";
 import { ReactNode, useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { cn } from "@/lib/utils";
-import { useStreamContext } from "@/providers/Stream";
+import {
+  useStreamContext,
+  type AppMessage,
+  type ContentBlock,
+} from "@/providers/Stream";
 import { useState, FormEvent } from "react";
 import { Button } from "../ui/button";
-import { Checkpoint, Message } from "@langchain/langgraph-sdk";
 import { AssistantMessage, AssistantMessageLoading } from "./messages/ai";
 import { HumanMessage } from "./messages/human";
-import {
-  DO_NOT_RENDER_ID_PREFIX,
-  ensureToolCallsHaveResponses,
-} from "@/lib/ensure-tool-responses";
+import { DO_NOT_RENDER_ID_PREFIX } from "@/lib/ensure-tool-responses";
 import { TooltipIconButton } from "./tooltip-icon-button";
 import {
   ArrowDown,
@@ -135,8 +134,6 @@ export function Thread() {
 
   const setThreadId = (id: string | null) => {
     _setThreadId(id);
-
-    // close artifact and reset artifact context
     closeArtifact();
     setArtifactContext({});
   };
@@ -148,12 +145,7 @@ export function Thread() {
     }
     try {
       const message = (stream.error as any).message;
-      if (!message || lastError.current === message) {
-        // Message has already been logged. do not modify ref, return early.
-        return;
-      }
-
-      // Message is defined, and it has not been logged yet. Save it, and send the error
+      if (!message || lastError.current === message) return;
       lastError.current = message;
       toast.error("An error occurred. Please try again.", {
         description: (
@@ -169,7 +161,6 @@ export function Thread() {
     }
   }, [stream.error]);
 
-  // TODO: this should be part of the useStream hook
   const prevMessageLength = useRef(0);
   useEffect(() => {
     if (
@@ -179,7 +170,6 @@ export function Thread() {
     ) {
       setFirstTokenReceived(true);
     }
-
     prevMessageLength.current = messages.length;
   }, [messages]);
 
@@ -190,7 +180,6 @@ export function Thread() {
         setDocumentName(null);
         return;
       }
-
       try {
         const supabase = createClient();
         const { data, error } = await supabase
@@ -198,19 +187,15 @@ export function Thread() {
           .select("filename")
           .eq("id", selectedDocumentId)
           .single();
-
         if (error || !data) {
-          console.error("Error fetching document:", error);
           setDocumentName(null);
         } else {
           setDocumentName(data.filename);
         }
-      } catch (err) {
-        console.error("Error fetching document name:", err);
+      } catch {
         setDocumentName(null);
       }
     }
-
     fetchDocumentName();
   }, [selectedDocumentId]);
 
@@ -220,90 +205,27 @@ export function Thread() {
       return;
     setFirstTokenReceived(false);
 
-    const newHumanMessage: Message = {
-      id: uuidv4(),
-      type: "human",
-      content: [
-        ...(input.trim().length > 0 ? [{ type: "text", text: input }] : []),
-        ...contentBlocks,
-      ] as Message["content"],
-    };
-
-    const toolMessages = ensureToolCallsHaveResponses(stream.messages);
-
-    // Build context including matter_id if selected
-    const matterContext = selectedMatterId
-      ? { matter_id: selectedMatterId }
-      : {};
-    const context =
-      Object.keys(artifactContext).length > 0 || selectedMatterId
-        ? { ...artifactContext, ...matterContext }
-        : undefined;
-
-    // Build context message so LLM can see the matter_id UUID and optional document_id
-    const contextMessages: Message[] = [];
+    // Build context prefix for the message
+    let contextPrefix = "";
     const selectedMatter = matters.find((m) => m.id === selectedMatterId);
     if (selectedMatter) {
-      let contextContent = `[CONTEXT] The user has selected matter "${selectedMatter.title}" (matter_id: ${selectedMatter.id}).`;
-
-      // Add document context if viewing a specific document
+      contextPrefix += `[CONTEXT] The user has selected matter "${selectedMatter.title}" (matter_id: ${selectedMatter.id}).`;
       if (selectedDocumentId && documentName) {
-        contextContent += `\nThe user is currently viewing document "${documentName}" (document_id: ${selectedDocumentId}).`;
+        contextPrefix += `\nThe user is currently viewing document "${documentName}" (document_id: ${selectedDocumentId}).`;
       }
-
-      // Add selected documents filter if any documents are specifically selected
       if (selectedDocumentIds.length > 0) {
-        contextContent += `\nThe user has selected specific documents to search: document_ids: [${selectedDocumentIds.map((id) => `"${id}"`).join(", ")}].`;
-        contextContent += `\nPass these document_ids to your tools to filter the search scope.`;
+        contextPrefix += `\nThe user has selected specific documents to search: document_ids: [${selectedDocumentIds.map((id) => `"${id}"`).join(", ")}].`;
+        contextPrefix += `\nPass these document_ids to your tools to filter the search scope.`;
       } else {
-        contextContent += `\nNo specific documents selected - search all documents in the matter.`;
+        contextPrefix += `\nNo specific documents selected - search all documents in the matter.`;
       }
-
-      contextMessages.push({
-        id: `${DO_NOT_RENDER_ID_PREFIX}context-${uuidv4()}`,
-        type: "system",
-        content: contextContent,
-      } as Message);
+      contextPrefix += "\n\n";
     }
 
-    stream.submit(
-      {
-        messages: [...toolMessages, ...contextMessages, newHumanMessage],
-        context,
-      },
-      {
-        streamMode: ["values"],
-        streamSubgraphs: true,
-        streamResumable: true,
-        optimisticValues: (prev) => ({
-          ...prev,
-          context,
-          messages: [
-            ...(prev.messages ?? []),
-            ...toolMessages,
-            ...contextMessages,
-            newHumanMessage,
-          ],
-        }),
-      },
-    );
-
+    const fullInput = contextPrefix + input;
+    stream.submit(fullInput, contentBlocks as ContentBlock[]);
     setInput("");
     setContentBlocks([]);
-  };
-
-  const handleRegenerate = (
-    parentCheckpoint: Checkpoint | null | undefined,
-  ) => {
-    // Do this so the loading state is correct
-    prevMessageLength.current = prevMessageLength.current - 1;
-    setFirstTokenReceived(false);
-    stream.submit(undefined, {
-      checkpoint: parentCheckpoint,
-      streamMode: ["values"],
-      streamSubgraphs: true,
-      streamResumable: true,
-    });
   };
 
   const chatStarted = !!threadId || !!messages.length;
@@ -441,20 +363,9 @@ export function Thread() {
                           key={message.id || `${message.type}-${index}`}
                           message={message}
                           isLoading={isLoading}
-                          handleRegenerate={handleRegenerate}
                         />
                       ),
                     )}
-                  {/* Special rendering case where there are no AI/tool messages, but there is an interrupt.
-                    We need to render it outside of the messages list, since there are no messages to render */}
-                  {hasNoAIOrToolMessages && !!stream.interrupt && (
-                    <AssistantMessage
-                      key="interrupt-msg"
-                      message={undefined}
-                      isLoading={isLoading}
-                      handleRegenerate={handleRegenerate}
-                    />
-                  )}
                   {isLoading && !firstTokenReceived && (
                     <AssistantMessageLoading />
                   )}
@@ -512,7 +423,6 @@ export function Thread() {
                               setSelectedMatterId(
                                 value === "none" ? "" : value,
                               );
-                              // Clear document selection when matter changes
                               setSelectedDocumentIds([]);
                             }}
                           >

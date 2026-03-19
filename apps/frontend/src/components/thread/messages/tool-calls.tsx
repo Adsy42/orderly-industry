@@ -1,4 +1,4 @@
-import { AIMessage, ToolMessage } from "@langchain/langgraph-sdk";
+import type { AppMessage, ToolCall } from "@/providers/Stream";
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { ChevronDown, ChevronUp } from "lucide-react";
@@ -10,7 +10,7 @@ function isComplexValue(value: any): boolean {
 export function ToolCalls({
   toolCalls,
 }: {
-  toolCalls: AIMessage["tool_calls"];
+  toolCalls: ToolCall[] | undefined;
 }) {
   if (!toolCalls || toolCalls.length === 0) return null;
 
@@ -65,25 +65,27 @@ export function ToolCalls({
   );
 }
 
-export function ToolResult({ message }: { message: ToolMessage }) {
+export function ToolResult({ message }: { message: AppMessage }) {
   const [isExpanded, setIsExpanded] = useState(false);
+
+  const rawContent =
+    typeof message.content === "string"
+      ? message.content
+      : JSON.stringify(message.content);
 
   let parsedContent: any;
   let isJsonContent = false;
 
   try {
-    if (typeof message.content === "string") {
-      parsedContent = JSON.parse(message.content);
-      isJsonContent = isComplexValue(parsedContent);
-    }
+    parsedContent = JSON.parse(rawContent);
+    isJsonContent = isComplexValue(parsedContent);
   } catch {
-    // Content is not JSON, use as is
-    parsedContent = message.content;
+    parsedContent = rawContent;
   }
 
   const contentStr = isJsonContent
     ? JSON.stringify(parsedContent, null, 2)
-    : String(message.content);
+    : String(rawContent);
   const contentLines = contentStr.split("\n");
   const shouldTruncate = contentLines.length > 4 || contentStr.length > 500;
   const displayedContent =
